@@ -1,0 +1,26 @@
+{
+  "source": "yfinance",
+  "codes": [
+    "TSLA.US",
+    "ARM.US",
+    "MU.US",
+    "SPY.US",
+    "IONQ.US",
+    "APLD.US"
+  ],
+  "start_date": "2024-08-01",
+  "end_date": "2026-07-11",
+  "initial_cash": 1000000,
+  "commission": 0.001,
+  "engine": "daily",
+  "extra_fields": null,
+  "strategy": {
+    "tuned_variant": "intraday",
+    "name": "2H_signal_4H_filter",
+    "interval": "1H",
+    "signal_tf": "2h",
+    "macd_htf": "4h",
+    "lookback": 20
+  },
+  "interval": "1H"
+}

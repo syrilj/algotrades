@@ -1,0 +1,21 @@
+{
+  "portfolio": {
+    "final_value": 2222914.3016290856,
+    "total_return": 1.2229143016290855,
+    "annual_return": 0.5168744586843881,
+    "max_drawdown": -0.275760276536684,
+    "sharpe": 1.154861470159241,
+    "calmar": 1.8744,
+    "sortino": 1.2611,
+    "win_rate": 0.553030303030303,
+    "profit_loss_ratio": 1.0644,
+    "profit_factor": 1.317,
+    "max_consecutive_loss": 7.0,
+    "avg_holding_days": 5.0,
+    "trade_count": 396.0,
+    "benchmark_return": 4.251131,
+    "excess_return": -3.028216,
+    "information_ratio": -0.8625
+  },
+  "note": "mom_pos+block_red_flag; soft_confidence=False; 1H 2024-08..2026-07"
+}

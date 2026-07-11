@@ -1,0 +1,22 @@
+{
+  "source": "yfinance",
+  "codes": [
+    "TSLA.US",
+    "ARM.US",
+    "MU.US",
+    "SPY.US",
+    "IONQ.US",
+    "APLD.US"
+  ],
+  "start_date": "2024-07-12",
+  "end_date": "2026-07-11",
+  "initial_cash": 1000000,
+  "commission": 0.001,
+  "engine": "daily",
+  "interval": "1H",
+  "extra_fields": null,
+  "strategy": {
+    "model_version": "v13_long_oos_1h_max",
+    "note": "Yahoo 1H hard cap ~730 days. This is max same-interval window vs v13 (2024-08-01). Not a true multi-year OOS. Caller: optional copy into runs/*/config.json; schema same as v13 config (source/codes/start_date/end_date YYYY-MM-DD/commission/engine/interval)."
+  }
+}

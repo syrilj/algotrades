@@ -1,0 +1,17 @@
+Build and iteratively improve this strategy using skill strategy-generate, then backtest.
+
+Strategy name: poc_va_macdha
+Existing draft: runs/poc_va_macdha/ (copy into the run_dir if needed)
+
+Logic:
+1. Prior-window Volume Profile (lookback bars, default 20): distribute volume across high-low into 25 bins.
+2. POC = max volume bin. Value Area = contiguous bins around POC covering 70% of volume → VAL/VAH.
+3. POC is support while close >= POC. When close loses POC, that POC is resistance — not a long base.
+4. Long only inside [VAL, VAH] while POC still holds, AND weekly Standardized MACD Heikin-Ashi is green.
+   St. MACD HA: macd=(EMA(src,12)-EMA(src,26))/EMA(high-low,26)*100 then Heikin-Ashi transform.
+5. Tuned exits: primarily when HTF HA is not green (POC/VAL hard exits optional).
+
+Config: yfinance, SPY.US, 2018-01-01 to 2026-07-11, cash 1e6, commission 0.001.
+
+Baseline tuned metrics to beat: Sharpe 0.64, total_return +70%, max_dd -21%, win_rate 68%.
+Iterate without lookahead. Report metrics.csv and best config.

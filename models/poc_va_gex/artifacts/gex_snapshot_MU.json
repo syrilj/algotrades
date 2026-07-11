@@ -1,0 +1,22 @@
+{
+  "ticker": "MU",
+  "spot": 979.2999877929688,
+  "asof_utc": "2026-07-11 18:05:29.912011",
+  "expiries_used": [
+    "2026-07-13",
+    "2026-07-17",
+    "2026-07-20"
+  ],
+  "net_dealer_gex": -532481704.851758,
+  "gex_sign": -1,
+  "regime": "negative_gex_amplify",
+  "call_wall": 1000.0,
+  "put_wall": 1000.0,
+  "dist_call_wall_pct": 2.113755995615042,
+  "dist_put_wall_pct": 2.113755995615042,
+  "approx_flip_strike": 5.0,
+  "otm_call_volume": 114630.0,
+  "otm_call_oi": 168487.0,
+  "n_contracts": 821,
+  "sign_convention": "dealer = -customer; customer assumed long calls and puts"
+}

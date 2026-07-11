@@ -1,0 +1,1230 @@
+#!/usr/bin/env python3
+"""Trade Desk — live setup tool for poc_va_macdha models.
+
+Usage:
+  python3 tools/trade_desk.py TSLA
+  python3 tools/trade_desk.py AAPL --model v12_regime_router
+  python3 tools/trade_desk.py MU --model auto
+  python3 tools/trade_desk.py rank
+  python3 tools/trade_desk.py rank --symbol TSLA
+  python3 tools/trade_desk.py rotate
+  python3 tools/trade_desk.py rotate --top 3
+  python3 tools/trade_desk.py picks --horizon day --model v14_risk_kelly
+"""
+from __future__ import annotations
+
+import argparse
+import importlib.util
+import json
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+import pandas as pd
+import yfinance as yf
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "tools"))
+from model_registry import (  # noqa: E402
+    DEFAULT_MODEL,
+    engine_path,
+    list_engine_models,
+    rank_models,
+    rank_models_for_symbol,
+    recommend_model,
+)
+
+DEFAULT_WATCH = [
+    # Mag7 + mega tech
+    "AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "META", "TSLA", "NFLX", "AVGO",
+    # Memory / semis
+    "MU", "SNDK", "WDC", "STX", "AMD", "TSM", "ARM", "SMH", "INTC", "QCOM", "MRVL", "ASML", "KLAC", "AMAT", "LRCX",
+    # Photonics / networking / optical
+    "COHR", "LITE", "AAOI", "CIEN", "ANET", "CRDO", "FN", "VRT", "GLW", "CSCO",
+    # Energy / power / uranium / grid
+    "XOM", "CVX", "COP", "SLB", "VST", "CEG", "FSLR", "ENPH", "XLE", "CCJ", "UEC", "OKLO", "NEE", "BE", "ETN",
+    # Space / defense
+    "RKLB", "ASTS", "PL", "LUNR", "BA", "LMT", "NOC", "RTX", "GE", "TDG", "AXON",
+    # Quantum
+    "IONQ", "RGTI", "QBTS", "QUBT",
+    # AI infra / software / cyber
+    "SMCI", "DELL", "HPE", "ORCL", "PLTR", "SNOW", "CRM", "NOW", "DDOG", "NET", "CRWD", "PANW", "ZS", "MDB",
+    # Banks / fintech
+    "JPM", "BAC", "GS", "MS", "SQ", "HOOD", "PYPL", "V", "MA",
+    # Biotech / healthcare
+    "LLY", "NVO", "UNH", "ISRG", "VKTX", "MRNA", "REGN",
+    # Metals / materials
+    "FCX", "NEM", "AA", "GLD", "SLV", "X",
+    # Consumer / retail
+    "COST", "WMT", "HD", "TJX", "NKE", "SBUX",
+    # Crypto / speculative beta
+    "COIN", "MSTR", "IBIT", "MARA",
+    # Index / sector ETFs
+    "SPY", "QQQ", "IWM", "ARKK", "XLF", "XBI", "URA", "XLE", "SMH", "XLK",
+]
+
+SECTORS = {
+    "mag7": ["AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "META", "TSLA", "NFLX", "AVGO"],
+    "memory": ["MU", "SNDK", "WDC", "STX", "AMD", "TSM", "ARM", "SMH", "INTC", "QCOM", "MRVL", "ASML", "KLAC", "AMAT", "LRCX"],
+    "photonics": ["COHR", "LITE", "AAOI", "CIEN", "ANET", "CRDO", "FN", "VRT", "GLW", "CSCO"],
+    "energy": ["XOM", "CVX", "COP", "SLB", "VST", "CEG", "FSLR", "ENPH", "XLE", "CCJ", "UEC", "OKLO", "NEE", "BE", "ETN"],
+    "space": ["RKLB", "ASTS", "PL", "LUNR", "BA", "LMT", "NOC", "RTX", "GE", "TDG", "AXON"],
+    "quantum": ["IONQ", "RGTI", "QBTS", "QUBT"],
+    "ai_infra": ["SMCI", "DELL", "HPE", "ORCL", "PLTR", "SNOW", "CRM", "NOW", "DDOG", "NET", "CRWD", "PANW", "ZS", "MDB"],
+    "banks": ["JPM", "BAC", "GS", "MS", "SQ", "HOOD", "PYPL", "V", "MA", "XLF"],
+    "biotech": ["LLY", "NVO", "UNH", "ISRG", "VKTX", "MRNA", "REGN", "XBI"],
+    "metals": ["FCX", "NEM", "AA", "GLD", "SLV", "X"],
+    "consumer": ["COST", "WMT", "HD", "TJX", "NKE", "SBUX"],
+    "crypto": ["COIN", "MSTR", "IBIT", "MARA"],
+    "beta": ["SPY", "QQQ", "IWM", "ARKK", "XLK"],
+}
+
+SECTOR_ETF = {
+    "mag7": "QQQ",
+    "memory": "SMH",
+    "photonics": None,
+    "energy": "XLE",
+    "space": None,
+    "quantum": None,
+    "ai_infra": "XLK",
+    "banks": "XLF",
+    "biotech": "XBI",
+    "metals": "GLD",
+    "consumer": None,
+    "crypto": "IBIT",
+    "beta": "SPY",
+}
+
+ROTATION_SECTORS = [
+    "mag7", "memory", "photonics", "energy", "space", "quantum",
+    "ai_infra", "banks", "biotech", "metals", "consumer", "crypto",
+]
+
+
+def _symbol_sector(sym: str) -> str:
+    s = _to_yf(sym)
+    for name, members in SECTORS.items():
+        if s in members:
+            return name
+    return "other"
+
+
+def _download_close(tickers: list[str], period: str = "6mo") -> pd.DataFrame:
+    """Adjusted close panel for tickers."""
+    data = yf.download(
+        tickers,
+        period=period,
+        interval="1d",
+        auto_adjust=True,
+        progress=False,
+        group_by="ticker",
+        threads=True,
+    )
+    if data is None or data.empty:
+        return pd.DataFrame()
+    if len(tickers) == 1:
+        t = tickers[0]
+        if "Close" in data.columns:
+            return pd.DataFrame({t: data["Close"]})
+        # single multiindex?
+        return pd.DataFrame({t: data.iloc[:, 0]})
+    closes = {}
+    for t in tickers:
+        try:
+            if isinstance(data.columns, pd.MultiIndex):
+                if t in data.columns.get_level_values(0):
+                    s = data[t]["Close"] if "Close" in data[t].columns else data[t].iloc[:, 0]
+                else:
+                    continue
+            else:
+                s = data["Close"] if "Close" in data.columns else data.iloc[:, 0]
+            closes[t] = s
+        except Exception:  # noqa: BLE001
+            continue
+    out = pd.DataFrame(closes).dropna(how="all")
+    return out
+
+
+def _basket_series(members: list[str], period: str = "6mo") -> pd.Series:
+    """Equal-weight basket total-return index from members."""
+    closes = _download_close(members, period=period)
+    if closes.empty:
+        return pd.Series(dtype=float)
+    rets = closes.pct_change().fillna(0.0)
+    basket = (1.0 + rets.mean(axis=1)).cumprod()
+    basket.name = "basket"
+    return basket
+
+
+def rank_sector_flows(period: str = "6mo") -> list[dict[str, Any]]:
+    """Rank thematic sectors by where money is rotating (RS vs SPY + trend)."""
+    spy = _download_close(["SPY"], period=period)
+    if spy.empty:
+        raise RuntimeError("Could not download SPY for sector rotation")
+    spy_px = spy.iloc[:, 0].dropna()
+
+    rows = []
+    for sec in ROTATION_SECTORS:
+        etf = SECTOR_ETF.get(sec)
+        members = [m for m in SECTORS[sec] if m not in ("SPY", "QQQ", "IWM", "ARKK")]
+        try:
+            if etf:
+                px = _download_close([etf], period=period).iloc[:, 0].dropna()
+                proxy = etf
+            else:
+                px = _basket_series(members[:8], period=period)  # cap for speed
+                proxy = f"basket({len(members[:8])})"
+            if px.empty or len(px) < 25:
+                continue
+            # align
+            joined = pd.concat([px.rename("sec"), spy_px.rename("spy")], axis=1).dropna()
+            if len(joined) < 25:
+                continue
+            sec_px = joined["sec"]
+            spy_a = joined["spy"]
+            ret_5 = float(sec_px.iloc[-1] / sec_px.iloc[-6] - 1) if len(sec_px) > 6 else 0.0
+            ret_20 = float(sec_px.iloc[-1] / sec_px.iloc[-21] - 1) if len(sec_px) > 21 else 0.0
+            spy_5 = float(spy_a.iloc[-1] / spy_a.iloc[-6] - 1) if len(spy_a) > 6 else 0.0
+            spy_20 = float(spy_a.iloc[-1] / spy_a.iloc[-21] - 1) if len(spy_a) > 21 else 0.0
+            rs_5 = ret_5 - spy_5
+            rs_20 = ret_20 - spy_20
+            ma20 = float(sec_px.tail(20).mean())
+            above_ma = float(sec_px.iloc[-1] > ma20)
+            # recent acceleration
+            ret_1 = float(sec_px.iloc[-1] / sec_px.iloc[-2] - 1) if len(sec_px) > 2 else 0.0
+            # flow score: weight near-term RS hardest (money rotating NOW)
+            flow = 0.45 * rs_5 + 0.35 * rs_20 + 0.10 * ret_1 + 0.10 * (0.02 if above_ma else -0.02)
+            rows.append(
+                {
+                    "sector": sec,
+                    "proxy": proxy,
+                    "ret_5d": round(ret_5, 4),
+                    "ret_20d": round(ret_20, 4),
+                    "rs_vs_spy_5d": round(rs_5, 4),
+                    "rs_vs_spy_20d": round(rs_20, 4),
+                    "above_ma20": bool(above_ma),
+                    "flow_score": round(flow, 4),
+                    "members": members,
+                }
+            )
+        except Exception as exc:  # noqa: BLE001
+            rows.append({"sector": sec, "error": str(exc), "flow_score": -9.0, "members": members})
+
+    rows.sort(key=lambda r: r.get("flow_score", -9), reverse=True)
+    for i, r in enumerate(rows, 1):
+        r["rank"] = i
+    return rows
+
+
+def rotate_picks(
+    account: float,
+    risk_pct: float,
+    horizon: str,
+    model: str,
+    top_n: int = 3,
+) -> dict[str, Any]:
+    """1) Rank sector money flow  2) Scan stocks in top N  3) Return picks."""
+    all_flows_sorted = rank_sector_flows()
+    top = [r for r in all_flows_sorted if "error" not in r][:top_n]
+    symbols: list[str] = []
+    for sec in top:
+        symbols.extend(sec.get("members") or [])
+    seen = set()
+    symbols = [s for s in symbols if not (s in seen or seen.add(s))]
+    print(f"Top sectors: {', '.join(t['sector'] for t in top)}", flush=True)
+    print(f"Scanning {len(symbols)} leaders in those sectors…", flush=True)
+    stock_rows = scan_picks(symbols, account, risk_pct, horizon, model=model)
+    sec_rank = {r["sector"]: r["rank"] for r in top}
+    for row in stock_rows:
+        row["sector_flow_rank"] = sec_rank.get(row.get("sector"), 99)
+    return {
+        "sector_flows": all_flows_sorted,
+        "top_sectors": top,
+        "stock_picks": stock_rows,
+        "scanned": symbols,
+    }
+
+
+def _print_rotate(payload: dict, horizon: str) -> None:
+    flows = payload.get("sector_flows") or []
+    top = payload.get("top_sectors") or []
+    stocks = payload.get("stock_picks") or []
+
+    print()
+    print("=" * 72)
+    print("  STEP 1 — WHERE IS MONEY FLOWING?  (sector rotation vs SPY)")
+    print("=" * 72)
+    print(f"  {'#':<3} {'sector':<12} {'5d':>7} {'20d':>7} {'RS5d':>7} {'RS20d':>7} {'flow':>7}  proxy")
+    for r in flows:
+        if "error" in r:
+            print(f"  {r.get('rank','?'):<3} {r['sector']:<12}  ERROR {r['error'][:40]}")
+            continue
+        mark = " <<<" if r in top or r.get("sector") in {t["sector"] for t in top} else ""
+        print(
+            f"  {r['rank']:<3} {r['sector']:<12} "
+            f"{r['ret_5d']:>6.1%} {r['ret_20d']:>6.1%} "
+            f"{r['rs_vs_spy_5d']:>6.1%} {r['rs_vs_spy_20d']:>6.1%} "
+            f"{r['flow_score']:>7.3f}  {r.get('proxy','')}{mark}"
+        )
+
+    top_names = [t["sector"] for t in top]
+    print()
+    print("=" * 72)
+    print(f"  STEP 2 — TOP {len(top_names)} SECTORS → scan leaders: {', '.join(top_names)}")
+    print("=" * 72)
+
+    buy = [r for r in stocks if r.get("setup_kind") in ("classic_buy", "breakout_buy") or r.get("setup_ok")]
+    breakouts = [r for r in stocks if r.get("setup_kind") == "breakout_watch" or r.get("action") == "BREAKOUT WATCH"]
+    pullbacks = [r for r in stocks if r.get("setup_kind") == "pullback_watch" or r.get("action") == "PULLBACK ZONE"]
+    almost = [
+        r for r in stocks
+        if r.get("action") in ("WAIT", "WAIT (almost ready)")
+        and "error" not in r
+        and r.get("confidence", 0) >= 0.65
+    ]
+
+    print("\n  BUY NOW / BUY BREAKOUT (from hot sectors)")
+    if not buy:
+        print("    None live — check BREAKOUT WATCH + PULLBACK ZONE below.")
+    for r in buy[:12]:
+        tag = "BREAKOUT" if r.get("setup_kind") == "breakout_buy" else "CLASSIC"
+        print(
+            f"    [{tag}] {r['symbol']:<5} [{r.get('sector'):<9}]  "
+            f"~${r['price']:.2f}  stop ${r['stop']:.2f}  "
+            f"risk ${r['dollar_risk']:.0f}  conf {r['confidence']:.0%}"
+        )
+
+    print("\n  ABOUT TO BREAK OUT (set buy-stop alerts)")
+    if not breakouts:
+        print("    None pressing highs in top sectors right now.")
+    for r in breakouts[:12]:
+        lvl = r.get("breakout_level")
+        tip = f"buy-stop > ${lvl:.2f}" if lvl else (r.get("do_next") or "")[:70]
+        print(
+            f"    {r['symbol']:<5} [{r.get('sector'):<9}]  "
+            f"${r['price']:.2f}  conf {r['confidence']:.0%}  → {tip}"
+        )
+
+    print("\n  PULLBACK ZONE (trend ok — wait for dip into value)")
+    if not pullbacks:
+        print("    (none)")
+    for r in pullbacks[:10]:
+        tip = (r.get("do_next") or "")[:80]
+        print(f"    {r['symbol']:<5} [{r.get('sector'):<9}]  ${r['price']:.2f}  → {tip}")
+
+    print("\n  OTHER HIGH-CONF WAIT (by sector)")
+    for sec in top_names:
+        bucket = [r for r in almost if r.get("sector") == sec]
+        buy_sec = [r for r in buy if r.get("sector") == sec]
+        bo_sec = [r for r in breakouts if r.get("sector") == sec]
+        print(f"    — {sec} —")
+        shown = buy_sec[:2] + bo_sec[:2] + bucket[:2]
+        if not shown:
+            print("      (no high-conf names right now)")
+            continue
+        for r in shown[:5]:
+            status = r.get("action") or ("BUY" if r.get("setup_ok") else "WAIT")
+            tip = (r.get("do_next") or "")[:75]
+            print(f"      [{status}] {r['symbol']:<5} ${r['price']:.2f}  conf {r['confidence']:.0%}  → {tip}")
+
+    print("\n  What this means")
+    print("    1) Money is rotating hardest into the sectors marked <<< above")
+    print("    2) BUY / BUY BREAKOUT = trade now (breakout = smaller size)")
+    print("    3) BREAKOUT WATCH = almost breaking — set alerts, don't chase early")
+    print("    4) PULLBACK ZONE = good names, wait for value-area dip")
+    print("    5) Drill in:  .venv/bin/python3 tools/trade_desk.py TICKER")
+    print("=" * 72)
+    print()
+
+_PRIOR_WR = {
+    "TSLA": 0.56, "ARM": 0.60, "MU": 0.59, "SPY": 0.56,
+    "IONQ": 0.74, "APLD": 0.75, "QQQ": 0.55, "AAPL": 0.55,
+}
+
+
+def _resolve_model(model_arg: str, symbol: str | None = None) -> tuple[str, dict[str, Any]]:
+    arg = (model_arg or DEFAULT_MODEL).strip()
+    if arg in ("auto", "best"):
+        rec = recommend_model(symbol)
+        return rec["model"], rec
+    if arg not in list_engine_models():
+        raise SystemExit(
+            f"Unknown model '{arg}'. Engines: {', '.join(list_engine_models())}"
+        )
+    return arg, {"model": arg, "reason": "user-selected"}
+
+
+def _load_engine(model: str):
+    path = engine_path(model)
+    spec = importlib.util.spec_from_file_location(f"poc_va_{model}", path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"Cannot load engine: {path}")
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _fallback_kelly(conf: float, atr_pct: float, med_atr_pct: float, kelly_fraction: float = 0.5) -> float:
+    if conf < 0.55 or not np.isfinite(conf):
+        return 0.0
+    if conf < 0.65:
+        base = 0.35
+    elif conf < 0.78:
+        base = 0.65
+    else:
+        base = 1.0
+    base *= float(np.clip(kelly_fraction / 0.5, 0.5, 1.0))
+    vol_scale = float(np.clip(med_atr_pct / max(atr_pct, 1e-9), 0.4, 1.25))
+    return float(np.clip(base * vol_scale, 0.25, 1.0))
+
+
+def _to_yf(symbol: str) -> str:
+    s = symbol.strip().upper()
+    for suf in (".US", ".us"):
+        if s.endswith(suf):
+            s = s[: -len(suf)]
+    return s
+
+
+def _to_code(symbol: str) -> str:
+    s = _to_yf(symbol)
+    return f"{s}.US"
+
+
+def _fetch_ohlcv(symbol: str, period: str = "60d", interval: str = "1h") -> pd.DataFrame:
+    ysym = _to_yf(symbol)
+    raw = yf.download(ysym, period=period, interval=interval, auto_adjust=True, progress=False)
+    if raw is None or raw.empty:
+        raise ValueError(f"No data for {ysym}")
+    if isinstance(raw.columns, pd.MultiIndex):
+        raw.columns = [c[0].lower() if isinstance(c, tuple) else str(c).lower() for c in raw.columns]
+    else:
+        raw.columns = [str(c).lower() for c in raw.columns]
+    need = ["open", "high", "low", "close", "volume"]
+    for c in need:
+        if c not in raw.columns:
+            raise ValueError(f"Missing column {c} for {ysym}")
+    df = raw[need].copy()
+    df.index = pd.to_datetime(df.index)
+    if getattr(df.index, "tz", None) is not None:
+        df.index = df.index.tz_localize(None)
+    return df.dropna(subset=["close"])
+
+
+def _compute_state(mod, code: str, df: pd.DataFrame, model_name: str) -> dict[str, Any]:
+    eng = mod.SignalEngine()
+    # routers expose _cfg(code); plain engines use defaults via __dict__/getattr
+    if hasattr(eng, "_cfg"):
+        cfg = eng._cfg(code)
+    else:
+        cfg = {k: getattr(eng, k) for k in dir(eng) if not k.startswith("_") and not callable(getattr(eng, k, None))}
+        # common attrs
+        for k in (
+            "value_area_pct", "profile_rows", "profile_lookback", "macd_fast", "macd_slow",
+            "macd_signal", "macd_htf", "signal_tf", "require_htf_green", "require_vwap_uptrend",
+            "require_above_vwap", "require_volume_expand", "require_vol_confirm", "block_red_flag",
+            "block_dump", "require_sqz_release", "require_mom_pos", "require_mom_pos_inc",
+            "allow_healthy_pull_entry", "exit_on_poc_break", "exit_on_val_break", "exit_below_vwap",
+            "exit_on_sqz_neg", "soft_confidence", "swing_period", "vol_look", "vol_sma",
+            "min_confidence", "stop_atr", "trail_atr", "arm_trail_atr", "kelly_fraction",
+        ):
+            if hasattr(eng, k):
+                cfg[k] = getattr(eng, k)
+
+    signal_tf = cfg.get("signal_tf", "2h") or ""
+    frame = mod._resample_ohlcv(df, signal_tf) if signal_tf else df
+    if frame.empty:
+        frame = df
+
+    profile_lookback = int(cfg.get("profile_lookback", 20))
+    profile_rows = int(cfg.get("profile_rows", 25))
+    value_area_pct = float(cfg.get("value_area_pct", 0.7))
+    macd_fast = int(cfg.get("macd_fast", 12))
+    macd_slow = int(cfg.get("macd_slow", 26))
+    macd_signal = int(cfg.get("macd_signal", 9))
+    macd_htf = cfg.get("macd_htf", "4h")
+    swing_period = int(cfg.get("swing_period", 50))
+    vol_look = int(cfg.get("vol_look", 5))
+    vol_sma = int(cfg.get("vol_sma", 20))
+    stop_atr = float(cfg.get("stop_atr", 1.5))
+    trail_atr = float(cfg.get("trail_atr", 2.5))
+    arm_trail_atr = float(cfg.get("arm_trail_atr", 1.0))
+    kelly_fraction = float(cfg.get("kelly_fraction", 0.5))
+    min_confidence = float(cfg.get("min_confidence", 0.55))
+
+    levels = mod._prior_session_profile(frame, profile_lookback, profile_rows, value_area_pct)
+    close = frame["close"]
+    high = frame["high"]
+    low = frame["low"]
+    poc, vah, val = levels["poc"], levels["vah"], levels["val"]
+    poc_ok = (close >= poc) & poc.notna()
+    in_va = (close >= val) & (close <= vah) & val.notna()
+    # htf helper signatures differ slightly across versions
+    try:
+        htf = mod._htf_ha_green(frame, macd_htf, macd_fast, macd_slow, macd_signal)
+    except TypeError:
+        htf = mod._htf_ha_green(frame, macd_htf, {"macd_fast": macd_fast, "macd_slow": macd_slow, "macd_signal": macd_signal})
+    if hasattr(mod, "dynamic_swing_anchored_vwap"):
+        swing = mod.dynamic_swing_anchored_vwap(frame, swing_period)
+    else:
+        swing = pd.DataFrame({"vwap": close, "uptrend": True}, index=frame.index)
+    vwap = swing["vwap"].shift(1)
+    uptrend = swing["uptrend"].shift(1).fillna(False).astype(bool)
+    above_vwap = (close >= vwap).fillna(False)
+    if hasattr(mod, "volume_price_state"):
+        vp = mod.volume_price_state(frame, vol_look, vol_sma)
+    else:
+        vp = pd.DataFrame({
+            "confirm_up": True, "healthy_pull": False, "red_flag_up": False,
+            "dump": False, "vol_expand": True,
+        }, index=frame.index)
+    if hasattr(mod, "squeeze_momentum"):
+        sqz = mod.squeeze_momentum(frame)
+    else:
+        sqz = pd.DataFrame({
+            "mom_pos": True, "mom_pos_inc": False, "mom_neg": False,
+            "sqz_off": True, "sqz_release": False,
+        }, index=frame.index)
+
+    parts = {
+        "poc_hold": poc_ok,
+        "in_value_area": in_va,
+        "htf_ha_green": htf,
+        "vwap_uptrend": uptrend,
+        "above_vwap": above_vwap,
+        "vol_confirm_or_pull": vp["confirm_up"] | vp["healthy_pull"],
+        "not_red_flag": ~vp["red_flag_up"],
+        "mom_pos": sqz["mom_pos"],
+        "sqz_off_or_release": sqz["sqz_off"] | sqz["sqz_release"],
+    }
+    conf = sum(p.astype(float) for p in parts.values()) / float(len(parts))
+
+    prev_close = close.shift(1).fillna(close)
+    tr = pd.concat([(high - low), (high - prev_close).abs(), (low - prev_close).abs()], axis=1).max(axis=1)
+    atr = tr.ewm(span=14, adjust=False).mean()
+    atr_pct = (atr / close.replace(0, np.nan)).fillna(0.0)
+    med_atr_pct = float(atr_pct.replace(0, np.nan).median()) or 0.02
+
+    gates = [poc_ok, in_va]
+    if cfg.get("require_htf_green", True):
+        gates.append(htf)
+    if cfg.get("require_vwap_uptrend", False):
+        gates.append(uptrend)
+    if cfg.get("require_above_vwap", False):
+        gates.append(above_vwap)
+    if cfg.get("require_volume_expand", False):
+        gates.append(vp["vol_expand"])
+    if cfg.get("require_vol_confirm", False):
+        gates.append(vp["confirm_up"] | (cfg.get("allow_healthy_pull_entry", False) & vp["healthy_pull"] & above_vwap))
+    if cfg.get("block_red_flag", False):
+        gates.append(~vp["red_flag_up"])
+    if cfg.get("block_dump", False):
+        gates.append(~vp["dump"])
+    if cfg.get("require_sqz_release", False):
+        gates.append(sqz["sqz_release"] | sqz["sqz_off"])
+    if cfg.get("require_mom_pos", False):
+        gates.append(sqz["mom_pos"])
+    if cfg.get("require_mom_pos_inc", False):
+        gates.append(sqz["mom_pos_inc"])
+    long_hard = gates[0]
+    for g in gates[1:]:
+        long_hard = long_hard & g
+
+    i = -1
+    px = float(close.iloc[i])
+    a = float(atr.iloc[i]) if np.isfinite(atr.iloc[i]) else px * 0.01
+    c = float(conf.iloc[i])
+    hard = bool(long_hard.iloc[i])
+    kelly_fn = getattr(mod, "_kelly_size", _fallback_kelly)
+    sleeve = float(kelly_fn(c, float(atr_pct.iloc[i]), med_atr_pct, kelly_fraction))
+    setup_ok = hard and c >= min_confidence and sleeve > 0
+
+    part_flags = {k: bool(v.iloc[i]) for k, v in parts.items()}
+    missing = [k for k, ok in part_flags.items() if not ok]
+
+    prior = _PRIOR_WR.get(_to_yf(code), 0.55)
+    # prefer historical WR for this model+symbol if available
+    hist = rank_models_for_symbol(code, engines_only=False)
+    hist_row = next((r for r in hist if r["model"] == model_name), None)
+    if hist_row:
+        prior = float(hist_row["win_rate"])
+    conf_prob = float(np.clip(0.35 + c * 0.45, 0.40, 0.78))
+    hit_prob = float(np.clip(0.55 * conf_prob + 0.45 * prior, 0.40, 0.80))
+
+    stop = px - stop_atr * a
+    arm = px + arm_trail_atr * a
+    trail_dist = trail_atr * a
+    atr_i = a if a > 0 else px * 0.01
+
+    # --- Structure: VOLUME first, then EMA22 (drawdowns), EMA200 (regime) ---
+    # Sector rotation = which pond. Volume + EMAs = when to cast.
+    ema22 = close.ewm(span=22, adjust=False).mean()
+    ema200 = close.ewm(span=200, adjust=False).mean()
+    e22 = float(ema22.iloc[i])
+    e200 = float(ema200.iloc[i]) if len(close) >= 180 and np.isfinite(ema200.iloc[i]) else None
+    above_22 = bool(np.isfinite(e22) and px >= e22)
+    above_200 = True if e200 is None else bool(px >= e200)
+    lost_200 = e200 is not None and not above_200
+    dist_22_atr = (px - e22) / atr_i if np.isfinite(e22) else 0.0
+    # Healthy drawdown: tagging 22 EMA from above while 200 structure intact
+    near_22_pull = above_200 and (-0.15 <= dist_22_atr <= 0.55)
+    reclaim_200 = False
+    if e200 is not None and len(close) > 2:
+        prev_below = float(close.iloc[i - 1]) < float(ema200.iloc[i - 1])
+        reclaim_200 = (not lost_200) and prev_below
+
+    vol = frame["volume"]
+    vol_sma20 = vol.rolling(20, min_periods=5).mean()
+    vs = float(vol_sma20.iloc[i]) if np.isfinite(vol_sma20.iloc[i]) and float(vol_sma20.iloc[i]) > 0 else 1.0
+    rvol = float(vol.iloc[i]) / vs
+    vol_rising = bool(float(vol.iloc[i]) > float(vol.iloc[i - 5])) if len(vol) > 5 else False
+    vol_expand = bool(vp["vol_expand"].iloc[i])
+    vol_confirm = bool(vp["confirm_up"].iloc[i])
+    vol_dry = bool(vp["red_flag_up"].iloc[i]) or (rvol < 0.75 and not vol_rising)
+    vol_awake = (rvol >= 1.0) or vol_expand or vol_rising or vol_confirm
+    # Real breakouts are volume events — price follows participation
+    vol_surge = (rvol >= 1.35) or (vol_expand and vol_rising) or (vol_confirm and rvol >= 1.1)
+    healthy_dip_vol = bool(vp["healthy_pull"].iloc[i])
+
+    hh20 = float(high.rolling(20, min_periods=5).max().iloc[i])
+    dist_high_atr = (hh20 - px) / atr_i
+    pressing_high = dist_high_atr <= 0.45
+    vah_v = float(vah.iloc[i]) if np.isfinite(vah.iloc[i]) else None
+    near_vah = False
+    just_broke_vah = False
+    if vah_v is not None and vah_v > 0:
+        near_vah = (px >= vah_v * 0.982) and (px <= vah_v * 1.008)
+        just_broke_vah = (px > vah_v) and (px <= vah_v + 0.85 * atr_i)
+    coiling = float(atr_pct.iloc[i]) < med_atr_pct * 0.92
+    sqz_ready = bool(sqz["sqz_release"].iloc[i] or sqz["sqz_off"].iloc[i] or sqz["mom_pos"].iloc[i])
+    trend_ok = bool(htf.iloc[i]) and bool(above_vwap.iloc[i]) and bool(part_flags.get("not_red_flag", True))
+    structure_ok = bool(part_flags.get("poc_hold", False)) or pressing_high
+
+    breakout_buy = (
+        above_200
+        and not vol_dry
+        and vol_surge  # PRIMARY gate
+        and (just_broke_vah or pressing_high)
+        and bool(sqz["mom_pos"].iloc[i])
+        and trend_ok
+        and c >= 0.55
+    )
+    breakout_ready = (
+        (not breakout_buy)
+        and above_200
+        and not vol_dry
+        and vol_awake
+        and structure_ok
+        and (pressing_high or near_vah or (coiling and (near_vah or pressing_high)))
+        and sqz_ready
+        and trend_ok
+        and c >= 0.50
+    )
+    pullback_to_22 = (
+        (not setup_ok)
+        and near_22_pull
+        and above_200
+        and trend_ok
+        and c >= 0.58
+        and (healthy_dip_vol or "in_value_area" in missing)
+    )
+
+    if breakout_buy:
+        sleeve = max(float(sleeve), 0.35) * 0.75
+
+    # Lost 200 EMA = structural break; only volume-led reclaim is an exception
+    if lost_200 and not (reclaim_200 and vol_surge):
+        setup_kind = "structural_break"
+    elif setup_ok and (above_200 or e200 is None):
+        setup_kind = "classic_buy"
+    elif breakout_buy:
+        setup_kind = "breakout_buy"
+    elif breakout_ready:
+        setup_kind = "breakout_watch"
+    elif pullback_to_22 or ("in_value_area" in missing and c >= 0.60 and trend_ok and above_200):
+        setup_kind = "pullback_watch"
+    elif (not part_flags.get("not_red_flag", True)) or (vol_dry and pressing_high):
+        setup_kind = "avoid"
+    else:
+        setup_kind = "wait"
+
+    if setup_kind == "structural_break":
+        hit_prob = float(np.clip(hit_prob - 0.12, 0.30, 0.55))
+    elif setup_kind not in ("classic_buy", "breakout_buy"):
+        hit_prob = float(np.clip(hit_prob - 0.08, 0.35, 0.70))
+    elif setup_kind == "breakout_buy":
+        hit_prob = float(np.clip(hit_prob - 0.03, 0.38, 0.75))
+
+    breakout_level = None
+    if np.isfinite(hh20) and (just_broke_vah or (vah_v is not None and px >= vah_v) or pressing_high):
+        breakout_level = round(hh20, 4)
+    elif vah_v is not None:
+        breakout_level = round(vah_v, 4)
+    elif np.isfinite(hh20):
+        breakout_level = round(hh20, 4)
+
+    part_flags = {
+        **part_flags,
+        "vol_surge": vol_surge,
+        "vol_awake": vol_awake,
+        "not_vol_dry": not vol_dry,
+        "above_ema22": above_22,
+        "above_ema200": above_200,
+        "near_ema22": near_22_pull,
+    }
+
+    return {
+        "model": model_name,
+        "symbol": _to_yf(code),
+        "code": code,
+        "asof": str(frame.index[i]),
+        "interval": signal_tf or "1h",
+        "htf": macd_htf,
+        "price": round(px, 4),
+        "atr": round(a, 4),
+        "poc": None if not np.isfinite(poc.iloc[i]) else round(float(poc.iloc[i]), 4),
+        "val": None if not np.isfinite(val.iloc[i]) else round(float(val.iloc[i]), 4),
+        "vah": None if not np.isfinite(vah.iloc[i]) else round(float(vah.iloc[i]), 4),
+        "vwap": None if not np.isfinite(vwap.iloc[i]) else round(float(vwap.iloc[i]), 4),
+        "ema22": round(e22, 4) if np.isfinite(e22) else None,
+        "ema200": round(e200, 4) if e200 is not None else None,
+        "rvol": round(rvol, 2),
+        "vol_surge": vol_surge,
+        "vol_awake": vol_awake,
+        "vol_dry": vol_dry,
+        "above_ema22": above_22,
+        "above_ema200": above_200,
+        "near_ema22": near_22_pull,
+        "lost_200": lost_200,
+        "reclaim_200": reclaim_200,
+        "confidence": round(c, 3),
+        "min_confidence": min_confidence,
+        "setup_ok": setup_kind in ("classic_buy", "breakout_buy"),
+        "setup_kind": setup_kind,
+        "breakout_ready": breakout_ready,
+        "breakout_buy": breakout_buy,
+        "breakout_level": breakout_level,
+        "pressing_high": pressing_high,
+        "coiling": coiling,
+        "hard_gates_ok": hard,
+        "sleeve_fraction": round(float(sleeve), 3),
+        "hit_probability": round(hit_prob, 3),
+        "prior_wr": prior,
+        "flags": part_flags,
+        "missing": missing,
+        "entry": round(px, 4) if setup_kind in ("classic_buy", "breakout_buy") else None,
+        "stop": round(stop, 4),
+        "stop_atr_mult": stop_atr,
+        "trail_arm": round(arm, 4),
+        "trail_atr_mult": trail_atr,
+        "trail_distance": round(trail_dist, 4),
+        "risk_per_share": round(max(px - stop, 0.01), 4),
+        "routing_notes": {
+            "require_mom_pos": bool(cfg.get("require_mom_pos", False)),
+            "require_above_vwap": bool(cfg.get("require_above_vwap", False)),
+            "exit_below_vwap": bool(cfg.get("exit_below_vwap", False)),
+            "block_red_flag": bool(cfg.get("block_red_flag", False)),
+        },
+    }
+
+
+def _position_math(state: dict, account: float, risk_pct: float) -> dict[str, Any]:
+    risk_budget = account * risk_pct
+    rps = float(state["risk_per_share"])
+    shares_by_risk = int(risk_budget // rps) if rps > 0 else 0
+    # sleeve caps notional
+    sleeve = float(state["sleeve_fraction"])
+    max_notional = account * sleeve if sleeve > 0 else 0.0
+    px = float(state["price"])
+    shares_by_sleeve = int(max_notional // px) if px > 0 else 0
+    shares = min(shares_by_risk, shares_by_sleeve) if state["setup_ok"] else 0
+    if not state["setup_ok"]:
+        # still show what risk would look like IF you forced entry
+        shares = min(shares_by_risk, int((account * max(sleeve, 0.25)) // px)) if px > 0 else 0
+        forced = True
+    else:
+        forced = False
+    notional = shares * px
+    dollar_risk = shares * rps
+    # Reward proxy: trail arm distance as first target
+    reward = max(float(state["trail_arm"]) - px, rps)
+    rr = reward / rps if rps > 0 else 0.0
+    return {
+        "account": account,
+        "risk_pct": risk_pct,
+        "risk_budget": round(risk_budget, 2),
+        "shares": shares,
+        "notional": round(notional, 2),
+        "dollar_risk": round(dollar_risk, 2),
+        "reward_to_arm": round(reward, 4),
+        "rr_to_arm": round(rr, 2),
+        "forced_preview": forced,
+    }
+
+
+def analyze(
+    symbol: str,
+    account: float,
+    risk_pct: float,
+    period: str = "60d",
+    model: str = DEFAULT_MODEL,
+) -> dict[str, Any]:
+    model_name, selection = _resolve_model(model, symbol)
+    mod = _load_engine(model_name)
+    code = _to_code(symbol)
+    df = _fetch_ohlcv(symbol, period=period, interval="1h")
+    state = _compute_state(mod, code, df, model_name)
+    sizing = _position_math(state, account, risk_pct)
+    symbol_ranks = rank_models_for_symbol(symbol, engines_only=False)[:8]
+    return {
+        "model": model_name,
+        "model_selection": selection,
+        "state": state,
+        "sizing": sizing,
+        "model_ranks_for_symbol": symbol_ranks,
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+def scan_picks(
+    symbols: list[str],
+    account: float,
+    risk_pct: float,
+    horizon: str,
+    model: str = DEFAULT_MODEL,
+) -> list[dict[str, Any]]:
+    rows = []
+    for sym in symbols:
+        try:
+            out = analyze(sym, account, risk_pct, model=model)
+            st, sz = out["state"], out["sizing"]
+            kind = st.get("setup_kind") or ("classic_buy" if st["setup_ok"] else "wait")
+            kind_mult = {
+                "classic_buy": 1.0,
+                "breakout_buy": 0.88,
+                "breakout_watch": 0.62,
+                "pullback_watch": 0.42,
+                "wait": 0.28,
+                "avoid": 0.10,
+            }.get(kind, 0.30)
+            score = st["hit_probability"] * kind_mult * max(st["sleeve_fraction"], 0.25)
+            if horizon == "week":
+                score *= (1.05 if st["flags"].get("mom_pos") else 0.9)
+                score *= (1.05 if st["flags"].get("htf_ha_green") else 0.85)
+            if st.get("pressing_high") or st.get("breakout_ready"):
+                score *= 1.08
+            best = (out.get("model_ranks_for_symbol") or [{}])[0]
+            plan = _plain_plan(st)
+            rows.append({
+                "symbol": st["symbol"],
+                "sector": _symbol_sector(sym),
+                "model": out["model"],
+                "best_hist_model": best.get("model"),
+                "best_hist_score": best.get("score"),
+                "setup_ok": st["setup_ok"],
+                "setup_kind": kind,
+                "breakout_level": st.get("breakout_level"),
+                "pressing_high": st.get("pressing_high"),
+                "price": st["price"],
+                "entry": st["entry"],
+                "stop": st["stop"],
+                "confidence": st["confidence"],
+                "hit_probability": st["hit_probability"],
+                "sleeve": st["sleeve_fraction"],
+                "shares": sz["shares"],
+                "dollar_risk": sz["dollar_risk"],
+                "rr_to_arm": sz["rr_to_arm"],
+                "missing": st["missing"][:3],
+                "action": plan["action"],
+                "do_next": plan["do_next"],
+                "score": round(score, 4),
+            })
+        except Exception as exc:  # noqa: BLE001
+            rows.append({"symbol": _to_yf(sym), "error": str(exc), "score": -1, "setup_ok": False})
+    rows.sort(key=lambda r: r.get("score", -1), reverse=True)
+    return rows
+
+
+_FLAG_LABELS = {
+    "poc_hold": "Holding above POC (support)",
+    "in_value_area": "Inside value area (not chasing)",
+    "htf_ha_green": "Bigger-timeframe trend is up",
+    "vwap_uptrend": "VWAP trend is up",
+    "above_vwap": "Price is above VWAP",
+    "vol_confirm_or_pull": "Volume confirms the move",
+    "not_red_flag": "Not a weak rally (vol drying up)",
+    "mom_pos": "Momentum is positive",
+    "sqz_off_or_release": "Squeeze released / not crushed",
+}
+
+_MISSING_DO = {
+    "in_value_area": "Do NOT buy here — price is extended above the value area. Wait for a pullback toward VAH/VAL.",
+    "poc_hold": "Do NOT buy — price lost POC support. Wait for a reclaim of POC.",
+    "htf_ha_green": "Do NOT buy — bigger-timeframe trend is not green yet. Wait for HTF flip up.",
+    "vwap_uptrend": "Wait for VWAP to turn up (or skip if your model requires it).",
+    "above_vwap": "Wait for price to get back above VWAP before entry.",
+    "vol_confirm_or_pull": "Wait for volume to expand with price (or a quiet healthy pullback).",
+    "not_red_flag": "AVOID for now — price rising on dying volume (trap risk).",
+    "mom_pos": "Wait for momentum to turn positive.",
+    "sqz_off_or_release": "Wait for squeeze release / momentum expansion.",
+}
+
+
+def _plain_plan(state: dict) -> dict[str, Any]:
+    """Turn gates into a simple action a human can follow."""
+    missing = list(state.get("missing") or [])
+    flags = state.get("flags") or {}
+    conf = float(state.get("confidence") or 0)
+    kind = state.get("setup_kind") or ("classic_buy" if state.get("setup_ok") else "wait")
+    lvl = state.get("breakout_level")
+    vah = state.get("vah")
+    val = state.get("val")
+
+    if kind == "classic_buy":
+        action = "BUY NOW"
+        why = "Pullback-in-value setup is live. Use the size/stop below."
+        do_next = (
+            f"Buy around ${state['price']:.2f}. "
+            f"Hard stop ${state['stop']:.2f}. "
+            f"If it runs to ${state['trail_arm']:.2f}, trail under the high."
+        )
+    elif kind == "breakout_buy":
+        action = "BUY BREAKOUT"
+        why = "Just breaking / pressing highs with trend + volume — take smaller size."
+        do_next = (
+            f"Buy around ${state['price']:.2f} (½–¾ normal size). "
+            f"Stop ${state['stop']:.2f}. "
+            f"Invalid if it fails back under {f'VAH ${lvl:.2f}' if lvl else 'breakout level'}."
+        )
+    elif kind == "breakout_watch":
+        action = "BREAKOUT WATCH"
+        why = "Coiling near highs / value top — about to break out if it clears the level."
+        trigger = f"${lvl:.2f}" if lvl else "the 20-bar high"
+        px = float(state.get("price") or 0)
+        if lvl and px >= float(lvl) * 0.998:
+            do_next = (
+                f"Already pressing ${px:.2f}. Hold / buy only on a volume push through {trigger}; "
+                f"abort if it fails under ${state['stop']:.2f}."
+            )
+        else:
+            do_next = (
+                f"Set a buy-stop / alert above {trigger}. "
+                f"Only enter on a close through with volume; stop under ${state['stop']:.2f}."
+            )
+    elif kind == "pullback_watch":
+        action = "PULLBACK ZONE"
+        why = "Trend is fine but price is chasing above value — wait for a dip."
+        if vah is not None and val is not None:
+            do_next = (
+                f"Alert near VAH ${vah:.2f} or VAL ${val:.2f}. "
+                f"Buy the pullback if HTF stays green — don't chase ${state['price']:.2f}."
+            )
+        else:
+            do_next = _MISSING_DO["in_value_area"]
+    elif kind == "avoid" or not flags.get("not_red_flag", True):
+        action = "AVOID"
+        why = "Weak rally: price up while volume fades — easy trap."
+        do_next = "Stand aside until volume confirms or price resets into value."
+    elif "poc_hold" in missing:
+        action = "WAIT"
+        why = "Support (POC) is broken."
+        do_next = _MISSING_DO["poc_hold"]
+    elif len(missing) <= 2 and conf >= 0.65:
+        action = "WAIT (almost ready)"
+        why = f"Only {len(missing)} check(s) left — close, but not a green light yet."
+        do_next = " ".join(_MISSING_DO.get(m, m) for m in missing[:2])
+    else:
+        action = "WAIT"
+        why = "Several required conditions are off."
+        do_next = " ".join(_MISSING_DO.get(m, m) for m in missing[:3]) if missing else "Re-check later."
+
+    checklist = [
+        {"ok": bool(flags.get(k)), "label": _FLAG_LABELS.get(k, k), "key": k}
+        for k in _FLAG_LABELS
+    ]
+    return {
+        "action": action,
+        "why": why,
+        "do_next": do_next,
+        "checklist": checklist,
+        "confidence_note": (
+            f"Confidence {conf:.0%} = how many quality checks are green. "
+            f"Actions: BUY NOW / BUY BREAKOUT = trade; BREAKOUT WATCH = alert; "
+            f"PULLBACK ZONE / WAIT = stand aside."
+        ),
+    }
+
+
+def _print_analyze(payload: dict) -> None:
+    st, sz = payload["state"], payload["sizing"]
+    plan = _plain_plan(st)
+    sel = payload.get("model_selection") or {}
+
+    print()
+    print("=" * 64)
+    print(f"  {st['symbol']}   >>>  {plan['action']}  <<<")
+    print("=" * 64)
+    print(f"  Why:     {plan['why']}")
+    print(f"  Do this: {plan['do_next']}")
+    print(f"  Model:   {payload.get('model')}  ({sel.get('reason', 'selected')})")
+    print(f"  Time:    {st['asof']}")
+    print("-" * 64)
+    print("  NUMBERS")
+    print(f"    Price now     ${st['price']:.2f}")
+    print(f"    Confidence    {st['confidence']:.0%}   ← {plan['confidence_note']}")
+    print(f"    Chance (est.) {st['hit_probability']:.0%}   based on this model’s past win-rate + live checks")
+    if plan["action"] in ("BUY NOW", "BUY BREAKOUT"):
+        print(f"    Buy around    ${st['entry']:.2f}")
+        print(f"    Stop loss     ${st['stop']:.2f}  (about ${st['risk_per_share']:.2f}/share)")
+        print(f"    First target  ${st['trail_arm']:.2f} then trail winners")
+        print(f"    Shares        {sz['shares']}   (~${sz['notional']:,.0f})")
+        print(f"    Cash at risk  ${sz['dollar_risk']:,.2f}  ({sz['risk_pct']:.0%} of ${sz['account']:,.0f})")
+        if plan["action"] == "BUY BREAKOUT":
+            print("    Note          Breakout size is smaller (½–¾ sleeve)")
+    else:
+        print(f"    If you forced it anyway (don't): stop ${st['stop']:.2f}, preview {sz['shares']} sh / ${sz['dollar_risk']:.0f} risk")
+        if st.get("val") is not None and st.get("vah") is not None:
+            print(f"    Value zone    ${st['val']:.2f}  →  ${st['vah']:.2f}   (POC ${st.get('poc')})")
+        if st.get("breakout_level") is not None:
+            print(f"    Breakout lvl  ${st['breakout_level']:.2f}   (buy-stop / alert)")
+        if st.get("vwap") is not None:
+            print(f"    VWAP          ${st['vwap']:.2f}")
+    print("-" * 64)
+    print("  CHECKLIST  (green = good)")
+    for row in plan["checklist"]:
+        mark = "YES" if row["ok"] else "NO "
+        print(f"    [{mark}]  {row['label']}")
+    print("-" * 64)
+    print("  WHAT TO DO IN PLAIN ENGLISH")
+    if plan["action"] in ("BUY NOW", "BUY BREAKOUT"):
+        print("    1) Enter near the price above")
+        print("    2) Place the stop immediately")
+        print("    3) Let winners run with the trail; cut losers at the stop")
+    elif plan["action"] == "BREAKOUT WATCH":
+        print(f"    1) {plan['do_next']}")
+        print("    2) Do not chase early — wait for the break + volume")
+        print("    3) Re-run this command once the alert fires")
+    elif plan["action"] == "PULLBACK ZONE":
+        print(f"    1) {plan['do_next']}")
+        print("    2) Prefer buying the dip into value, not the extension")
+    elif plan["action"] == "AVOID":
+        print("    1) Skip this name today")
+        print("    2) Re-run the desk later or pick another symbol from `picks` / `rotate`")
+    else:
+        print(f"    1) {plan['do_next']}")
+        print("    2) Re-run this command after the alert/condition hits")
+        print("    3) Or run:  .venv/bin/python3 tools/trade_desk.py rotate --top 5")
+    ranks = payload.get("model_ranks_for_symbol") or []
+    if ranks:
+        print("-" * 64)
+        print("  BEST MODELS FOR THIS STOCK (past backtests)")
+        for r in ranks[:3]:
+            print(
+                f"    #{r['rank']} {r['model']:<20} "
+                f"won {r['win_rate']:.0%} of trades, Sharpe {r['sharpe']:.2f}"
+            )
+        print("    Tip: retry with  --model auto  to use #1 engine for this name")
+    print("=" * 64)
+    print()
+
+
+def _print_rank(rows: list[dict], title: str) -> None:
+    print()
+    print("=" * 78)
+    print(f"  {title}")
+    print("=" * 78)
+    print(f"  {'#':<3} {'model':<22} {'score':>6} {'WR':>6} {'Sh':>6} {'PF':>6} {'DD':>7} {'ret':>7}")
+    for r in rows[:15]:
+        print(
+            f"  {r['rank']:<3} {r['model']:<22} {r['score']:>6.3f} "
+            f"{r['win_rate']:>5.0%} {r['sharpe']:>6.2f} {r['profit_factor']:>6.2f} "
+            f"{r['max_drawdown']:>7.1%} {r['total_return']:>7.1%}"
+        )
+    print("-" * 78)
+    print(f"  Default: {DEFAULT_MODEL}   Engines: {', '.join(list_engine_models())}")
+    print("=" * 78)
+    print()
+
+
+def _print_picks(rows: list[dict], horizon: str) -> None:
+    print()
+    print("=" * 72)
+    print(f"  SECTOR LEADERS — {horizon.upper()}  ({len(rows)} names scanned)")
+    print("=" * 72)
+    playable = [r for r in rows if r.get("setup_kind") in ("classic_buy", "breakout_buy") or r.get("setup_ok")]
+    breakouts = [r for r in rows if r.get("setup_kind") == "breakout_watch" or r.get("action") == "BREAKOUT WATCH"]
+    pullbacks = [r for r in rows if r.get("setup_kind") == "pullback_watch" or r.get("action") == "PULLBACK ZONE"]
+    almost = [
+        r for r in rows
+        if not r.get("setup_ok") and "error" not in r
+        and r.get("confidence", 0) >= 0.65
+        and r.get("action") in ("WAIT", "WAIT (almost ready)")
+    ]
+    avoid = [r for r in rows if r.get("action") == "AVOID"]
+
+    print("\n  BUY NOW / BUY BREAKOUT")
+    if not playable:
+        print("    None live — use BREAKOUT WATCH + PULLBACK ZONE.")
+    for r in playable[:12]:
+        tag = "BREAKOUT" if r.get("setup_kind") == "breakout_buy" else "CLASSIC"
+        print(
+            f"    [{tag}] {r['symbol']:<5} [{r.get('sector','?'):<9}]  "
+            f"~${r['price']:.2f}  stop ${r['stop']:.2f}  "
+            f"risk ${r['dollar_risk']:.0f}  conf {r['confidence']:.0%}  "
+            f"est.win {r['hit_probability']:.0%}"
+        )
+
+    print("\n  ABOUT TO BREAK OUT (set buy-stop alerts)")
+    if not breakouts:
+        print("    (none)")
+    for r in breakouts[:15]:
+        lvl = r.get("breakout_level")
+        tip = f"buy-stop > ${lvl:.2f}" if lvl else (r.get("do_next") or "")[:80]
+        print(
+            f"    {r['symbol']:<5} [{r.get('sector','?'):<9}]  "
+            f"${r['price']:.2f}  conf {r['confidence']:.0%}  → {tip}"
+        )
+
+    print("\n  PULLBACK ZONE (wait for dip into value)")
+    if not pullbacks:
+        print("    (none)")
+    for r in pullbacks[:12]:
+        tip = (r.get("do_next") or "")[:85]
+        print(f"    {r['symbol']:<5} [{r.get('sector','?'):<9}]  ${r['price']:.2f}  → {tip}")
+
+    print("\n  OTHER HIGH-CONF WAIT")
+    by_sec: dict[str, list] = {}
+    for r in almost:
+        by_sec.setdefault(r.get("sector", "other"), []).append(r)
+    shown = 0
+    for sec in [
+        "memory", "photonics", "energy", "space", "quantum", "mag7",
+        "ai_infra", "banks", "biotech", "metals", "consumer", "crypto", "beta", "other",
+    ]:
+        bucket = by_sec.get(sec) or []
+        if not bucket:
+            continue
+        print(f"    — {sec} —")
+        for r in bucket[:3]:
+            tip = (r.get("do_next") or "")[:90]
+            print(
+                f"      {r['symbol']:<5} ${r['price']:.2f}  conf {r['confidence']:.0%}  "
+                f"→ {tip}"
+            )
+            shown += 1
+        if shown >= 18:
+            break
+    if shown == 0:
+        print("    (none)")
+
+    if avoid:
+        print("\n  AVOID right now")
+        for r in avoid[:8]:
+            print(f"    {r['symbol']:<5} [{r.get('sector','?'):<9}]  {r.get('do_next','')[:80]}")
+
+    print("\n  How to use")
+    print("    • BUY NOW / BUY BREAKOUT = take trade (breakout = smaller size)")
+    print("    • BREAKOUT WATCH = about to break — set buy-stop alerts")
+    print("    • PULLBACK ZONE = good trend, wait for value-area dip")
+    print("    • Drill in:  .venv/bin/python3 tools/trade_desk.py TICKER")
+    print("=" * 72)
+    print()
+
+
+def main(argv: list[str] | None = None) -> int:
+    p = argparse.ArgumentParser(description="POC/VA trade desk (multi-model)")
+    p.add_argument("command", nargs="?", help="Symbol, 'picks', 'rotate', or 'rank'")
+    p.add_argument("--account", type=float, default=100_000, help="Account equity (default 100000)")
+    p.add_argument("--risk-pct", type=float, default=0.01, help="Max risk fraction per trade (default 1%%)")
+    p.add_argument("--horizon", choices=["day", "week"], default="day", help="For picks/rotate: day or week")
+    p.add_argument("--top", type=int, default=5, help="For rotate: how many hot sectors to dig into")
+    p.add_argument("--symbols", type=str, default="", help="Comma watchlist for picks")
+    p.add_argument(
+        "--sectors",
+        type=str,
+        default="",
+        help="Comma sectors for picks: mag7,memory,photonics,energy,space,quantum,ai_infra,banks,biotech,metals,consumer,crypto,beta",
+    )
+    p.add_argument(
+        "--model",
+        type=str,
+        default=DEFAULT_MODEL,
+        help=f"Model engine ({'/'.join(list_engine_models())}) or 'auto'",
+    )
+    p.add_argument("--symbol", type=str, default="", help="For rank: rank models on this symbol")
+    p.add_argument("--engines-only", action="store_true", help="For rank: only runnable engines")
+    p.add_argument("--json", action="store_true", help="Print raw JSON")
+    p.add_argument("--period", type=str, default="60d", help="yfinance lookback period")
+    args = p.parse_args(argv)
+
+    if not args.command:
+        p.print_help()
+        print("\nExamples:")
+        print("  python3 tools/trade_desk.py TSLA --account 50000")
+        print("  python3 tools/trade_desk.py MU --model auto")
+        print("  python3 tools/trade_desk.py rank")
+        print("  python3 tools/trade_desk.py rank --symbol IONQ")
+        print("  python3 tools/trade_desk.py rotate")
+        print("  python3 tools/trade_desk.py rotate --top 5 --horizon day")
+        print("  python3 tools/trade_desk.py picks --horizon week --model v14_risk_kelly")
+        return 0
+
+    cmd = args.command.strip().lower()
+    if cmd == "rank":
+        if args.symbol:
+            rows = rank_models_for_symbol(args.symbol, engines_only=args.engines_only)
+            title = f"MODEL RANK ON {args.symbol.upper()}  (hist backtest)"
+        else:
+            rows = rank_models(engines_only=args.engines_only)
+            title = "OVERALL MODEL RANK  (portfolio hist)"
+        if args.json:
+            print(json.dumps(rows, indent=2))
+        else:
+            _print_rank(rows, title)
+        return 0
+
+    if cmd == "rotate":
+        payload = rotate_picks(
+            args.account, args.risk_pct, args.horizon, args.model, top_n=max(1, args.top)
+        )
+        if args.json:
+            print(json.dumps(payload, indent=2, default=str))
+        else:
+            _print_rotate(payload, args.horizon)
+        return 0
+
+    if cmd == "picks":
+        if args.symbols.strip():
+            symbols = [s.strip() for s in args.symbols.split(",") if s.strip()]
+        elif args.sectors.strip():
+            symbols = []
+            for sec in args.sectors.split(","):
+                sec = sec.strip().lower()
+                if sec not in SECTORS:
+                    raise SystemExit(f"Unknown sector '{sec}'. Choose: {', '.join(SECTORS)}")
+                symbols.extend(SECTORS[sec])
+            # unique
+            seen = set()
+            symbols = [s for s in symbols if not (s in seen or seen.add(s))]
+        else:
+            symbols = list(DEFAULT_WATCH)
+        print(f"Scanning {len(symbols)} names…", flush=True)
+        rows = scan_picks(symbols, args.account, args.risk_pct, args.horizon, model=args.model)
+        if args.json:
+            print(json.dumps({"horizon": args.horizon, "model": args.model, "picks": rows}, indent=2))
+        else:
+            _print_picks(rows, args.horizon)
+        return 0
+
+    payload = analyze(args.command, args.account, args.risk_pct, period=args.period, model=args.model)
+    if args.json:
+        print(json.dumps(payload, indent=2, default=str))
+    else:
+        _print_analyze(payload)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

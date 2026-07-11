@@ -1,0 +1,34 @@
+{
+  "source": "yfinance",
+  "codes": [
+    "TSLA.US",
+    "ARM.US",
+    "MU.US",
+    "SPY.US",
+    "IONQ.US",
+    "APLD.US"
+  ],
+  "start_date": "2024-08-01",
+  "end_date": "2026-07-11",
+  "initial_cash": 1000000,
+  "commission": 0.001,
+  "engine": "daily",
+  "interval": "1H",
+  "extra_fields": null,
+  "strategy": {
+    "model_version": "v16_meta_risk",
+    "note": "v16: v15 meta-XGB gate/size thr=0.6 + v14 Kelly/ATR risk (stop=1.5 trail=2.5 arm=1.0 half-Kelly vol-scale)",
+    "meta_oos": {
+      "avg_lift_hit": 0.0243,
+      "avg_lift_exp": 0.0074,
+      "n_folds": 2
+    },
+    "risk": {
+      "stop_atr": 1.5,
+      "trail_atr": 2.5,
+      "arm_trail_atr": 1.0,
+      "kelly_fraction": 0.5,
+      "sizing": "meta_bucket_then_half_kelly_vol_scaled"
+    }
+  }
+}

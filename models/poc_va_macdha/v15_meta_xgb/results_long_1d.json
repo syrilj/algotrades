@@ -1,0 +1,23 @@
+{
+  "model": "v15_meta_xgb",
+  "window": "2020-01-01..2026-07-11",
+  "interval": "1D",
+  "portfolio": {
+    "final_value": 1966160.6155677263,
+    "total_return": 0.9661606155677264,
+    "annual_return": 0.1096145751004584,
+    "max_drawdown": -0.2216445118566128,
+    "sharpe": 0.7506203192627566,
+    "calmar": 0.4946,
+    "sortino": 0.6639,
+    "win_rate": 0.5641025641025641,
+    "profit_loss_ratio": 1.315,
+    "profit_factor": 1.7018,
+    "max_consecutive_loss": 5.0,
+    "avg_holding_days": 3.8,
+    "trade_count": 156.0,
+    "benchmark_return": 16.752364,
+    "excess_return": -15.786203,
+    "information_ratio": -1.0374
+  }
+}

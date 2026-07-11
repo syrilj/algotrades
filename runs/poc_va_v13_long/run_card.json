@@ -1,0 +1,109 @@
+{
+  "artifacts": [
+    {
+      "path": "artifacts/equity.csv",
+      "sha256": "a48c9002f2ff7ead71d4366e2d7011a3b63c89b7d368ea57add8a0f5a06156e6",
+      "size_bytes": 165484
+    },
+    {
+      "path": "artifacts/metrics.csv",
+      "sha256": "276bc844ce7ff93fb4be3685e35b1f6e64ee60cde52c7651659b09196dce311e",
+      "size_bytes": 395
+    },
+    {
+      "path": "artifacts/ohlcv_APLD.US.csv",
+      "sha256": "d38d26897fffed2889fdde91fde024b980dff58bb00aedbd90889ecc50312fe6",
+      "size_bytes": 97235
+    },
+    {
+      "path": "artifacts/ohlcv_ARM.US.csv",
+      "sha256": "4de442d7d6d697af966e528429de512c62c807f94dea807c26f85467e955fc83",
+      "size_bytes": 62796
+    },
+    {
+      "path": "artifacts/ohlcv_IONQ.US.csv",
+      "sha256": "11b73be0da2f18eedda94ef446bd1e10f352d1e969baf88bcadf7503e4d73c27",
+      "size_bytes": 126178
+    },
+    {
+      "path": "artifacts/ohlcv_MU.US.csv",
+      "sha256": "2917b78eba2f57da11bdde1cc58328e1e335e5096cc015220e796f031dcba6c5",
+      "size_bytes": 145896
+    },
+    {
+      "path": "artifacts/ohlcv_SPY.US.csv",
+      "sha256": "34a3d3284e1965498bbf43d8cb31e6ca84021e3bacb16ce14e5eb534eaca5b79",
+      "size_bytes": 147868
+    },
+    {
+      "path": "artifacts/ohlcv_TSLA.US.csv",
+      "sha256": "2acebce1ac79a1d934f4c754a10c5bf47ef22b3f6945eef375d0fa8efb9aef0a",
+      "size_bytes": 148059
+    },
+    {
+      "path": "artifacts/positions.csv",
+      "sha256": "bf9fdabc93ffb55af2c3f4708618e010348d812ee06dad1c58280e9c2d31643c",
+      "size_bytes": 58464
+    },
+    {
+      "path": "artifacts/trades.csv",
+      "sha256": "4b02b10c8bb5890f5b170c8f36d8dbec2e335eeb32c4c62eb6e679dfcd73caa0",
+      "size_bytes": 24291
+    },
+    {
+      "path": "code/signal_engine.py",
+      "sha256": "53da0d9a31f5950d52908db66adbb97036911d811090cd3006f59f9e80fc1ade",
+      "size_bytes": 20185
+    },
+    {
+      "path": "config.json",
+      "sha256": "2a9f2d86b10697a21b4e425a206829d32f7c8e4de48e2896768b0c468773458d",
+      "size_bytes": 1020
+    }
+  ],
+  "backtest": {
+    "codes": [
+      "TSLA.US",
+      "ARM.US",
+      "MU.US",
+      "SPY.US",
+      "IONQ.US",
+      "APLD.US"
+    ],
+    "end_date": "2026-07-11",
+    "engine": "daily",
+    "initial_cash": 1000000,
+    "interval": "1D",
+    "source": "yfinance",
+    "start_date": "2020-01-01"
+  },
+  "data_sources": [
+    "yfinance"
+  ],
+  "generated_at": "2026-07-11T17:51:47.244785Z",
+  "metrics": {
+    "annual_return": 0.08466028563909611,
+    "avg_holding_days": 3.8,
+    "benchmark_return": 16.752364,
+    "calmar": 0.2351,
+    "excess_return": -16.056429,
+    "final_value": 1695935.3908432226,
+    "information_ratio": -1.0038,
+    "max_consecutive_loss": 7,
+    "max_drawdown": -0.3601052535102024,
+    "profit_factor": 1.2386,
+    "profit_loss_ratio": 1.2143,
+    "sharpe": 0.446065723662057,
+    "sortino": 0.4187,
+    "total_return": 0.6959353908432226,
+    "trade_count": 202,
+    "win_rate": 0.504950495049505
+  },
+  "reproducibility": {
+    "config_hash": "2a9f2d86b10697a21b4e425a206829d32f7c8e4de48e2896768b0c468773458d",
+    "strategy_hash": "53da0d9a31f5950d52908db66adbb97036911d811090cd3006f59f9e80fc1ade"
+  },
+  "run_dir": "/Users/syriljacob/Desktop/TradingAlgoWork/runs/poc_va_v13_long",
+  "schema_version": "0.1",
+  "warnings": []
+}

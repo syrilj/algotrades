@@ -1,0 +1,21 @@
+{
+  "name": "ionq_A_4h_v8",
+  "interval": "4H",
+  "final_value": 2795721.197309877,
+  "total_return": 1.7957211973098768,
+  "annual_return": 0.7107821895760056,
+  "max_drawdown": -0.16757200174799314,
+  "sharpe": 1.5483843625829317,
+  "calmar": 4.2417,
+  "sortino": 1.2906,
+  "win_rate": 0.7419354838709677,
+  "profit_loss_ratio": 1.3246,
+  "profit_factor": 3.8083,
+  "max_consecutive_loss": 2,
+  "avg_holding_days": 3.1,
+  "trade_count": 31,
+  "benchmark_return": 4.657652,
+  "excess_return": -2.86193,
+  "information_ratio": -0.8843,
+  "score": 0.7887093356454471
+}

@@ -1,0 +1,21 @@
+{
+  "name": "apld_B_full_stack",
+  "interval": "1H",
+  "final_value": 1940618.3782951164,
+  "total_return": 0.9406183782951163,
+  "annual_return": 0.41314009205877733,
+  "max_drawdown": -0.26701530534230045,
+  "sharpe": 1.3515994357278018,
+  "calmar": 1.5473,
+  "sortino": 0.432,
+  "win_rate": 0.8125,
+  "profit_loss_ratio": 1.4479,
+  "profit_factor": 6.2743,
+  "max_consecutive_loss": 1,
+  "avg_holding_days": 7.9,
+  "trade_count": 16,
+  "benchmark_return": 5.639659,
+  "excess_return": -4.69904,
+  "information_ratio": -1.1045,
+  "score": 0.8064499294659753
+}

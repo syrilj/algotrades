@@ -1,0 +1,128 @@
+{
+  "winner": "v15_regime_specialists",
+  "selection_rule": "0.35*WR + 0.25*sharpe_norm + 0.25*(1+DD) + 0.15*PF_norm; DD weighted per LSE drawdown analysis",
+  "scores": {
+    "v13_specialists": 0.49212930822073186,
+    "v14_risk_kelly": 0.6144769476146936,
+    "v15_regime_specialists": 0.7142472141629467
+  },
+  "comparison": {
+    "v13_specialists": {
+      "win_rate": 0.59,
+      "sharpe": 1.0804619596476694,
+      "max_drawdown": -0.43447675366629573,
+      "total_return": 1.0561824413852912,
+      "profit_factor": 1.4456,
+      "trade_count": 200
+    },
+    "v14_risk_kelly": {
+      "win_rate": 0.6108597285067874,
+      "sharpe": 1.722017858842625,
+      "max_drawdown": -0.23960678239826902,
+      "total_return": 2.5241560104415637,
+      "profit_factor": 1.7887,
+      "trade_count": 221
+    },
+    "v15_regime_specialists": {
+      "win_rate": 0.6385542168674698,
+      "sharpe": 1.778859482831906,
+      "max_drawdown": -0.17516020790663947,
+      "total_return": 1.1731664620733175,
+      "profit_factor": 3.6348,
+      "trade_count": 83,
+      "calmar": 2.8492,
+      "max_consecutive_loss": 3
+    }
+  },
+  "per_symbol_v15": [
+    {
+      "code": "APLD.US",
+      "n": 9,
+      "wr": 0.8888888888888888,
+      "avg_ret": 5.014444444444445,
+      "sum_pnl": 316839.7269
+    },
+    {
+      "code": "ARM.US",
+      "n": 9,
+      "wr": 0.4444444444444444,
+      "avg_ret": -0.9266666666666666,
+      "sum_pnl": -120034.3287
+    },
+    {
+      "code": "IONQ.US",
+      "n": 6,
+      "wr": 0.8333333333333334,
+      "avg_ret": 3.793333333333333,
+      "sum_pnl": 212558.81729999997
+    },
+    {
+      "code": "MU.US",
+      "n": 37,
+      "wr": 0.6216216216216216,
+      "avg_ret": 1.875135135135135,
+      "sum_pnl": 613439.2054
+    },
+    {
+      "code": "SPY.US",
+      "n": 7,
+      "wr": 0.5714285714285714,
+      "avg_ret": 0.024285714285714282,
+      "sum_pnl": 2871.478099999999
+    },
+    {
+      "code": "TSLA.US",
+      "n": 15,
+      "wr": 0.6,
+      "avg_ret": 1.1333333333333333,
+      "sum_pnl": 147491.5634
+    }
+  ],
+  "regime_proof": {
+    "gate": "gate_qqq_trend",
+    "apply_to": "non_SPY",
+    "oos_wr": 0.7272727272727273,
+    "oos_lift_wr": 0.08763308763308764,
+    "train_lift_wr": 0.054545454545454564,
+    "train_retention": 0.4,
+    "path": "runs/poc_va_regime/artifacts/REGIME_PROOF.json"
+  },
+  "portfolio": {
+    "annual_return": 0.4990723799325847,
+    "avg_holding_days": 7.7,
+    "benchmark_return": 3.485542,
+    "calmar": 2.8492,
+    "excess_return": -2.312376,
+    "final_value": 2173166.4620733177,
+    "information_ratio": -0.9395,
+    "max_consecutive_loss": 3,
+    "max_drawdown": -0.17516020790663947,
+    "profit_factor": 3.6348,
+    "profit_loss_ratio": 2.0575,
+    "sharpe": 1.778859482831906,
+    "sortino": 1.328,
+    "total_return": 1.1731664620733175,
+    "trade_count": 83,
+    "win_rate": 0.6385542168674698
+  },
+  "anti_overfit": [
+    "binary/structural gates only",
+    "gate chosen on train half only",
+    "OOS test must show WR lift and stable expectancy",
+    "no continuous threshold grid search"
+  ],
+  "lse_reference": "https://londonstrategicedge.com/machine-learning/risk-management/drawdown-analysis/",
+  "universe": [
+    "TSLA.US",
+    "ARM.US",
+    "MU.US",
+    "SPY.US",
+    "IONQ.US",
+    "APLD.US"
+  ],
+  "regime_ref": [
+    "QQQ.US"
+  ],
+  "window": "2024-08-01..2026-07-11",
+  "note": "v15 = v14 half-Kelly/ATR + QQQ trend gate on non-SPY. Fewer trades by design (regime filter). Absolute return below v14; risk-adjusted WR/Sharpe/DD/PF dominate."
+}

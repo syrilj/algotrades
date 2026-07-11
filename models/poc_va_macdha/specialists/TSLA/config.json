@@ -1,0 +1,43 @@
+{
+  "source": "yfinance",
+  "codes": [
+    "TSLA.US"
+  ],
+  "start_date": "2024-08-01",
+  "end_date": "2026-07-11",
+  "initial_cash": 1000000,
+  "commission": 0.001,
+  "engine": "daily",
+  "interval": "1H",
+  "strategy": {
+    "specialist": "tsla_F_lb30_block",
+    "value_area_pct": 0.7,
+    "profile_rows": 25,
+    "profile_lookback": 30,
+    "macd_fast": 12,
+    "macd_slow": 26,
+    "macd_signal": 9,
+    "macd_htf": "4h",
+    "signal_tf": "2h",
+    "require_htf_green": true,
+    "require_vwap_uptrend": false,
+    "require_above_vwap": false,
+    "require_volume_expand": false,
+    "require_vol_confirm": true,
+    "block_red_flag": true,
+    "block_dump": true,
+    "require_sqz_release": false,
+    "require_mom_pos": false,
+    "require_mom_pos_inc": false,
+    "allow_healthy_pull_entry": false,
+    "exit_on_poc_break": false,
+    "exit_on_val_break": false,
+    "exit_below_vwap": false,
+    "exit_on_sqz_neg": false,
+    "soft_confidence": false,
+    "swing_period": 50,
+    "vol_look": 3,
+    "vol_sma": 20,
+    "min_confidence": 0.6
+  }
+}

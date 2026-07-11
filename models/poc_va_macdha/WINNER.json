@@ -1,0 +1,26 @@
+{
+  "winner": "v15_meta_xgb",
+  "selection_rule": "PASS_BAR + best portfolio Sharpe/PF/DD among engines on 2024-08..2026-07 window; meta-gate on v13 specialists",
+  "updated_at": "2026-07-11T18:09:28Z",
+  "caveat": "Booster trained full-sample; WF candidate proxy still shows positive lift. Long OOS of raw v13 FAILED \u2014 meta+size is the active edge claim.",
+  "portfolio": {
+    "final_value": 2305064.079643825,
+    "total_return": 1.305064079643825,
+    "annual_return": 0.545859302486791,
+    "max_drawdown": -0.13240206158555437,
+    "sharpe": 2.128009651762961,
+    "calmar": 4.1227,
+    "sortino": 2.0161,
+    "win_rate": 0.6230769230769231,
+    "profit_loss_ratio": 1.6193,
+    "profit_factor": 2.6768,
+    "max_consecutive_loss": 4,
+    "avg_holding_days": 12.9,
+    "trade_count": 130,
+    "benchmark_return": 4.251131,
+    "excess_return": -2.946067,
+    "information_ratio": -1.1095
+  },
+  "previous_winner": "v13_specialists",
+  "pass_bar": true
+}

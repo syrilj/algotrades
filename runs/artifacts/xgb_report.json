@@ -1,0 +1,87 @@
+{
+  "symbols": [
+    {
+      "folds": [],
+      "edge": false,
+      "code": "SPY.US",
+      "n_candidates": 57
+    },
+    {
+      "folds": [],
+      "edge": false,
+      "code": "QQQ.US",
+      "n_candidates": 68
+    },
+    {
+      "folds": [],
+      "edge": false,
+      "code": "AAPL.US",
+      "n_candidates": 104
+    },
+    {
+      "folds": [],
+      "edge": false,
+      "code": "MU.US",
+      "n_candidates": 193
+    },
+    {
+      "folds": [
+        {
+          "test_year": 2024,
+          "n_test": 37,
+          "n_taken": 37,
+          "base_hit_rate": 0.43243243243243246,
+          "filt_hit_rate": 0.43243243243243246,
+          "base_exp": 0.028030099258598846,
+          "filt_exp": 0.028030099258598846,
+          "lift_hit": 0.0,
+          "lift_exp": 0.0
+        },
+        {
+          "test_year": 2025,
+          "n_test": 27,
+          "n_taken": 27,
+          "base_hit_rate": 0.48148148148148145,
+          "filt_hit_rate": 0.48148148148148145,
+          "base_exp": -0.007176103630866971,
+          "filt_exp": -0.007176103630866971,
+          "lift_hit": 0.0,
+          "lift_exp": 0.0
+        }
+      ],
+      "avg_lift_hit": 0.0,
+      "avg_lift_exp": 0.0,
+      "avg_filt_hit_rate": 0.45695695695695693,
+      "feature_importance_gain": {
+        "dist_poc": 0.2556,
+        "macd_hist": 0.2245,
+        "rsi": 0.2188,
+        "atr_pct": 0.1208,
+        "mom10": 0.0518,
+        "vol_expand": 0.0516,
+        "dist_vwap": 0.0405,
+        "ret1": 0.0364,
+        "ha_green": 0.0,
+        "above_vwap": 0.0,
+        "above_poc": 0.0
+      },
+      "edge": false,
+      "params": {
+        "learning_rate": 0.05,
+        "max_depth": 4,
+        "subsample": 0.8,
+        "horizon": 5,
+        "threshold": 0.55
+      },
+      "code": "TSLA.US",
+      "n_candidates": 212
+    }
+  ],
+  "any_edge": false,
+  "best": {
+    "folds": [],
+    "edge": false,
+    "code": "SPY.US",
+    "n_candidates": 57
+  }
+}

@@ -1,0 +1,31 @@
+{
+  "model": "v15_meta_xgb",
+  "window": "2024-08-01..2026-07-11",
+  "interval": "1H",
+  "note": "Full-sample frozen booster + size; OOS fold lift was modest \u2014 treat as upper-bound until WF portfolio stitch",
+  "portfolio": {
+    "final_value": 2305064.079643825,
+    "total_return": 1.305064079643825,
+    "annual_return": 0.545859302486791,
+    "max_drawdown": -0.13240206158555437,
+    "sharpe": 2.128009651762961,
+    "calmar": 4.1227,
+    "sortino": 2.0161,
+    "win_rate": 0.6230769230769231,
+    "profit_loss_ratio": 1.6193,
+    "profit_factor": 2.6768,
+    "max_consecutive_loss": 4,
+    "avg_holding_days": 12.9,
+    "trade_count": 130,
+    "benchmark_return": 4.251131,
+    "excess_return": -2.946067,
+    "information_ratio": -1.1095
+  },
+  "vs_v14": {
+    "sharpe": 0.406009651762961,
+    "profit_factor": 0.8881000000000001,
+    "max_drawdown": 0.10719793841444564,
+    "win_rate": 0.012176923076923085
+  },
+  "pass_bar": true
+}

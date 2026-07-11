@@ -1,0 +1,139 @@
+{
+  "artifacts": [
+    {
+      "path": "artifacts/equity.csv",
+      "sha256": "11e7e057a08501aa76d3564f3c0c44fd941cd99ef3dd98f7d86d5e3be8ee4012",
+      "size_bytes": 381784
+    },
+    {
+      "path": "artifacts/final_metrics.json",
+      "sha256": "96c74c57195b37734905ba4b9ea97f35a5c0f6cc08d8ca7aa9a284add5b4136c",
+      "size_bytes": 492
+    },
+    {
+      "path": "artifacts/intraday_2h4h_results.json",
+      "sha256": "7b62b9a28920efc51c80d2d47e966abdd69c6ad3df41bfc8ddab35b5815259f3",
+      "size_bytes": 7636
+    },
+    {
+      "path": "artifacts/metrics.csv",
+      "sha256": "485187be2fbc293e162e08bbeb524b71fd1f62c90dd75a050b9556f25c070246",
+      "size_bytes": 382
+    },
+    {
+      "path": "artifacts/multi_symbol_results.json",
+      "sha256": "13f276c8e139c8a79521a0652369f0d96f277af01d45e3f2753f207c223a63c7",
+      "size_bytes": 4123
+    },
+    {
+      "path": "artifacts/ohlcv_APLD.US.csv",
+      "sha256": "18bbdb31c157df97d98821d423e8dbc8b15d3f449bf4b59ff3cec9f13df2e6ff",
+      "size_bytes": 334326
+    },
+    {
+      "path": "artifacts/ohlcv_ARM.US.csv",
+      "sha256": "0d62e1e5a5ff8decd4eb902639c9848b60b199ef8d53c4329c3f9b2f0962bc14",
+      "size_bytes": 332296
+    },
+    {
+      "path": "artifacts/ohlcv_IONQ.US.csv",
+      "sha256": "752bff78443c724ad2aec84994c150df66690ba7a42eb97e5f4cded51c3d4fcf",
+      "size_bytes": 340563
+    },
+    {
+      "path": "artifacts/ohlcv_MU.US.csv",
+      "sha256": "5900c4a64c6af4f1f975bcd9840aeda517454428594f2a04f4903fe9fd23dc22",
+      "size_bytes": 332670
+    },
+    {
+      "path": "artifacts/ohlcv_SPY.US.csv",
+      "sha256": "bd540fe5bf6d3f5c040b1bb4e191c3ae18f0f5d2fe4bd9f225e45f36b99e9801",
+      "size_bytes": 328018
+    },
+    {
+      "path": "artifacts/ohlcv_TSLA.US.csv",
+      "sha256": "fabdff03d04b583010008822d51b83b3f90d38abc636ed7738f33a0060ea7bf2",
+      "size_bytes": 333607
+    },
+    {
+      "path": "artifacts/param_sweep.json",
+      "sha256": "796a16764edd5f8683d7ad9d7913a5b788eef3f4e8db9838b6c5eae43efeed79",
+      "size_bytes": 5015
+    },
+    {
+      "path": "artifacts/positions.csv",
+      "sha256": "0bcdeab9984895de373f916782a770ca2b6bc7b9f2e6c99e475d636d2b1247e0",
+      "size_bytes": 155691
+    },
+    {
+      "path": "artifacts/trades.csv",
+      "sha256": "5070dbfa47edc4071192e2c8bf6d5aa3dd566782e45728ee08cacb3d88416dcd",
+      "size_bytes": 23975
+    },
+    {
+      "path": "artifacts/v12_regime_router_results.json",
+      "sha256": "cbae791c9b8369a60c4fcd689c0823b610ec17cb24254787a5e935273162383c",
+      "size_bytes": 5229
+    },
+    {
+      "path": "artifacts/v2_vwap_results.json",
+      "sha256": "0108d759c6f98fd8cd26e78197d2a721f92590089beb868892050bd0a3b869f9",
+      "size_bytes": 4114
+    },
+    {
+      "path": "code/signal_engine.py",
+      "sha256": "53da0d9a31f5950d52908db66adbb97036911d811090cd3006f59f9e80fc1ade",
+      "size_bytes": 20185
+    },
+    {
+      "path": "config.json",
+      "sha256": "5125daec7320ed5b7c24784a9fc3c4fe47bb744d1025f8dbdfb476ad1667ae77",
+      "size_bytes": 2674
+    }
+  ],
+  "backtest": {
+    "codes": [
+      "TSLA.US",
+      "ARM.US",
+      "MU.US",
+      "SPY.US",
+      "IONQ.US",
+      "APLD.US"
+    ],
+    "end_date": "2026-07-11",
+    "engine": "daily",
+    "initial_cash": 1000000,
+    "interval": "1H",
+    "source": "yfinance",
+    "start_date": "2024-08-01"
+  },
+  "data_sources": [
+    "yfinance"
+  ],
+  "generated_at": "2026-07-11T17:22:23.602928Z",
+  "metrics": {
+    "annual_return": 0.45642530215332444,
+    "avg_holding_days": 11.7,
+    "benchmark_return": 4.251131,
+    "calmar": 1.0505,
+    "excess_return": -3.194948,
+    "final_value": 2056182.441385291,
+    "information_ratio": -0.9935,
+    "max_consecutive_loss": 9,
+    "max_drawdown": -0.43447675366629573,
+    "profit_factor": 1.4456,
+    "profit_loss_ratio": 1.0045,
+    "sharpe": 1.0804619596476694,
+    "sortino": 1.0353,
+    "total_return": 1.0561824413852912,
+    "trade_count": 200,
+    "win_rate": 0.59
+  },
+  "reproducibility": {
+    "config_hash": "5125daec7320ed5b7c24784a9fc3c4fe47bb744d1025f8dbdfb476ad1667ae77",
+    "strategy_hash": "53da0d9a31f5950d52908db66adbb97036911d811090cd3006f59f9e80fc1ade"
+  },
+  "run_dir": "/Users/syriljacob/Desktop/TradingAlgoWork/runs/poc_va_macdha",
+  "schema_version": "0.1",
+  "warnings": []
+}

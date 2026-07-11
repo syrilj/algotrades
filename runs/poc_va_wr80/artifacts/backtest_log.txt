@@ -1,0 +1,36 @@
+/Users/syriljacob/Desktop/TradingAlgoWork/runs/poc_va_wr80/code/signal_engine.py:337: FutureWarning: Downcasting object dtype arrays on .fillna, .ffill, .bfill is deprecated and will change in a future version. Call result.infer_objects(copy=False) instead. To opt-in to the future behavior, set `pd.set_option('future.no_silent_downcasting', True)`
+  uptrend = swing["uptrend"].shift(1).fillna(False).astype(bool)
+/Users/syriljacob/Desktop/TradingAlgoWork/runs/poc_va_wr80/code/signal_engine.py:147: FutureWarning: Downcasting object dtype arrays on .fillna, .ffill, .bfill is deprecated and will change in a future version. Call result.infer_objects(copy=False) instead. To opt-in to the future behavior, set `pd.set_option('future.no_silent_downcasting', True)`
+  squeeze_release = sqz_on.shift(1).fillna(False) & sqz_off  # just released
+/Users/syriljacob/Desktop/TradingAlgoWork/runs/poc_va_wr80/code/signal_engine.py:337: FutureWarning: Downcasting object dtype arrays on .fillna, .ffill, .bfill is deprecated and will change in a future version. Call result.infer_objects(copy=False) instead. To opt-in to the future behavior, set `pd.set_option('future.no_silent_downcasting', True)`
+  uptrend = swing["uptrend"].shift(1).fillna(False).astype(bool)
+/Users/syriljacob/Desktop/TradingAlgoWork/runs/poc_va_wr80/code/signal_engine.py:147: FutureWarning: Downcasting object dtype arrays on .fillna, .ffill, .bfill is deprecated and will change in a future version. Call result.infer_objects(copy=False) instead. To opt-in to the future behavior, set `pd.set_option('future.no_silent_downcasting', True)`
+  squeeze_release = sqz_on.shift(1).fillna(False) & sqz_off  # just released
+/Users/syriljacob/Desktop/TradingAlgoWork/runs/poc_va_wr80/code/signal_engine.py:337: FutureWarning: Downcasting object dtype arrays on .fillna, .ffill, .bfill is deprecated and will change in a future version. Call result.infer_objects(copy=False) instead. To opt-in to the future behavior, set `pd.set_option('future.no_silent_downcasting', True)`
+  uptrend = swing["uptrend"].shift(1).fillna(False).astype(bool)
+/Users/syriljacob/Desktop/TradingAlgoWork/runs/poc_va_wr80/code/signal_engine.py:147: FutureWarning: Downcasting object dtype arrays on .fillna, .ffill, .bfill is deprecated and will change in a future version. Call result.infer_objects(copy=False) instead. To opt-in to the future behavior, set `pd.set_option('future.no_silent_downcasting', True)`
+  squeeze_release = sqz_on.shift(1).fillna(False) & sqz_off  # just released
+/Users/syriljacob/Desktop/TradingAlgoWork/runs/poc_va_wr80/code/signal_engine.py:337: FutureWarning: Downcasting object dtype arrays on .fillna, .ffill, .bfill is deprecated and will change in a future version. Call result.infer_objects(copy=False) instead. To opt-in to the future behavior, set `pd.set_option('future.no_silent_downcasting', True)`
+  uptrend = swing["uptrend"].shift(1).fillna(False).astype(bool)
+/Users/syriljacob/Desktop/TradingAlgoWork/runs/poc_va_wr80/code/signal_engine.py:147: FutureWarning: Downcasting object dtype arrays on .fillna, .ffill, .bfill is deprecated and will change in a future version. Call result.infer_objects(copy=False) instead. To opt-in to the future behavior, set `pd.set_option('future.no_silent_downcasting', True)`
+  squeeze_release = sqz_on.shift(1).fillna(False) & sqz_off  # just released
+/Users/syriljacob/Desktop/TradingAlgoWork/.venv/lib/python3.13/site-packages/backtest/engines/base.py:129: FutureWarning: The default fill_method='pad' in DataFrame.pct_change is deprecated and will be removed in a future version. Either fill in any non-leading NA values prior to calling pct_change or specify 'fill_method=None' to not fill NA values.
+  ret = close.pct_change().fillna(0.0)
+{
+  "final_value": 2404176.347594654,
+  "total_return": 1.404176347594654,
+  "annual_return": 0.5801789247124085,
+  "max_drawdown": -0.126161623695749,
+  "sharpe": 2.042022816766059,
+  "calmar": 4.5987,
+  "sortino": 1.4335,
+  "win_rate": 0.6567164179104478,
+  "profit_loss_ratio": 2.8904,
+  "profit_factor": 5.5295,
+  "max_consecutive_loss": 4,
+  "avg_holding_days": 7.0,
+  "trade_count": 67,
+  "benchmark_return": 4.825839,
+  "excess_return": -3.421663,
+  "information_ratio": -1.0409
+}

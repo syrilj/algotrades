@@ -1,0 +1,14 @@
+{
+  "monte_carlo": {
+    "actual_sharpe": 5.1988,
+    "actual_max_dd": -0.1489,
+    "p_value_sharpe": 0.89,
+    "p_value_max_dd": 0.982,
+    "simulated_sharpe_mean": 5.5803,
+    "simulated_sharpe_std": 0.3252,
+    "simulated_sharpe_p5": 5.0378,
+    "simulated_sharpe_p95": 6.119,
+    "n_simulations": 1000,
+    "n_trades": 83
+  }
+}

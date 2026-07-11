@@ -1,0 +1,21 @@
+{
+  "name": "arm_A_4h_v8",
+  "interval": "4H",
+  "final_value": 1130538.108208445,
+  "total_return": 0.13053810820844491,
+  "annual_return": 0.06603687470928765,
+  "max_drawdown": -0.19398556434583658,
+  "sharpe": 0.3632509281409648,
+  "calmar": 0.3404,
+  "sortino": 0.2271,
+  "win_rate": 0.6,
+  "profit_loss_ratio": 0.8165,
+  "profit_factor": 1.2247,
+  "max_consecutive_loss": 2,
+  "avg_holding_days": 4.8,
+  "trade_count": 30,
+  "benchmark_return": 1.663937,
+  "excess_return": -1.533399,
+  "information_ratio": -1.0191,
+  "score": 0.4666413660176206
+}

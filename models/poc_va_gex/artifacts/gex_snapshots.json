@@ -1,0 +1,46 @@
+{
+  "TSLA": {
+    "ticker": "TSLA",
+    "spot": 407.760009765625,
+    "asof_utc": "2026-07-11 18:06:21.588469",
+    "expiries_used": [
+      "2026-07-13",
+      "2026-07-15",
+      "2026-07-17"
+    ],
+    "net_dealer_gex": -913573249.6070806,
+    "gex_sign": -1,
+    "regime": "negative_gex_amplify",
+    "call_wall": 420.0,
+    "put_wall": 400.0,
+    "dist_call_wall_pct": 3.0017632777207313,
+    "dist_put_wall_pct": -1.9030825926469221,
+    "approx_flip_strike": 5.0,
+    "otm_call_volume": 425787.0,
+    "otm_call_oi": 447693.0,
+    "n_contracts": 760,
+    "sign_convention": "dealer = -customer; customer assumed long calls and puts"
+  },
+  "QQQ": {
+    "ticker": "QQQ",
+    "spot": 725.510009765625,
+    "asof_utc": "2026-07-11 18:06:22.477728",
+    "expiries_used": [
+      "2026-07-13",
+      "2026-07-14",
+      "2026-07-15"
+    ],
+    "net_dealer_gex": -2337852473.586593,
+    "gex_sign": -1,
+    "regime": "negative_gex_amplify",
+    "call_wall": 730.0,
+    "put_wall": 722.0,
+    "dist_call_wall_pct": 0.6188736439109207,
+    "dist_put_wall_pct": -0.48379894396755513,
+    "approx_flip_strike": 495.0,
+    "otm_call_volume": 210583.0,
+    "otm_call_oi": 74719.0,
+    "n_contracts": 558,
+    "sign_convention": "dealer = -customer; customer assumed long calls and puts"
+  }
+}

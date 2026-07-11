@@ -1,0 +1,28 @@
+{
+  "v13_specialists": {
+    "win_rate": 0.59,
+    "sharpe": 1.0804619596476694,
+    "max_drawdown": -0.43447675366629573,
+    "total_return": 1.0561824413852912,
+    "profit_factor": 1.4456,
+    "trade_count": 200
+  },
+  "v14_risk_kelly": {
+    "win_rate": 0.6108597285067874,
+    "sharpe": 1.722017858842625,
+    "max_drawdown": -0.23960678239826902,
+    "total_return": 2.5241560104415637,
+    "profit_factor": 1.7887,
+    "trade_count": 221
+  },
+  "v15_regime_specialists": {
+    "win_rate": 0.6385542168674698,
+    "sharpe": 1.778859482831906,
+    "max_drawdown": -0.17516020790663947,
+    "total_return": 1.1731664620733175,
+    "profit_factor": 3.6348,
+    "trade_count": 83,
+    "calmar": 2.8492,
+    "max_consecutive_loss": 3
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "portfolio": {
+    "final_value": 3524156.0104415636,
+    "total_return": 2.5241560104415637,
+    "annual_return": 0.9290152979927108,
+    "max_drawdown": -0.239606782398269,
+    "sharpe": 1.722017858842625,
+    "calmar": 3.8772,
+    "sortino": 1.6069,
+    "win_rate": 0.6108597285067874,
+    "profit_loss_ratio": 1.1395,
+    "profit_factor": 1.7887,
+    "max_consecutive_loss": 4.0,
+    "avg_holding_days": 7.7,
+    "trade_count": 221.0,
+    "benchmark_return": 4.251131,
+    "excess_return": -1.726975,
+    "information_ratio": -0.4612
+  },
+  "vs_v12": {
+    "total_return": -0.6283552924364288,
+    "sharpe": 0.06105574844599859,
+    "win_rate": -0.016005943135003697,
+    "max_drawdown": 0.1507753468509604
+  }
+}

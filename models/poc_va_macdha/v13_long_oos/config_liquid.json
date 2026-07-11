@@ -1,0 +1,30 @@
+{
+  "source": "yfinance",
+  "codes": [
+    "SPY.US",
+    "QQQ.US",
+    "AAPL.US",
+    "MU.US",
+    "TSLA.US",
+    "NVDA.US"
+  ],
+  "start_date": "2020-01-01",
+  "end_date": "2026-07-11",
+  "initial_cash": 1000000,
+  "commission": 0.001,
+  "engine": "daily",
+  "interval": "1D",
+  "extra_fields": null,
+  "strategy": {
+    "model_version": "v13_long_oos_liquid",
+    "note": "Liquid bucket Phase A secondary on 1D (Yahoo 1H 730d cap). Frozen routing: TSLA/MU/SPY use v13 specialists; QQQ/AAPL/NVDA fall back to SPY.US specialist params (no retune).",
+    "per_symbol": {
+      "SPY.US": {"specialist": "spy_A_vwap_trend", "interval": "1H"},
+      "QQQ.US": {"specialist": "spy_A_vwap_trend_fallback", "interval": "1H"},
+      "AAPL.US": {"specialist": "spy_A_vwap_trend_fallback", "interval": "1H"},
+      "MU.US": {"specialist": "mu_A_block", "interval": "1H"},
+      "TSLA.US": {"specialist": "tsla_F_lb30_block", "interval": "1H"},
+      "NVDA.US": {"specialist": "spy_A_vwap_trend_fallback", "interval": "1H"}
+    }
+  }
+}

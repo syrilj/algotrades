@@ -1,0 +1,68 @@
+{
+  "TSLA.US": {
+    "specialist": "tsla_F_lb30_block",
+    "win_rate": 0.5853658536585366,
+    "sharpe": 0.7532800536345038,
+    "total_return": 0.2778956278959004,
+    "max_drawdown": -0.2465814155228906,
+    "trade_count": 41,
+    "interval": "1H",
+    "score": 0.5204895188994348,
+    "why": "feedback-tuned from FEATURE_INSIGHTS lifts"
+  },
+  "ARM.US": {
+    "specialist": "arm_A_4h_v8",
+    "win_rate": 0.6,
+    "sharpe": 0.3632509281409648,
+    "total_return": 0.13053810820844491,
+    "max_drawdown": -0.19398556434583658,
+    "trade_count": 30,
+    "interval": "4H",
+    "score": 0.4666413660176206,
+    "why": "feedback-tuned from FEATURE_INSIGHTS lifts"
+  },
+  "MU.US": {
+    "specialist": "mu_A_block",
+    "win_rate": 0.5888888888888889,
+    "sharpe": 1.0618418137487506,
+    "total_return": 0.7146072677191542,
+    "max_drawdown": -0.36660450367635106,
+    "trade_count": 90,
+    "interval": "1H",
+    "score": 0.5651685600519272,
+    "why": "feedback-tuned from FEATURE_INSIGHTS lifts"
+  },
+  "SPY.US": {
+    "specialist": "spy_A_vwap_trend",
+    "win_rate": 0.5135135135135135,
+    "sharpe": 0.7404992608438381,
+    "total_return": 0.07599741575820462,
+    "max_drawdown": -0.042968950339550394,
+    "trade_count": 37,
+    "interval": "1H",
+    "score": 0.4816605157135878,
+    "why": "feedback-tuned from FEATURE_INSIGHTS lifts"
+  },
+  "IONQ.US": {
+    "specialist": "ionq_A_4h_v8",
+    "win_rate": 0.7419354838709677,
+    "sharpe": 1.5483843625829317,
+    "total_return": 1.7957211973098768,
+    "max_drawdown": -0.16757200174799314,
+    "trade_count": 31,
+    "interval": "4H",
+    "score": 0.7887093356454471,
+    "why": "feedback-tuned from FEATURE_INSIGHTS lifts"
+  },
+  "APLD.US": {
+    "specialist": "apld_B_full_stack",
+    "win_rate": 0.8125,
+    "sharpe": 1.3515994357278018,
+    "total_return": 0.9406183782951163,
+    "max_drawdown": -0.26701530534230045,
+    "trade_count": 16,
+    "interval": "1H",
+    "score": 0.8064499294659753,
+    "why": "feedback-tuned from FEATURE_INSIGHTS lifts"
+  }
+}

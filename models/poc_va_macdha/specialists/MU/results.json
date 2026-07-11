@@ -1,0 +1,21 @@
+{
+  "name": "mu_A_block",
+  "interval": "1H",
+  "final_value": 1714607.2677191542,
+  "total_return": 0.7146072677191542,
+  "annual_return": 0.324758582442211,
+  "max_drawdown": -0.36660450367635106,
+  "sharpe": 1.0618418137487506,
+  "calmar": 0.8859,
+  "sortino": 0.6173,
+  "win_rate": 0.5888888888888889,
+  "profit_loss_ratio": 1.1045,
+  "profit_factor": 1.5821,
+  "max_consecutive_loss": 5,
+  "avg_holding_days": 7.1,
+  "trade_count": 90,
+  "benchmark_return": 8.323521,
+  "excess_return": -7.608914,
+  "information_ratio": -1.7646,
+  "score": 0.5651685600519272
+}

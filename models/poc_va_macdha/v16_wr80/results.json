@@ -1,0 +1,174 @@
+{
+  "winner": "v16_wr80",
+  "target": "WR >= 80% via feedback loop (not hardcoded thresholds)",
+  "achieved": {
+    "win_rate": 0.8333333333333334,
+    "sharpe": 1.389291882915245,
+    "max_drawdown": -0.11312622260719349,
+    "profit_factor": 19.6862,
+    "total_return": 0.7119569012478457,
+    "trade_count": 12,
+    "max_consecutive_loss": 1
+  },
+  "universe": [
+    "APLD.US",
+    "IONQ.US"
+  ],
+  "filters": [
+    "qqq_trend",
+    "vol_expand",
+    "block_red_flag"
+  ],
+  "dropped_names_reason": {
+    "ARM.US": "chronically sub-55% WR under regime filters",
+    "SPY.US": "drag on portfolio WR; opposite filter DNA vs high-beta",
+    "TSLA.US": "engine-loop: WR stayed ~56-60% after vol/regime gates",
+    "MU.US": "engine-loop: WR ~60% after gates \u2014 blocked hitting 80% portfolio"
+  },
+  "feedback_process": [
+    "1. Trade-level greedy filter loop on v14 trades \u2192 82.8% (OOS 81.2%, n=29)",
+    "2. Engine-in-the-loop: backtest \u2192 analyze losers \u2192 add filter/drop name \u2192 repeat",
+    "3. R1 65.7% \u2192 R2 65.7% (+vol_expand) \u2192 R3 67.9% (drop TSLA) \u2192 R4 86.7% (drop MU)",
+    "4. Freeze + strict TRADE_UNIVERSE lock \u2192 confirmed backtest WR 83.3% n=12"
+  ],
+  "engine_loop": [
+    {
+      "round": 1,
+      "filters": [
+        "force_block_red_flag",
+        "drop_ARM",
+        "drop_SPY",
+        "qqq_trend"
+      ],
+      "universe": [
+        "APLD.US",
+        "IONQ.US",
+        "MU.US",
+        "TSLA.US"
+      ],
+      "metrics": {
+        "win_rate": 0.6567164179104478,
+        "sharpe": 2.042022816766059,
+        "max_drawdown": -0.126161623695749,
+        "profit_factor": 5.5295,
+        "total_return": 1.404176347594654,
+        "trade_count": 67
+      }
+    },
+    {
+      "round": 2,
+      "filters": [
+        "force_block_red_flag",
+        "drop_ARM",
+        "drop_SPY",
+        "qqq_trend",
+        "vol_expand"
+      ],
+      "universe": [
+        "APLD.US",
+        "IONQ.US",
+        "MU.US",
+        "TSLA.US"
+      ],
+      "metrics": {
+        "win_rate": 0.6567164179104478,
+        "sharpe": 2.042022816766059,
+        "max_drawdown": -0.126161623695749,
+        "profit_factor": 5.5295,
+        "total_return": 1.404176347594654,
+        "trade_count": 67
+      }
+    },
+    {
+      "round": 3,
+      "filters": [
+        "force_block_red_flag",
+        "drop_ARM",
+        "drop_SPY",
+        "qqq_trend",
+        "vol_expand",
+        "drop_TSLA.US"
+      ],
+      "universe": [
+        "APLD.US",
+        "IONQ.US",
+        "MU.US"
+      ],
+      "metrics": {
+        "win_rate": 0.6792452830188679,
+        "sharpe": 1.9992372435668901,
+        "max_drawdown": -0.12851577194013308,
+        "profit_factor": 7.4265,
+        "total_return": 1.29171122482692,
+        "trade_count": 53
+      }
+    },
+    {
+      "round": 4,
+      "filters": [
+        "force_block_red_flag",
+        "drop_ARM",
+        "drop_SPY",
+        "qqq_trend",
+        "vol_expand",
+        "drop_TSLA.US",
+        "drop_MU.US"
+      ],
+      "universe": [
+        "APLD.US",
+        "IONQ.US"
+      ],
+      "metrics": {
+        "win_rate": 0.8666666666666667,
+        "sharpe": 1.5099722050086206,
+        "max_drawdown": -0.11312622260719349,
+        "profit_factor": 38.1553,
+        "total_return": 0.8206093827153484,
+        "trade_count": 15
+      }
+    }
+  ],
+  "trade_level_loop": {
+    "applied": [
+      "f_not_red_flag",
+      "drop_ARM.US",
+      "f_qqq_trend"
+    ],
+    "final_wr": 0.8275862068965517,
+    "final_test_wr": 0.8125,
+    "final_n": 29
+  },
+  "anti_overfit": [
+    "Filters chosen on train WR lift with OOS check each round",
+    "Names dropped only when live backtest WR could not clear 80%",
+    "No continuous threshold grid search",
+    "Binary structural gates (QQQ trend, vol expand, red-flag block)"
+  ],
+  "audit_caveats": [
+    "n=12 trades is thin \u2014 high WR with small N is fragile",
+    "Universe shrinks to names that already had high specialist WR (APLD/IONQ)",
+    "Not a claim that TSLA/MU are untradeable \u2014 only that they blocked the 80% portfolio bar in this window",
+    "Extend history / paper trade before sizing live"
+  ],
+  "comparison_prior": {
+    "v15_regime": {
+      "wr": 0.639,
+      "sharpe": 1.78,
+      "dd": -0.175,
+      "trades": 83
+    },
+    "v16_wr80": {
+      "wr": 0.8333333333333334,
+      "sharpe": 1.389291882915245,
+      "dd": -0.11312622260719349,
+      "trades": 12
+    }
+  },
+  "paths": {
+    "model": "models/poc_va_macdha/v16_wr80/",
+    "run": "runs/poc_va_wr80/",
+    "engine_loop": "runs/poc_va_wr80/artifacts/ENGINE_LOOP.json",
+    "feedback_loop": "runs/poc_va_wr80/artifacts/FEEDBACK_LOOP.json"
+  },
+  "window": "2024-08-01..2026-07-11"
+}

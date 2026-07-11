@@ -1,0 +1,21 @@
+{
+  "name": "spy_A_vwap_trend",
+  "interval": "1H",
+  "final_value": 1075997.4157582046,
+  "total_return": 0.07599741575820462,
+  "annual_return": 0.03894427690257829,
+  "max_drawdown": -0.042968950339550394,
+  "sharpe": 0.7404992608438381,
+  "calmar": 0.9063,
+  "sortino": 0.5274,
+  "win_rate": 0.5135135135135135,
+  "profit_loss_ratio": 1.5346,
+  "profit_factor": 1.6198,
+  "max_consecutive_loss": 4,
+  "avg_holding_days": 23.1,
+  "trade_count": 37,
+  "benchmark_return": 0.37297,
+  "excess_return": -0.296972,
+  "information_ratio": -0.8915,
+  "score": 0.4816605157135878
+}

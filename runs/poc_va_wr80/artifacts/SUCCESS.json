@@ -1,0 +1,24 @@
+{
+  "round": 4,
+  "filters": [
+    "force_block_red_flag",
+    "drop_ARM",
+    "drop_SPY",
+    "qqq_trend",
+    "vol_expand",
+    "drop_TSLA.US",
+    "drop_MU.US"
+  ],
+  "universe": [
+    "APLD.US",
+    "IONQ.US"
+  ],
+  "metrics": {
+    "win_rate": 0.8666666666666667,
+    "sharpe": 1.5099722050086206,
+    "max_drawdown": -0.11312622260719349,
+    "profit_factor": 38.1553,
+    "total_return": 0.8206093827153484,
+    "trade_count": 15
+  }
+}

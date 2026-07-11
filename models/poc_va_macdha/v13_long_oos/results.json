@@ -1,0 +1,471 @@
+{
+  "version": "v13_long_oos",
+  "phase": "A",
+  "verdict": "FAIL",
+  "pass_bar": {
+    "rules": {
+      "profit_factor": ">1.2",
+      "max_drawdown": "<25%",
+      "sharpe": ">0.5"
+    },
+    "checks": {
+      "profit_factor_gt_1_2": true,
+      "max_dd_lt_25pct": false,
+      "sharpe_gt_0_5": false
+    }
+  },
+  "data_notes": {
+    "intended_interval": "1H",
+    "effective_interval": "1D",
+    "reason": "Yahoo Finance refuses 1H history outside last ~730 days; 2020-01-01 1H download failed for all tickers.",
+    "coverage": {
+      "APLD.US": {
+        "rows": 1063,
+        "start": "2022-04-13",
+        "end": "2026-07-10"
+      },
+      "ARM.US": {
+        "rows": 707,
+        "start": "2023-09-14",
+        "end": "2026-07-10"
+      },
+      "IONQ.US": {
+        "rows": 1385,
+        "start": "2021-01-04",
+        "end": "2026-07-10"
+      },
+      "MU.US": {
+        "rows": 1638,
+        "start": "2020-01-02",
+        "end": "2026-07-10"
+      },
+      "SPY.US": {
+        "rows": 1638,
+        "start": "2020-01-02",
+        "end": "2026-07-10"
+      },
+      "TSLA.US": {
+        "rows": 1638,
+        "start": "2020-01-02",
+        "end": "2026-07-10"
+      }
+    },
+    "ipo_truncation": {
+      "ARM.US": "listed ~2023-09-14",
+      "IONQ.US": "from ~2021-01-04",
+      "APLD.US": "from ~2022-04-13"
+    }
+  },
+  "config": {
+    "start_date": "2020-01-01",
+    "end_date": "2026-07-11",
+    "codes": [
+      "TSLA.US",
+      "ARM.US",
+      "MU.US",
+      "SPY.US",
+      "IONQ.US",
+      "APLD.US"
+    ],
+    "commission": 0.001,
+    "engine": "daily",
+    "interval": "1D",
+    "routing": "frozen v13 specialists (unchanged)"
+  },
+  "portfolio": {
+    "final_value": 1695935.3908432226,
+    "total_return": 0.6959353908432226,
+    "annual_return": 0.0846602856390961,
+    "max_drawdown": -0.3601052535102024,
+    "sharpe": 0.446065723662057,
+    "calmar": 0.2351,
+    "sortino": 0.4187,
+    "win_rate": 0.504950495049505,
+    "profit_loss_ratio": 1.2143,
+    "profit_factor": 1.2386,
+    "max_consecutive_loss": 7.0,
+    "avg_holding_days": 3.8,
+    "trade_count": 202.0,
+    "benchmark_return": 16.752364,
+    "excess_return": -16.056429,
+    "information_ratio": -1.0038
+  },
+  "vs_v13_short_window": {
+    "baseline": {
+      "window": "2024-08-01..2026-07-11",
+      "interval": "1H",
+      "profit_factor": 1.4456,
+      "max_drawdown": -0.43447675366629573,
+      "sharpe": 1.0804619596476694,
+      "win_rate": 0.59,
+      "total_return": 1.0561824413852912,
+      "trade_count": 200
+    },
+    "delta": {
+      "profit_factor": -0.20700000000000007,
+      "max_drawdown": 0.07437150015609334,
+      "sharpe": -0.6343962359856125,
+      "win_rate": -0.08504950495049501,
+      "total_return": -0.3602470505420685
+    }
+  },
+  "yearly": [
+    {
+      "period": "2020",
+      "start_equity": 1000000.0,
+      "end_equity": 953786.2631149682,
+      "return": -0.04621373688503183,
+      "max_drawdown": -0.1601929929306607,
+      "sharpe": -0.21122327716887948,
+      "trade_count": 23,
+      "win_rate": 0.4782608695652174,
+      "profit_factor": 0.8096458839016424,
+      "pnl_sum": -46213.73669999997
+    },
+    {
+      "period": "2021",
+      "start_equity": 953786.2631149682,
+      "end_equity": 732468.1016847582,
+      "return": -0.23204167431328648,
+      "max_drawdown": -0.2499859521557385,
+      "sharpe": -1.0019775011239562,
+      "trade_count": 28,
+      "win_rate": 0.42857142857142855,
+      "profit_factor": 0.3522580091738215,
+      "pnl_sum": -221318.1614
+    },
+    {
+      "period": "2022",
+      "start_equity": 732468.1016847582,
+      "end_equity": 690420.0671861718,
+      "return": -0.05740595993446174,
+      "max_drawdown": -0.19514443655946312,
+      "sharpe": -0.08651201260166284,
+      "trade_count": 32,
+      "win_rate": 0.4375,
+      "profit_factor": 0.8999342482547743,
+      "pnl_sum": -42048.03470000001
+    },
+    {
+      "period": "2023",
+      "start_equity": 690420.0671861718,
+      "end_equity": 1220225.4456701253,
+      "return": 0.7673667143586826,
+      "max_drawdown": -0.1327229339851611,
+      "sharpe": 2.303032979886453,
+      "trade_count": 33,
+      "win_rate": 0.5151515151515151,
+      "profit_factor": 4.360040424490919,
+      "pnl_sum": 529805.3784
+    },
+    {
+      "period": "2024",
+      "start_equity": 1220225.4456701253,
+      "end_equity": 2063789.460211452,
+      "return": 0.6913181638152588,
+      "max_drawdown": -0.14683576053202163,
+      "sharpe": 2.506650836775184,
+      "trade_count": 32,
+      "win_rate": 0.78125,
+      "profit_factor": 10.222509357045396,
+      "pnl_sum": 843564.0146000001
+    },
+    {
+      "period": "2025",
+      "start_equity": 2063789.460211452,
+      "end_equity": 2123159.3107176404,
+      "return": 0.02876739689333685,
+      "max_drawdown": -0.3601052535102024,
+      "sharpe": 0.2520345926398208,
+      "trade_count": 35,
+      "win_rate": 0.42857142857142855,
+      "profit_factor": 1.0850730605038144,
+      "pnl_sum": 76692.12430000004
+    },
+    {
+      "period": "2026",
+      "start_equity": 2127051.1857176404,
+      "end_equity": 1695935.3908432226,
+      "return": -0.20268237914028608,
+      "max_drawdown": -0.27344725426400573,
+      "sharpe": -1.7046575016733232,
+      "trade_count": 19,
+      "win_rate": 0.42105263157894735,
+      "profit_factor": 0.41650875041801355,
+      "pnl_sum": -444546.19389999995
+    }
+  ],
+  "quarterly": [
+    {
+      "period": "2020Q1",
+      "return": -0.018880510530646988,
+      "max_drawdown": -0.047053226834803286,
+      "sharpe": -0.9604885338150267,
+      "trade_count": 4,
+      "win_rate": 0.25,
+      "profit_factor": 0.1786238093091695,
+      "pnl_sum": -18880.510499999997
+    },
+    {
+      "period": "2020Q2",
+      "return": -0.10590812367376712,
+      "max_drawdown": -0.1505183821076198,
+      "sharpe": -1.6933278970866812,
+      "trade_count": 9,
+      "win_rate": 0.3333333333333333,
+      "profit_factor": 0.3269308899656503,
+      "pnl_sum": -103908.52409999998
+    },
+    {
+      "period": "2020Q3",
+      "return": 0.010141787748651598,
+      "max_drawdown": -0.04038997520607379,
+      "sharpe": 0.33566942482480694,
+      "trade_count": 7,
+      "win_rate": 0.5714285714285714,
+      "profit_factor": 1.1360088213032473,
+      "pnl_sum": 8896.487400000007
+    },
+    {
+      "period": "2020Q4",
+      "return": 0.0789927114795188,
+      "max_drawdown": -0.029566053530013958,
+      "sharpe": 2.7334451464350544,
+      "trade_count": 3,
+      "win_rate": 1.0,
+      "profit_factor": Infinity,
+      "pnl_sum": 67678.8105
+    },
+    {
+      "period": "2021Q1",
+      "return": -0.16587156210929677,
+      "max_drawdown": -0.19334503537177927,
+      "sharpe": -1.5893711375984934,
+      "trade_count": 6,
+      "win_rate": 0.3333333333333333,
+      "profit_factor": 0.054759221577511424,
+      "pnl_sum": -159796.4973
+    },
+    {
+      "period": "2021Q2",
+      "return": 0.051949501303285794,
+      "max_drawdown": -0.04012191845737101,
+      "sharpe": 1.7902467587477062,
+      "trade_count": 6,
+      "win_rate": 0.5,
+      "profit_factor": 2.3134494912601085,
+      "pnl_sum": 38039.40190000001
+    },
+    {
+      "period": "2021Q3",
+      "return": -0.07523782706380244,
+      "max_drawdown": -0.08630122335972101,
+      "sharpe": -1.9055839332324311,
+      "trade_count": 11,
+      "win_rate": 0.45454545454545453,
+      "profit_factor": 0.33804830671165187,
+      "pnl_sum": -66436.77189999999
+    },
+    {
+      "period": "2021Q4",
+      "return": -0.011298775391866078,
+      "max_drawdown": -0.02502907494321327,
+      "sharpe": -1.320556677783393,
+      "trade_count": 5,
+      "win_rate": 0.4,
+      "profit_factor": 0.23493815947845015,
+      "pnl_sum": -33124.2941
+    },
+    {
+      "period": "2022Q1",
+      "return": 0.09122364649562287,
+      "max_drawdown": -0.05655874173807751,
+      "sharpe": 1.3742420210979176,
+      "trade_count": 5,
+      "win_rate": 0.6,
+      "profit_factor": 2.530995022204048,
+      "pnl_sum": 74404.8254
+    },
+    {
+      "period": "2022Q2",
+      "return": -0.06815761153978284,
+      "max_drawdown": -0.13993920697212214,
+      "sharpe": -1.7296240140114398,
+      "trade_count": 6,
+      "win_rate": 0.16666666666666666,
+      "profit_factor": 0.1794527902533712,
+      "pnl_sum": -78415.424
+    },
+    {
+      "period": "2022Q3",
+      "return": -0.0015546686603421511,
+      "max_drawdown": -0.13755535982534972,
+      "sharpe": 0.12694553731467909,
+      "trade_count": 10,
+      "win_rate": 0.4,
+      "profit_factor": 0.989413799700469,
+      "pnl_sum": -1132.510100000014
+    },
+    {
+      "period": "2022Q4",
+      "return": -0.06330377225006256,
+      "max_drawdown": -0.15683377554135824,
+      "sharpe": -0.7324927609994669,
+      "trade_count": 11,
+      "win_rate": 0.5454545454545454,
+      "profit_factor": 0.7817056948229746,
+      "pnl_sum": -36904.92599999999
+    },
+    {
+      "period": "2023Q1",
+      "return": 0.08906105130733,
+      "max_drawdown": -0.07604187521469663,
+      "sharpe": 1.4646111309988274,
+      "trade_count": 9,
+      "win_rate": 0.4444444444444444,
+      "profit_factor": 1.585305243240183,
+      "pnl_sum": 37260.05400000001
+    },
+    {
+      "period": "2023Q2",
+      "return": 0.4077196413420161,
+      "max_drawdown": -0.055710168704978136,
+      "sharpe": 4.851401986788056,
+      "trade_count": 8,
+      "win_rate": 0.375,
+      "profit_factor": 11.832139637750089,
+      "pnl_sum": 326373.74730000005
+    },
+    {
+      "period": "2023Q3",
+      "return": -0.04392268744763317,
+      "max_drawdown": -0.08155627936241339,
+      "sharpe": -0.5374330316477891,
+      "trade_count": 8,
+      "win_rate": 0.5,
+      "profit_factor": 0.27178299285797136,
+      "pnl_sum": -46296.8786
+    },
+    {
+      "period": "2023Q4",
+      "return": 0.21083302618141242,
+      "max_drawdown": -0.038090891069822885,
+      "sharpe": 3.627926826409063,
+      "trade_count": 8,
+      "win_rate": 0.75,
+      "profit_factor": 679.1594977491337,
+      "pnl_sum": 212468.4557
+    },
+    {
+      "period": "2024Q1",
+      "return": 0.12495577766710597,
+      "max_drawdown": -0.027556890679287016,
+      "sharpe": 3.14754040064933,
+      "trade_count": 8,
+      "win_rate": 1.0,
+      "profit_factor": Infinity,
+      "pnl_sum": 152474.2196
+    },
+    {
+      "period": "2024Q2",
+      "return": 0.06348366946556427,
+      "max_drawdown": -0.015217400530465053,
+      "sharpe": 2.131326376180508,
+      "trade_count": 5,
+      "win_rate": 0.6,
+      "profit_factor": 17.58233075488756,
+      "pnl_sum": 87144.01180000001
+    },
+    {
+      "period": "2024Q3",
+      "return": 0.05744652566457731,
+      "max_drawdown": -0.00744935999771934,
+      "sharpe": 2.7912870883884535,
+      "trade_count": 4,
+      "win_rate": 1.0,
+      "profit_factor": Infinity,
+      "pnl_sum": 80642.6245
+    },
+    {
+      "period": "2024Q4",
+      "return": 0.3427470115988034,
+      "max_drawdown": -0.14683576053202163,
+      "sharpe": 3.269352589366663,
+      "trade_count": 15,
+      "win_rate": 0.6666666666666666,
+      "profit_factor": 7.069906895254182,
+      "pnl_sum": 523303.1587
+    },
+    {
+      "period": "2025Q1",
+      "return": -0.0931852718813918,
+      "max_drawdown": -0.25252355043993324,
+      "sharpe": -0.6049657949553892,
+      "trade_count": 9,
+      "win_rate": 0.2222222222222222,
+      "profit_factor": 0.8772599380134732,
+      "pnl_sum": -14801.96609999999
+    },
+    {
+      "period": "2025Q2",
+      "return": -0.017046031250214422,
+      "max_drawdown": -0.21537702814158477,
+      "sharpe": 0.034989089022966983,
+      "trade_count": 8,
+      "win_rate": 0.375,
+      "profit_factor": 0.773553430316365,
+      "pnl_sum": -143400.71580000003
+    },
+    {
+      "period": "2025Q3",
+      "return": -0.029525052743480162,
+      "max_drawdown": -0.061595651675105834,
+      "sharpe": -0.8683056155100458,
+      "trade_count": 10,
+      "win_rate": 0.5,
+      "profit_factor": 0.3348697673274684,
+      "pnl_sum": -56262.5504
+    },
+    {
+      "period": "2025Q4",
+      "return": 0.1480730519912561,
+      "max_drawdown": -0.04663894933179247,
+      "sharpe": 2.660224992785125,
+      "trade_count": 8,
+      "win_rate": 0.625,
+      "profit_factor": 5.618943982932584,
+      "pnl_sum": 291157.35660000006
+    },
+    {
+      "period": "2026Q1",
+      "return": -0.10457412132985944,
+      "max_drawdown": -0.23537675681553016,
+      "sharpe": -1.3911847871915355,
+      "trade_count": 10,
+      "win_rate": 0.3,
+      "profit_factor": 0.34272216646069104,
+      "pnl_sum": -378258.61189999996
+    },
+    {
+      "period": "2026Q2",
+      "return": -0.13804349340438993,
+      "max_drawdown": -0.13804349340438993,
+      "sharpe": -3.334783137208035,
+      "trade_count": 8,
+      "win_rate": 0.5,
+      "profit_factor": 0.574005709402161,
+      "pnl_sum": -79396.90729999999
+    },
+    {
+      "period": "2026Q3",
+      "return": 0.007790065523659129,
+      "max_drawdown": -0.007826646013952554,
+      "sharpe": 4.2169628548159785,
+      "trade_count": 1,
+      "win_rate": 1.0,
+      "profit_factor": Infinity,
+      "pnl_sum": 13109.3253
+    }
+  ],
+  "run_dir": "runs/poc_va_v13_long"
+}

@@ -1,0 +1,30 @@
+# Secrets — never commit
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+*.key
+credentials.json
+secrets/
+
+# Local env / caches
+.venv/
+venv/
+__pycache__/
+*.pyc
+.DS_Store
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# Large blobs / copyrighted books (do not push)
+books/
+*.pdf
+*.epub
+*.mobi
+
+# Lottie / animation assets
+**/lottie/
+*.lottie
+*lottie*.json

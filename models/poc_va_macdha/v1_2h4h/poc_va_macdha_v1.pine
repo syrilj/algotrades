@@ -1,0 +1,91 @@
+//@version=6
+// MODEL: poc_va_macdha v1_2h4h — frozen snapshot
+// Stack: prior VP (POC/VA 70%) + St.MACD Heikin-Ashi HTF green filter
+// Mirror of models/poc_va_macdha/v1_2h4h/signal_engine.py
+// CC BY-NC-SA components referenced: dgtrd VP ideas, EliCobra St.MACD HA, Zeiierman VWAP (v2 only)
+
+indicator("poc_va_macdha v1_2h4h", overlay=true, max_bars_back=5000)
+
+vaPct     = input.float(70.0, "Value Area %", minval=1, maxval=100) / 100.0
+rows      = input.int(25, "Profile Rows", minval=10, maxval=100)
+lookback  = input.int(20, "Profile Lookback Bars", minval=1)
+fastL     = input.int(12, "MACD Fast")
+slowL     = input.int(26, "MACD Slow")
+sigL      = input.int(9, "MACD Signal")
+requireHA = input.bool(true, "Require St.MACD HA green (chart TF proxy for HTF)")
+
+f_ema(src, len) =>
+    ta.ema(src, len)
+
+f_st_macd_ha() =>
+    hl = high - low
+    macd = (f_ema(close, fastL) - f_ema(close, slowL)) / f_ema(hl, slowL) * 100.0
+    o = nz(macd[1], macd)
+    h = math.max(macd, o)
+    l = math.min(macd, o)
+    c = macd
+    var float haO = na
+    haC = (o + h + l + c) / 4.0
+    haO := na(haO[1]) ? (o + c) / 2.0 : (haO[1] + haC[1]) / 2.0
+    haGreen = haC > haO
+    [haGreen, haC, haO]
+
+// Approximate prior-window VP on last `lookback` bars
+f_vp_levels() =>
+    float hi = ta.highest(high, lookback)
+    float lo = ta.lowest(low, lookback)
+    float step = (hi - lo) / rows
+    float poc = lo + (hi - lo) * 0.5
+    float vah = hi
+    float val = lo
+    if step > 0
+        var array<float> bins = array.new_float(rows, 0.0)
+        for k = 0 to rows - 1
+            array.set(bins, k, 0.0)
+        for i = 1 to lookback
+            bh = high[i]
+            bl = low[i]
+            bv = volume[i]
+            br = bh - bl
+            for k = 0 to rows - 1
+                binLo = lo + k * step
+                binHi = binLo + step
+                if bh >= binLo and bl < binHi
+                    w = br == 0 ? 1.0 : step / br
+                    array.set(bins, k, array.get(bins, k) + bv * w)
+        float mx = array.max(bins)
+        int pocIdx = array.indexof(bins, mx)
+        float target = array.sum(bins) * vaPct
+        float acc = array.get(bins, pocIdx)
+        int above = pocIdx
+        int below = pocIdx
+        while acc < target
+            if below == 0 and above == rows - 1
+                break
+            float va = above < rows - 1 ? array.get(bins, above + 1) : 0.0
+            float vb = below > 0 ? array.get(bins, below - 1) : 0.0
+            if va == 0 and vb == 0
+                break
+            if va >= vb
+                above += 1
+                acc += va
+            else
+                below -= 1
+                acc += vb
+        poc := lo + (pocIdx + 0.5) * step
+        vah := lo + (above + 1.0) * step
+        val := lo + below * step
+    [poc, vah, val]
+
+[poc, vah, val] = f_vp_levels()
+[haGreen, haC, haO] = f_st_macd_ha()
+
+pocOk = close >= poc
+inVA  = close >= val and close <= vah
+longCond = pocOk and inVA and (not requireHA or haGreen)
+
+plot(poc, "POC", color=color.red, linewidth=2)
+plot(vah, "VAH", color=color.blue)
+plot(val, "VAL", color=color.blue)
+bgcolor(longCond ? color.new(color.green, 90) : na)
+plotshape(longCond and not longCond[1], title="Long", style=shape.triangleup, location=location.belowbar, color=color.lime, size=size.tiny)

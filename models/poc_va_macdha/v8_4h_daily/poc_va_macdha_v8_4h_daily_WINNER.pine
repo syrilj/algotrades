@@ -1,0 +1,135 @@
+//@version=6
+// MODEL: poc_va_macdha v8_4h_daily (TRAINING WINNER by avg win rate)
+// 4H chart | daily St.MACD-HA | swing VWAP above | LazyBear SQZ mom>0 | block price↑/vol↓ red-flag
+// Universe trained: TSLA ARM MU SPY IONQ APLD | 2024-08..2026-07
+
+indicator("poc_va_macdha v8_4h_daily WINNER", overlay=true, max_bars_back=5000)
+
+vaPct = input.float(70.0, "VA %") / 100.0
+rows = input.int(25, "Rows")
+lookback = input.int(20, "VP Lookback")
+fastL = input.int(12, "MACD Fast")
+slowL = input.int(26, "MACD Slow")
+prd = input.int(50, "Swing Period")
+baseAPT = input.float(20, "APT")
+volLen = input.int(20, "Vol SMA")
+volLook = input.int(5, "Vol/Price Look")
+bbLen = input.int(20, "SQZ Length")
+bbMult = input.float(2.0, "BB Mult")
+kcMult = input.float(1.5, "KC Mult")
+
+f_ema(src,len) => ta.ema(src,len)
+
+// St.MACD HA (use on Daily HTF via request.security ideally; here chart TF proxy — run on 4H)
+f_ha() =>
+    hl = high-low
+    macd = (f_ema(close,fastL)-f_ema(close,slowL))/f_ema(hl,slowL)*100
+    o = nz(macd[1], macd)
+    h = math.max(macd,o)
+    l = math.min(macd,o)
+    c = macd
+    var float haO = na
+    haC = (o+h+l+c)/4
+    haO := na(haO[1]) ? (o+c)/2 : (haO[1]+haC[1])/2
+    haC > haO
+
+haGreen = request.security(syminfo.tickerid, "D", f_ha(), barmerge.gaps_off, barmerge.lookahead_off)
+
+// VP approx
+hi = ta.highest(high, lookback)
+lo = ta.lowest(low, lookback)
+step = (hi-lo)/rows
+poc = lo + (hi-lo)*0.5
+vah = hi
+val = lo
+if step > 0
+    array<float> bins = array.new_float(rows, 0.0)
+    for i = 1 to lookback
+        for k = 0 to rows-1
+            binLo = lo + k*step
+            if high[i] >= binLo and low[i] < binLo+step
+                br = high[i]-low[i]
+                w = br==0 ? 1.0 : step/br
+                array.set(bins, k, array.get(bins,k)+volume[i]*w)
+    pocIdx = array.indexof(bins, array.max(bins))
+    target = array.sum(bins)*vaPct
+    acc = array.get(bins, pocIdx)
+    above = pocIdx
+    below = pocIdx
+    while acc < target
+        if below==0 and above==rows-1
+            break
+        va = above < rows-1 ? array.get(bins, above+1) : 0.0
+        vb = below > 0 ? array.get(bins, below-1) : 0.0
+        if va==0 and vb==0
+            break
+        if va >= vb
+            above += 1
+            acc += va
+        else
+            below -= 1
+            acc += vb
+    poc := lo + (pocIdx+0.5)*step
+    vah := lo + (above+1.0)*step
+    val := lo + below*step
+
+// Swing VWAP (Zeiierman-lite)
+var float ph=na
+var float pl=na
+var int phL=bar_index
+var int plL=bar_index
+var float p=na
+var float vol=na
+var float vap=na
+ph := ta.highestbars(high,prd)==0 ? high : ph
+pl := ta.lowestbars(low,prd)==0 ? low : pl
+phL := ta.highestbars(high,prd)==0 ? bar_index : phL
+plL := ta.lowestbars(low,prd)==0 ? bar_index : plL
+dir = phL>plL ? 1 : -1
+alphaFromAPT(apt) => 1.0 - math.exp(-math.log(2)/math.max(1.0, apt))
+if dir != dir[1]
+    x = dir>0 ? plL : phL
+    y = dir>0 ? pl : ph
+    barsback = bar_index-x
+    p := y*volume[barsback]
+    vol := volume[barsback]
+    for i = barsback to 0
+        a = alphaFromAPT(baseAPT)
+        p := (1-a)*p + a*hlc3[i]*volume[i]
+        vol := (1-a)*vol + a*volume[i]
+    vap := vol>0 ? p/vol : na
+else
+    a = alphaFromAPT(baseAPT)
+    p := (1-a)*nz(p, hlc3*volume) + a*hlc3*volume
+    vol := (1-a)*nz(vol, volume) + a*volume
+    vap := vol>0 ? p/vol : na
+
+// LazyBear Squeeze Momentum
+basis = ta.sma(close, bbLen)
+dev = bbMult * ta.stdev(close, bbLen)
+upperBB = basis+dev
+lowerBB = basis-dev
+ma = ta.sma(close, bbLen)
+rangema = ta.sma(ta.tr(true), bbLen)
+upperKC = ma + rangema*kcMult
+lowerKC = ma - rangema*kcMult
+sqzOn = lowerBB>lowerKC and upperBB<upperKC
+sqzOff = lowerBB<lowerKC and upperBB>upperKC
+mid = (math.avg(ta.highest(high,bbLen), ta.lowest(low,bbLen)) + ta.sma(close,bbLen))/2
+valSqz = ta.linreg(close - mid, bbLen, 0)
+momPos = valSqz > 0
+
+// Volume-price
+priceUp = close > close[volLook]
+volFalling = volume < volume[volLook]
+redFlag = priceUp and volFalling and volume < ta.sma(volume, volLen)
+
+longCond = close>=poc and close>=val and close<=vah and haGreen and close>=vap and momPos and not redFlag
+
+plot(poc,"POC",color.red,2)
+plot(vah,"VAH",color.blue)
+plot(val,"VAL",color.blue)
+plot(vap,"SwingVWAP", dir>0?color.lime:color.red, 2)
+bgcolor(longCond ? color.new(color.green,88) : na)
+plotshape(longCond and not longCond[1], style=shape.triangleup, location=location.belowbar, color=color.lime, size=size.tiny)
+alertcondition(longCond and not longCond[1], "v8 winner long", "poc_va_macdha v8_4h_daily long")
