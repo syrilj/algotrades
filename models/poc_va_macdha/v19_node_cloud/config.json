@@ -1,0 +1,32 @@
+{
+  "source": "yfinance",
+  "codes": [
+    "TSLA.US",
+    "ARM.US",
+    "MU.US",
+    "SPY.US",
+    "IONQ.US",
+    "APLD.US"
+  ],
+  "start_date": "2024-08-01",
+  "end_date": "2026-07-11",
+  "initial_cash": 1000000,
+  "commission": 0.001,
+  "engine": "daily",
+  "extra_fields": null,
+  "interval": "1H",
+  "strategy": {
+    "name": "v19_node_cloud",
+    "model_version": "v19_node_cloud",
+    "signal_tf": "2h",
+    "profile_lookback": 20,
+    "ema_fast": 8,
+    "ema_mid": 21,
+    "ema_slow": 55,
+    "min_target_room_pct": 0.004,
+    "require_support_node": true,
+    "exit_at_target": true,
+    "exit_on_cloud_flip": true,
+    "exit_on_support_break": true
+  }
+}

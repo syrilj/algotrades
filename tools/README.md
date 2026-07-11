@@ -49,20 +49,29 @@ cd /Users/syriljacob/Desktop/TradingAlgoWork
 .venv/bin/python3 tools/trade_desk.py picks --horizon day --model v14_risk_kelly
 .venv/bin/python3 tools/trade_desk.py picks --horizon week --model auto
 
-# Sector rotation first → stocks in top hot sectors (default top 5)
-.venv/bin/python3 tools/trade_desk.py rotate
-.venv/bin/python3 tools/trade_desk.py rotate --top 5 --horizon day
-.venv/bin/python3 tools/trade_desk.py picks --sectors memory,photonics,ai_infra,metals
+# Live watch (market open / real-time board)
+.venv/bin/python3 tools/trade_desk.py watch NVDA --every 30
+.venv/bin/python3 tools/trade_desk.py watch NVDA,MU,ANET --every 45 --interval 5m
+.venv/bin/python3 tools/trade_desk.py watch rotate --every 90 --top 3
+.venv/bin/python3 tools/trade_desk.py watch --symbols NVDA,IBIT --interval 1m --every 20
 ```
+
+Near the open, prefer `--interval 1m --every 20`. Yahoo is delayed (not a broker feed); Ctrl+C stops the loop. Action flips print with ★.
 
 ## Actions (plain English)
 | Action | Meaning |
 |--------|---------|
-| **BUY NOW** | Classic pullback-in-value — take the trade |
-| **BUY BREAKOUT** | Just clearing highs with volume — take **smaller** size |
-| **BREAKOUT WATCH** | Pressing highs / about to break — set buy-stop alerts |
-| **PULLBACK ZONE** | Trend OK but extended — wait for dip into value |
-| **WAIT / AVOID** | Stand aside |
+| **BUY NOW** | Classic pullback-in-value (best near **22 EMA**) |
+| **BUY BREAKOUT** | Level break **+ volume surge** (smaller size) |
+| **BREAKOUT WATCH** | Near highs, volume waking — only take a surge through |
+| **PULLBACK ZONE** | Wait for dip into **22 EMA** / value |
+| **AVOID (structure broken)** | Lost **200 EMA** — no longs until volume reclaim |
+| **WAIT / AVOID** | Stand aside (esp. dry volume) |
+
+**Timing stack (live advisory):** sector rotation → volume → 22 EMA → 200 EMA.  
+Hard structure gates were A/B backtested vs v15 and **failed** promotion (see `PERF_MODEL_ROUTING.md` / `STRUCTURE_GATES_AB.json`) — keep as desk labels only.
+
+**Model performance:** default `v15_meta_xgb`; use `--model auto` per stock (TSLA→v13_specialists, MU→v1_2h4h, IONQ→v8_4h_daily, …).
 
 ## Ranking score
 `0.55×win_rate + 0.30×sharpe_norm + 0.15×PF_norm − DD_penalty`  

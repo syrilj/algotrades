@@ -1,0 +1,47 @@
+[
+  {
+    "thr": 0.7,
+    "win_rate": 0.6875,
+    "trade_count": 16,
+    "sharpe": 0.5165840170034011,
+    "profit_factor": 1.884,
+    "max_drawdown": -0.052430129728559545,
+    "total_return": 0.05597386702404861
+  },
+  {
+    "thr": 0.75,
+    "win_rate": 0.0,
+    "trade_count": 0,
+    "sharpe": 0.0,
+    "profit_factor": 0.0,
+    "max_drawdown": 0.0,
+    "total_return": 0.0
+  },
+  {
+    "thr": 0.8,
+    "win_rate": 0.0,
+    "trade_count": 0,
+    "sharpe": 0.0,
+    "profit_factor": 0.0,
+    "max_drawdown": 0.0,
+    "total_return": 0.0
+  },
+  {
+    "thr": 0.85,
+    "win_rate": 0.0,
+    "trade_count": 0,
+    "sharpe": 0.0,
+    "profit_factor": 0.0,
+    "max_drawdown": 0.0,
+    "total_return": 0.0
+  },
+  {
+    "thr": 0.9,
+    "win_rate": 0.0,
+    "trade_count": 0,
+    "sharpe": 0.0,
+    "profit_factor": 0.0,
+    "max_drawdown": 0.0,
+    "total_return": 0.0
+  }
+]

@@ -1,0 +1,42 @@
+{
+  "version": "v19b_node_macro",
+  "run": "runs/poc_va_v19b_node_macro",
+  "window": {
+    "start": "2024-08-01",
+    "end": "2026-07-11",
+    "interval": "1H"
+  },
+  "portfolio": {
+    "annual_return": 0.026128619664208097,
+    "avg_holding_days": 9.3,
+    "benchmark_return": 2.854875,
+    "calmar": 0.046,
+    "excess_return": -2.804181,
+    "final_value": 1050694.5223680707,
+    "information_ratio": -1.2899,
+    "max_consecutive_loss": 5,
+    "max_drawdown": -0.5680694070919278,
+    "profit_factor": 1.0274,
+    "profit_loss_ratio": 0.934,
+    "sharpe": 0.2783916180017395,
+    "sortino": 0.1928,
+    "total_return": 0.050694522368070594,
+    "trade_count": 126,
+    "win_rate": 0.5238095238095238
+  },
+  "vs_v19": {
+    "ret_lift": 0.4309125223680706,
+    "pf_lift": 0.11830000000000007,
+    "dd_lift": 0.10873059290807219,
+    "trades": 126
+  },
+  "pass_bar": false,
+  "gates": {
+    "profit_factor_min": false,
+    "max_drawdown_max_abs": false,
+    "sharpe_min": false,
+    "min_trades": true
+  },
+  "status": "fail",
+  "note": "Macro gate fixed sign of returns vs v19 but still misses PASS_BAR; large-cap drag remains."
+}

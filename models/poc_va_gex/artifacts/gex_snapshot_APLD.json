@@ -1,0 +1,23 @@
+{
+  "ticker": "APLD",
+  "spot": 31.149999618530273,
+  "asof_utc": "2026-07-11 22:14:01.193204",
+  "expiries_used": [
+    "2026-07-17",
+    "2026-07-24",
+    "2026-07-31",
+    "2026-08-07"
+  ],
+  "net_dealer_gex": -6799942.907265258,
+  "gex_sign": -1,
+  "regime": "negative_gex_amplify",
+  "call_wall": 32.0,
+  "put_wall": 30.0,
+  "dist_call_wall_pct": 2.728733200253668,
+  "dist_put_wall_pct": -3.6918126247621865,
+  "approx_flip_strike": 10.0,
+  "otm_call_volume": 18918.0,
+  "otm_call_oi": 101939.0,
+  "n_contracts": 365,
+  "sign_convention": "dealer = -customer; customer assumed long calls and puts"
+}

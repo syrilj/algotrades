@@ -1,0 +1,73 @@
+{
+  "artifacts": [
+    {
+      "path": "artifacts/equity.csv",
+      "sha256": "d1f5c323e06f880a07b2efd41d21eade94be7f908a7a560341b4facb5362ff1a",
+      "size_bytes": 18785
+    },
+    {
+      "path": "artifacts/greeks.csv",
+      "sha256": "8461f3f354959ec290fc901c7c356dbf7a0f473d0f748a5228cc6fc62991fdc3",
+      "size_bytes": 14497
+    },
+    {
+      "path": "artifacts/metrics.csv",
+      "sha256": "252ee6c2a0f3d03889dc7ce131f8db6a0bf077f4e8b2082764cd1ea189061cb9",
+      "size_bytes": 187
+    },
+    {
+      "path": "artifacts/ohlcv_AMZN.US.csv",
+      "sha256": "bd7fe724708b24c6a3bebb27690f0ba8919b8037c0ed59d181568b95dff2bb40",
+      "size_bytes": 44377
+    },
+    {
+      "path": "artifacts/trades.csv",
+      "sha256": "f10d51593a375a5ef2d9e1af91f26b351246fbf13dae37d69af39a19ea0b741f",
+      "size_bytes": 816
+    },
+    {
+      "path": "code/signal_engine.py",
+      "sha256": "b9c142ea18aa8f6f27e245984799193ea780109abb5a34e63f5241d30da230d1",
+      "size_bytes": 8718
+    },
+    {
+      "path": "config.json",
+      "sha256": "476ccef7bdcda6e79a23fc66f38bb082b477079a01e43930502e5376c72c8706",
+      "size_bytes": 458
+    }
+  ],
+  "backtest": {
+    "codes": [
+      "AMZN.US"
+    ],
+    "end_date": "2026-07-11",
+    "engine": "options",
+    "initial_cash": 1000000.0,
+    "interval": "1D",
+    "source": "yfinance",
+    "start_date": "2024-08-01"
+  },
+  "data_sources": [
+    "yfinance"
+  ],
+  "generated_at": "2026-07-11T22:58:39.290087Z",
+  "metrics": {
+    "annual_return": 0.021543,
+    "calmar": 0.8478,
+    "final_value": 1041961.96,
+    "max_drawdown": -0.025411,
+    "profit_loss_ratio": 2.9482,
+    "sharpe": 0.4277,
+    "sortino": 0.2111,
+    "total_return": 0.041962,
+    "trade_count": 10,
+    "win_rate": 0.4
+  },
+  "reproducibility": {
+    "config_hash": "476ccef7bdcda6e79a23fc66f38bb082b477079a01e43930502e5376c72c8706",
+    "strategy_hash": "b9c142ea18aa8f6f27e245984799193ea780109abb5a34e63f5241d30da230d1"
+  },
+  "run_dir": "/Users/syriljacob/Desktop/TradingAlgoWork/runs/poc_va_opts_hunt/loops/solo_amzn__atm10_21",
+  "schema_version": "0.1",
+  "warnings": []
+}

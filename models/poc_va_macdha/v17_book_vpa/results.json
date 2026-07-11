@@ -1,0 +1,34 @@
+{
+  "model": "v17_book_vpa",
+  "window": "2024-08-01..2026-07-11",
+  "interval": "1H",
+  "note": "Full Coulling/Soros/commitment stack on v15; PASS bar, worse Sharpe/return than v15 (over-filter).",
+  "portfolio": {
+    "final_value": 1622803.025982018,
+    "total_return": 0.6228030259820181,
+    "annual_return": 0.28727537859502994,
+    "max_drawdown": -0.09446262461168681,
+    "sharpe": 1.6206930560659647,
+    "calmar": 3.0412,
+    "sortino": 1.1199,
+    "win_rate": 0.5934065934065934,
+    "profit_loss_ratio": 1.8037,
+    "profit_factor": 2.6324,
+    "max_consecutive_loss": 5,
+    "avg_holding_days": 8.2,
+    "trade_count": 91,
+    "benchmark_return": 4.251131,
+    "excess_return": -3.628328,
+    "information_ratio": -1.4537
+  },
+  "vs_v15": {
+    "sharpe_delta": -0.5073165956969963,
+    "pf_delta": -0.044399999999999995,
+    "dd_delta": 0.03793943697386756,
+    "return_delta": -0.682261053661807,
+    "trades_delta": -39
+  },
+  "pass_bar": true,
+  "beats_winner_sharpe": false,
+  "beats_winner_pf": false
+}

@@ -1,0 +1,58 @@
+{
+  "version": "v20b_macro_light",
+  "run": "runs/poc_va_v20b_macro_light",
+  "window": {
+    "start": "2024-08-01",
+    "end": "2026-07-11",
+    "interval": "1H"
+  },
+  "portfolio": {
+    "annual_return": 0.48534068695699806,
+    "avg_holding_days": 12.5,
+    "benchmark_return": 2.930867,
+    "calmar": 4.8298,
+    "excess_return": -1.795706,
+    "final_value": 2135161.4630623506,
+    "information_ratio": -0.9693,
+    "max_consecutive_loss": 4,
+    "max_drawdown": -0.10048826980005673,
+    "profit_factor": 3.04,
+    "profit_loss_ratio": 1.6837,
+    "sharpe": 2.2344823691454345,
+    "sortino": 1.8448,
+    "total_return": 1.1351614630623508,
+    "trade_count": 101,
+    "win_rate": 0.6435643564356436
+  },
+  "pass_bar": true,
+  "gates": {
+    "profit_factor_min": true,
+    "max_drawdown_max_abs": true,
+    "sharpe_min": true,
+    "min_trades": true
+  },
+  "vs_v15_winner": {
+    "ret_delta": -0.16983853693764916,
+    "dd_delta": 0.031911730199943256,
+    "sharpe_delta": 0.10648236914543441,
+    "pf_delta": 0.36319999999999997
+  },
+  "also_ran": {
+    "v20_book_macro": {
+      "ret": 0.365,
+      "dd": -0.051,
+      "sharpe": 1.67,
+      "pf": 6.03,
+      "n": 50,
+      "note": "over-gated Mag7/QQQ"
+    },
+    "v16_meta_risk": {
+      "ret": 1.165,
+      "dd": -0.108,
+      "sharpe": 2.06,
+      "pf": 2.44
+    }
+  },
+  "status": "pass",
+  "recipe": "v16 meta+Kelly + block XLP/SPY defensive + drop ARM"
+}

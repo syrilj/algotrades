@@ -1,0 +1,28 @@
+{
+  "ticker": "ARM",
+  "idea": "react_not_predict",
+  "cloud": {
+    "spot": 323.3900146484375,
+    "ema_fast": 325.01524558860126,
+    "ema_mid": 336.35599552919894,
+    "ema_slow": 300.4922821286036,
+    "direction": "neutral",
+    "cloud_bull": false,
+    "cloud_bear": false
+  },
+  "gex_regime": "negative_gex_amplify",
+  "net_dealer_gex": -48063669.428459965,
+  "nodes": {
+    "put_wall": 300.0,
+    "approx_flip": 55.0,
+    "call_wall": 350.0
+  },
+  "target": {
+    "target_node": null,
+    "target_price": null,
+    "room_pct": null,
+    "reason": "cloud neutral \u2014 wait, do not force a trade"
+  },
+  "guide_bias": "flat",
+  "note": "Desk guide only. Historical SIDE = poc_va_macdha/v19_node_cloud."
+}

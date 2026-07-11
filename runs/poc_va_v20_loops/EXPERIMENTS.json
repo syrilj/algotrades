@@ -1,0 +1,214 @@
+{
+  "experiments": [
+    {
+      "id": "wf_purged_stitch_baseline",
+      "name": "Purged/embargoed walk-forward retrain + stitched OOS portfolio as new promotion baseline",
+      "rank": 1,
+      "layer": "validation",
+      "hypothesis": "The headline Sharpe 2.13 was produced with a full-sample booster (meta_config.json n_folds=2, findings.jsonl caveat 'booster is full-sample \u2014 need WF-stitched portfolio for honest OOS'). If the meta-XGB is retrained per expanding fold with purging of trades whose 1H holding windows overlap the test fold and a >= max-holding-period embargo, and only out-of-fold gate decisions are stitched into one equity curve, the stitched Sharpe will be within 0.3 of 2.13 \u2014 i.e., the edge is real and not label-overlap leakage. If it falls further, current promotion decisions are unreliable and every downstream experiment is moot.",
+      "implementation_sketch": "Build shared tooling (e.g. models/_shared/wf_harness.py): (1) expanding walk-forward folds over 2024-08..2026-07 (5-6 folds) plus a rolling 9-12mo variant; (2) purge training trades whose entry-to-exit window overlaps any test-fold trade, embargo 1-2 days of bars after each train window; (3) retrain the v15 meta-XGB per fold with threshold and any hyperparameters selected strictly on inner-fold data; (4) stitch fold-OOS trades into one portfolio equity curve and score full PASS_BAR on the stitch; (5) run the ANTI_OVERFIT frozen-rules holdout on the stitched preset. Optionally add CPCV paths to get a Sharpe distribution for confidence intervals. This becomes the mandatory harness every experiment below runs through.",
+      "pass_criteria": "Stitched OOS meets full PASS_BAR (PF>1.2, |DD|<25%, Sharpe>0.5, n>=40, positive expectancy after costs) and stitched Sharpe >= 1.8 (within ~15% of the full-sample 2.13). If stitched Sharpe < 1.5, freeze all challenger promotion and treat v15's reported numbers as inflated.",
+      "expected_sharpe_direction": "neutral \u2014 truth-revealing; establishes the honest baseline all other experiments must beat",
+      "overfit_risk": "low",
+      "lse_sources": [
+        "londonstrategicedge.com/machine-learning/time-series/walk-forward/",
+        "core-concepts_model-evaluation",
+        "londonstrategicedge.com/machine-learning/algorithms/ensemble-methods/",
+        "education.txt",
+        "models/_shared/findings.jsonl v15 caveat + SSRN CPCV literature entry"
+      ]
+    },
+    {
+      "id": "v20_soft_nodemand",
+      "name": "Lake A: soft 0.5x size-down on Coulling no-demand entry bars (no hard block)",
+      "rank": 2,
+      "layer": "risk",
+      "hypothesis": "v17b proved the no-demand signal carries quality information (PF 2.88, DD -9.6%) but hard-blocking destroyed capacity (98 trades) and Sharpe (1.82 vs 2.13). If all 130 v15 entries are kept and entries flagged no-demand (up bar + thin volume) are merely sized to 0.5x, PF and DD improve materially while trade count and therefore Sharpe capacity are preserved \u2014 capturing v17b's signal quality without its capacity tax.",
+      "implementation_sketch": "In signal_engine.py sizing path: compute the existing Coulling no_demand flag at the entry bar; after the meta size_map output, multiply size by 0.5 when flagged, else 1.0. Zero changes to side rules, meta threshold, or feat_cols. Evaluate on the stitched WF harness (experiment 1) on 2024-08..2026-07, then the long 1D 2020-2026 stress. This is the repo's own written next_action in RESEARCH_NEXT.md Lake A with the pass bar already specified.",
+      "pass_criteria": "On stitched OOS: Sharpe >= 2.03 (v15 - 0.1) AND PF >= 2.68 AND |DD| <= 13.2% AND trade count >= ~125 of 130 (no entries dropped) AND WR >= 62.3% not required but must not fall below 58%.",
+      "expected_sharpe_direction": "+0.0 to +0.1, with PF/DD improvement as the primary lift; best risk-adjusted first shot",
+      "overfit_risk": "low",
+      "lse_sources": [
+        "models/poc_va_macdha/RESEARCH_NEXT.md Lake A",
+        "models/_shared/BOOK_FINDINGS.md B1/B4",
+        "core-concepts_unsupervised-learning (soft exposure adjustment principle)"
+      ]
+    },
+    {
+      "id": "v21_calibrated_size",
+      "name": "Probability-calibrated continuous sizing replacing the binary 0.6 gate (Platt + fractional-Kelly p)",
+      "rank": 3,
+      "layer": "meta",
+      "hypothesis": "The hard thr=0.6 gate plus 3-step size_map (0.25/0.5/1.0 at 0.55/0.65) discards information: a 0.58 trade is all-or-nothing when it should be right-sized. If meta probabilities are Platt-calibrated on purged walk-forward OOF predictions (not isotonic \u2014 too flexible at n=130) and mapped continuously to size (p<0.50 skip, 0.50-0.65 scaled 0.5-1.0x, >0.65 full, optionally feeding the calibrated p into the half-Kelly formula floored/capped at [0.25x, 1.0x]), expectancy per unit of risk rises and P&L smooths, lifting Sharpe at roughly constant trade count.",
+      "implementation_sketch": "Extend the meta stage: fit sklearn CalibratedClassifierCV-style sigmoid scaling per fold on OOF predictions from the WF harness; replace size_map with a continuous p->size function; variant B substitutes calibrated p for static historical WR in the existing half-Kelly sizing. Threshold/breakpoints selected on inner folds only (never test \u2014 logged failure). Evaluate on both the 1H stitched window and the long 1D window, where the coarse size_map was tuned on the short window (v16 findings' repeated next_action: threshold sweep on long 1D).",
+      "pass_criteria": "Stitched OOS Sharpe > 2.13 AND trades >= 120 AND PF >= 2.4 AND |DD| <= 13.2%; on the 1D 2020-2026 stress: Sharpe >= 0.85 (vs 0.75) with |DD| <= 22%. Calibration curve (reliability plot) must be monotone on OOF data.",
+      "expected_sharpe_direction": "+0.1 to +0.25; the most plausible direct route above 2.13",
+      "overfit_risk": "medium",
+      "lse_sources": [
+        "londonstrategicedge.com/machine-learning/algorithms/ensemble-methods/ (model confidence)",
+        "londonstrategicedge.com/machine-learning/risk-management/position-sizing/",
+        "core-concepts_supervised-learning (probability outputs)",
+        "models/_shared/findings.jsonl v16 next_action"
+      ]
+    },
+    {
+      "id": "v22_volz_size",
+      "name": "vol_z-tiered size multiplier (volume z-score concentrates capital, never gates)",
+      "rank": 4,
+      "layer": "risk",
+      "hypothesis": "Entry-bar volume z-score >= 1 is the repo's 'strongest OOS lift on stock trades' (BOOK_FINDINGS B5), and the earlier vol_z>=2 attempt failed only on thin training n (failure_class=needs_data), not absent OOS lift. If vol_z maps to a size multiplier (vol_z<0: 0.5x, 0-1: 1.0x, >=1: 1.25x capped by the Kelly cap) applied after the existing size_map, capital concentrates in volume-confirmed trades and expectancy and Sharpe rise with zero capacity loss.",
+      "implementation_sketch": "In signal_engine.py: compute entry-bar volume z-score vs 20-bar rolling mean/std (shift-safe, entry bar close only); apply the 3-tier multiplier post-size_map. Do NOT add vol_z to feat_cols yet \u2014 RESEARCH_NEXT's Avoid list defers feat_cols retrains until a soft-gate variant beats v15. Tier breakpoints fixed a priori (0, 1), not swept. Evaluate on the WF-stitched harness; composable with v20 (multipliers multiply).",
+      "pass_criteria": "Stitched OOS Sharpe > 2.13 AND expectancy/trade > v15's AND trades unchanged (no entries dropped) AND |DD| <= 15%. Secondary: WR >= 62.3% on the vol_z>=1 subset confirms the B5 finding out-of-sample.",
+      "expected_sharpe_direction": "+0.05 to +0.15 via expectancy concentration",
+      "overfit_risk": "medium",
+      "lse_sources": [
+        "models/_shared/BOOK_FINDINGS.md B5",
+        "models/poc_va_macdha/RESEARCH_NEXT.md Lake C",
+        "core-concepts_feature-engineering (relative volume validates moves)"
+      ]
+    },
+    {
+      "id": "v23_corr_throttle",
+      "name": "Correlation-aware concurrent-exposure scaling (soft size-down on correlated stacked longs)",
+      "rank": 5,
+      "layer": "portfolio",
+      "hypothesis": "TSLA/ARM/MU/IONQ/APLD are all high-beta tech; three concurrent longs are effectively one leveraged bet, and correlated simultaneous losers drive the -13.2% (and stress -22%) drawdowns. If a new gate-passing signal is sized by a soft multiplier (0.5-0.7x, scaled by 60-day rolling mean pairwise correlation to open positions when rho_bar > 0.6, with a crisis override assuming rho->1 when SPY realized vol is elevated), clustered-loss episodes shrink, portfolio vol falls at similar mean return, and Sharpe rises directly.",
+      "implementation_sketch": "Portfolio-level wrapper in the backtest/live executor (no signal_engine.py side changes): track open positions; on new entry compute trailing 60d return correlation of candidate vs each open symbol; multiplier = 1.0 if rho_bar<=0.6 else linearly down to 0.5x at rho_bar>=0.85, additionally scaled by open-position count; cap total gross exposure when SPY 20d realized vol is in its top decile. Entries are never rejected. Parameters fixed a priori, not tuned.",
+      "pass_criteria": "Stitched OOS Sharpe >= 2.13 AND |DD| < 12% (must beat v15's -13.2%) AND trades unchanged AND PF >= 2.5; 1D 2020-2026 stress |DD| <= 18% (vs -22%). Also must not worsen Calmar vs v15.",
+      "expected_sharpe_direction": "+0.05 to +0.2, mostly via vol/DD reduction on the same return stream",
+      "overfit_risk": "low",
+      "lse_sources": [
+        "londonstrategicedge.com/machine-learning/risk-management/correlation-portfolio-risk/",
+        "portfolio-optimisation_modern-portfolio-theory.txt"
+      ]
+    },
+    {
+      "id": "v24_inverse_vol_budgets",
+      "name": "Inverse-volatility per-symbol risk budgets under the existing Kelly/ATR overlay",
+      "rank": 6,
+      "layer": "portfolio",
+      "hypothesis": "Equal-capital sizing lets IONQ/APLD/TSLA dominate portfolio variance versus SPY/MU (the 60/40-is-90%-equity-risk problem). Setting base risk per trade proportional to 1/sigma_sym (trailing 60-day realized vol, normalized across the 6 symbols), layered under half-Kelly+ATR, equalizes risk contributions, smooths the equity curve, and lifts Sharpe without changing which trades fire. Parameter-light and side-neutral, so it composes with everything above.",
+      "implementation_sketch": "In position sizing: base_risk_sym = account_risk * (1/sigma_sym) / sum_j(1/sigma_j), recomputed weekly from 60d realized vol; no leverage on low-vol sleeves (cap all weights at 1.0x of current per-trade risk \u2014 only high-vol sleeves shrink). Everything else unchanged. Evaluate standalone on the WF harness first, then combined with the best of v20-v23 (watch for over-stacking: v16 showed overlay stacking can shave Sharpe, so combined variants must each re-clear the bar).",
+      "pass_criteria": "Stitched OOS Sharpe > 2.13 AND |DD| <= 13.2% AND trades unchanged AND PF >= 2.5; if Sharpe lands in [2.03, 2.13] but DD improves >2pp, log as documented lower-DD sleeve (v16 precedent) and do not promote.",
+      "expected_sharpe_direction": "+0.05 to +0.15 via variance equalization",
+      "overfit_risk": "low",
+      "lse_sources": [
+        "portfolio-optimisation_risk-parity.txt",
+        "portfolio-optimisation_modern-portfolio-theory.txt"
+      ]
+    },
+    {
+      "id": "meta_feature_hygiene",
+      "name": "Meta feature-matrix hygiene: stationarity (ADF) + correlation pruning + fold-stable SHAP + small-sample XGB regularization",
+      "rank": 7,
+      "layer": "meta",
+      "hypothesis": "With only 130 labeled trades the meta-XGB is data-starved and almost certainly over-parameterized. A one-time audit \u2014 (a) ADF-test every feat_col and replace level-like features (dollar distances to POC/VAH/VAL, raw volume) with ATR/percent-normalized forms, (b) drop feature pairs with |corr|>0.9, (c) drop features with near-zero or fold-unstable SHAP/gain importance across WF folds, (d) point-in-time/shift(1) audit, (e) re-tune to a small-sample config (max_depth 2-3, learning_rate 0.01-0.05, subsample 0.8, raised min_child_weight, early stopping on the last time-ordered fold only) \u2014 reduces gate variance and closes part of the gap between the 2yr Sharpe 2.13 and the 1D stress Sharpe 0.75, where price-level nonstationarity bites hardest.",
+      "implementation_sketch": "Script in models/_shared/research/: load v15 feat matrix, run statsmodels ADF per feature over 2020-2026, correlation matrix, per-fold SHAP via the WF harness; emit a pruned feat_cols list + normalized replacements; retrain with the regularized config inside the WF harness. All selection happens inside training folds. Primary side rules untouched.",
+      "pass_criteria": "Stitched OOS Sharpe >= 2.13 (must not degrade) AND 1D 2020-2026 stress Sharpe >= 0.85 (vs 0.75) AND cross-fold gate-decision agreement (fraction of trades gated identically across adjacent folds) improves vs the unpruned model; PF >= 2.5, trades >= 120.",
+      "expected_sharpe_direction": "roughly flat on 1H window, +0.1 to +0.2 on the long stress window; main payoff is holdout robustness",
+      "overfit_risk": "low",
+      "lse_sources": [
+        "core-concepts_feature-engineering",
+        "londonstrategicedge.com/machine-learning/time-series/stationarity/",
+        "londonstrategicedge.com/machine-learning/algorithms/xgboost/"
+      ]
+    },
+    {
+      "id": "v25_vol_target",
+      "name": "Portfolio volatility targeting on the fixed v15 trade stream (CML scaling, optional GARCH sigma forecast)",
+      "rank": 8,
+      "layer": "risk",
+      "hypothesis": "v15's returns cluster by vol regime, and its worst DD stretches coincide with realized-vol spikes (1D stress DD -22%). Treating the v15 stream as a fixed tangency portfolio and scaling gross exposure weekly by target_vol / trailing_20d_realized_vol of the strategy equity curve (capped at 1.0x \u2014 no leverage; take min with the half-Kelly scaler) deleverages exactly when vol and DD spike, raising Sharpe through a lower vol denominator. Variant B replaces trailing realized vol with a per-symbol GARCH(1,1) 1-5d sigma forecast for soft 0.5x size-down when forecast vol is top-quintile.",
+      "implementation_sketch": "Equity-curve-level scaler in the backtest runner: weekly, scale = min(1.0, target_vol/realized_20d_vol), applied to all new entry sizes; composition, entries, sides, gate untouched. GARCH variant: arch package, walk-forward refit monthly per symbol, feed only the sizing layer (never a gate \u2014 hard vol gates cost Sharpe 2.13->1.75). Target_vol set to v15's full-period realized vol, not tuned. v16's lesson applies: this is an overlay, so it must beat v15 Sharpe outright or it gets logged, not promoted.",
+      "pass_criteria": "Stitched OOS Sharpe > 2.13 AND trades unchanged; 1D 2020-2026 stress: Sharpe >= 0.9 AND |DD| <= 17% (vs 0.75/-22%). If short-window Sharpe in [2.03,2.13] but stress metrics clear, log as stress-hardened sleeve only.",
+      "expected_sharpe_direction": "+0.0 to +0.1 short window, +0.15 to +0.3 on the long stress window",
+      "overfit_risk": "low",
+      "lse_sources": [
+        "portfolio-optimisation_efficient-frontier.txt (CML)",
+        "londonstrategicedge.com/machine-learning/time-series/arima-garch/ (GARCH half only)",
+        "londonstrategicedge.com/machine-learning/risk-management/drawdown-analysis/ (soft-throttle adaptation)"
+      ]
+    },
+    {
+      "id": "v26_regime_meta_features",
+      "name": "Regime feature pack for the meta-XGB (QQQ trend, Mag7 breadth, vol-regime bucket, rolling beta) \u2014 GATED behind a soft-gate win",
+      "rank": 9,
+      "layer": "meta",
+      "hypothesis": "v15's feat_cols contain only spy_htf_green as regime context, yet per-symbol data shows regime is the largest un-modeled conditional (APLD 88.9% WR under f_qqq_trend vs ARM 44.4%). Adding a small, pre-audited pack \u2014 QQQ trend state, Mag7-breadth^QQQ, realized-vol-regime bucket, 60-90 bar rolling beta/R\u00b2 vs SPY \u2014 as meta features (WHETHER/HOW MUCH inputs only, never side) lets the gate learn regime-conditional odds, raising filtered WR above 62.3% and PF without hard-gating capacity. Per RESEARCH_NEXT's Avoid list, this feat_cols retrain runs ONLY after one of v20-v22 beats v15 on stitched OOS Sharpe; it also completes the pending official v18_dual_sleeve harness run (equity/DD) as its precursor evidence.",
+      "implementation_sketch": "Step 1: finish the pending official harness backtest of v18_dual_sleeve with Mag7 data and score PASS_BAR (repo-scaffolded, cheap). Step 2: compute the 4-6 regime features point-in-time daily; add to feat_cols; retrain inside the WF harness with the hygiene-pruned config; adjudicate each new feature by fold-stable SHAP before keeping (drop any with |corr|>0.9 to existing features). Kalman-slope or K-means-regime-ID variants are second-line substitutes only if the direct features show unstable importance.",
+      "pass_criteria": "Stitched OOS Sharpe > best-prior-challenger AND > 2.13 AND WR >= 62.3% AND trades >= 110 AND PF >= 2.68; every retained feature shows same-sign SHAP direction in >= 4 of 5 folds. Sequencing precondition: a v20/v21/v22 variant already beat v15 Sharpe on the stitch.",
+      "expected_sharpe_direction": "+0.1 to +0.2 with WR lift, conditional on the sequencing gate",
+      "overfit_risk": "medium",
+      "lse_sources": [
+        "models/_shared/findings.jsonl v18_dual_sleeve + SMALL_VS_LARGE_CAP.md",
+        "londonstrategicedge.com/machine-learning/algorithms/linear-regression/ (rolling beta)",
+        "londonstrategicedge.com/machine-learning/time-series/kalman-filter/",
+        "core-concepts_unsupervised-learning (K-means regimes)",
+        "portfolio-optimisation_factor-investing.txt"
+      ]
+    },
+    {
+      "id": "holdout_report_hardening",
+      "name": "Promotion-report hardening: Calmar, average DD, underwater duration + crisis-correlation stress scenario",
+      "rank": 10,
+      "layer": "validation",
+      "hypothesis": "Max DD and Sharpe alone let a challenger win via a lucky window while sitting underwater longer or depending on benign-period diversification. Adding Calmar, average drawdown, max underwater duration, and a crisis scenario (recompute DD/Sharpe assuming all concurrent positions perfectly correlated \u2014 sum absolute exposures) to the OOS reporter, and requiring challengers not to worsen Calmar or underwater duration vs v15, prevents false promotions at near-zero cost and zero trading-rule changes.",
+      "implementation_sketch": "Extend the backtest reporter used by the WF harness: compute Calmar (ann. return / MDD), mean DD, max underwater bars, plus a crisis-corr rerun of the stitched curve; write all into results.json and findings.jsonl entries. Encode as promotion rules alongside PASS_BAR. One afternoon of work; every experiment above then consumes it for free.",
+      "pass_criteria": "Not a Sharpe experiment \u2014 pass = metrics implemented, v15 baseline values recorded (Calmar, underwater duration on 2024-08..2026-07 and the 1D stress), crisis-scenario DD for v15 documented and < 25%; all subsequent promotions require Calmar >= v15's and crisis-DD < 25%.",
+      "expected_sharpe_direction": "neutral \u2014 prevents accepting fake Sharpe improvements",
+      "overfit_risk": "low",
+      "lse_sources": [
+        "londonstrategicedge.com/machine-learning/risk-management/drawdown-analysis/",
+        "londonstrategicedge.com/machine-learning/risk-management/correlation-portfolio-risk/"
+      ]
+    },
+    {
+      "id": "v27_htf_climax_exit",
+      "name": "Lake B: 4H/1D climax / effort-vs-result as soft exit tightener (entries untouched)",
+      "rank": 11,
+      "layer": "risk",
+      "hypothesis": "The full climax/effort stack over-filtered on 1H (v17 FAIL, wrong_hypothesis), but the logged next_action is to retest on coarser grain as an exit modifier. If buying-climax / effort-vs-result flags computed on 4H/1D bars tighten the trail or halve remaining size on OPEN positions only, the loser tail from blow-off bars shrinks with zero capacity cost, improving PF and DD while entry count and WR stay fixed.",
+      "implementation_sketch": "Reuse the existing v17 Coulling detectors resampled to 4H/1D; in the position-management loop, when the higher TF flags climax while a position is open: switch trail from ATR-k to ATR-k/2 (or exit half). No entry logic touched. Audit output must show the modified exits disproportionately hit trades that were losers under v15 ('fewer climax-chase losers' per RESEARCH_NEXT Lake B).",
+      "pass_criteria": "Stitched OOS: entry count identical to v15, Sharpe >= 2.03, PF >= 2.68, |DD| < 13.2%; trade audit shows net R improvement concentrated in the bottom-decile v15 trades. If PF/DD improve but Sharpe < 2.03, do not promote (v17b lesson).",
+      "expected_sharpe_direction": "+0.0 to +0.1, primarily PF/DD via cheaper exits",
+      "overfit_risk": "medium",
+      "lse_sources": [
+        "models/poc_va_macdha/RESEARCH_NEXT.md Lake B",
+        "models/_shared/BOOK_FINDINGS.md B6/B7/F1"
+      ]
+    },
+    {
+      "id": "sniper_universe_expand",
+      "name": "Small-cap peer screen to grow the 83%-WR sniper sleeve toward n>=40 (satellite only) + one low-correlation diversifier candidate",
+      "rank": 12,
+      "layer": "portfolio",
+      "hypothesis": "The APLD+IONQ sniper sleeve (WR 83.3%, PF 19.7) fails PASS_BAR only on n=12; the statistically valid fix is more names sharing the DNA, not more filters. Screening for APLD-like microstructure (daily vol 2.5-3%, $60-120M dollar volume, high volume CV, sparse options chains, low institutional footprint), verifying the same DNA lifts (VWAP/vol_expand/red_flag) per candidate on train data before admission, and running 3-6 admitted peers through the unchanged pipeline grows sleeve n past 40 and raises blended-book WR \u2014 the direct route to 'keep or raise 62.3%' without touching v15. Secondarily, screen 1-2 genuinely low-correlation liquid names (non-tech) for a capped sleeve under the same locked rules, admitted only on sleeve-level PASS_BAR.",
+      "implementation_sketch": "Script over the existing OHLCV + FEATURE_INSIGHTS pipeline: universe scan -> microstructure filter -> per-name DNA-lift verification (Wilson intervals given small n) -> admit -> backtest expanded sleeve 2024-2026 through the WF harness. Book composition stays wA*Sleeve + wB*v15 with a fixed satellite cap mirroring the current sniper weighting; never replaces v15.",
+      "pass_criteria": "Expanded sleeve: n >= 40 OOS, WR >= 75%, PF > 1.2 (full PASS_BAR); blended book: WR >= 62.3% AND Sharpe >= 2.13 AND |DD| <= 13.2%. Any new diversifier symbol admits only if its standalone stitched sleeve passes PF>1.2 at n>=40. No new filters may be added to force WR (logged trap).",
+      "expected_sharpe_direction": "+0.05 to +0.15 blended, via more independent bets and higher blended WR; highest effort in the list (data acquisition + screening)",
+      "overfit_risk": "medium",
+      "lse_sources": [
+        "models/_shared/research/SMALL_VS_LARGE_CAP.md sections 2.5/4",
+        "models/poc_va_macdha/RESEARCH_NEXT.md Lake D",
+        "portfolio-optimisation_efficient-frontier.txt (uncorrelated-asset frontier expansion)"
+      ]
+    }
+  ],
+  "discarded": [
+    "ARIMA short-term mean forecasting as a signal \u2014 price-predicting model as signal source violates the locked architecture and rhymes with the failed naive-XGB-next-close; its useful half (GARCH vol) is kept in v25_vol_target.",
+    "LSTM/Transformer sequence models \u2014 n=130 tabular trade outcomes is orders of magnitude below what sequence models need; the source page itself disqualifies the use case.",
+    "Neural networks for trade-outcome prediction \u2014 same n<1K tabular disqualification per the source's own guidance; XGBoost stays.",
+    "Regression models forecasting next price/return \u2014 explicitly banned as primary by the architecture lock and the logged poc_va_xgb failure.",
+    "Full Markowitz mean-variance weight optimization \u2014 per-symbol expected returns from 130 trades are noise; kept only as its estimation-free degenerate form (inverse-vol budgets, v24).",
+    "Time-series stacking with a diverse base model \u2014 high overfit risk at n=130 for a +1-5% expected squeeze per the source itself; revisit only after sample size grows.",
+    "PCA of meta features \u2014 second-line hygiene made redundant by correlation pruning in meta_feature_hygiene; XGB tolerates residual correlation.",
+    "Cross-sectional momentum rank \u2014 degenerate with a 6-symbol universe (rank in sixths); near-zero power for the added feature-count cost.",
+    "IV-minus-realized-vol spread meta feature \u2014 GEX chain snapshots lack point-in-time IV history for the backtest window; deferred to live-forward evaluation only, not a rankable experiment now.",
+    "Isolation Forest / one-class SVM anomaly size-down \u2014 redundant with the vol-targeting + GARCH + correlation-throttle stack, which covers the same 'abnormal state -> smaller size' mechanism with fewer fitted parameters.",
+    "Historical-simulation ES/CVaR exposure budget \u2014 tail estimate too noisy at ~130 trades of P&L history to be a fitted control; crisis-correlation stress scenario (holdout_report_hardening) covers the tail-risk validation need cheaply.",
+    "Drawdown-triggered soft equity throttle \u2014 plausible but overlaps vol targeting (both deleverage in bad stretches) and v16 already showed overlay stacking shaves Sharpe; hold as a fallback if v25 fails its bar.",
+    "Bucket-specific FEATURE_INSIGHTS rebuild for large caps \u2014 high overfit risk (per-flag lift on small per-symbol n) and sequenced behind v18_dual_sleeve official run inside v26; not a standalone experiment yet.",
+    "Kalman filter and K-means regime models as standalone experiments \u2014 folded into v26_regime_meta_features as second-line variants; running them separately would be 3 variants of one idea.",
+    "All TRAP entries (hard entry gates, WR>=90% chasing, reactive node+MA-cloud primary, random k-fold, test-set threshold tuning, premature feat_cols retrains) \u2014 retained as constraints baked into every experiment's design and sequencing, not as experiments."
+  ]
+}

@@ -1,0 +1,28 @@
+{
+  "ticker": "COIN",
+  "idea": "react_not_predict",
+  "cloud": {
+    "spot": 159.07000732421875,
+    "ema_fast": 159.5066099905801,
+    "ema_mid": 161.35619539844157,
+    "ema_slow": 171.60236580673345,
+    "direction": "down",
+    "cloud_bull": false,
+    "cloud_bear": true
+  },
+  "gex_regime": "negative_gex_amplify",
+  "net_dealer_gex": -51063204.52159653,
+  "nodes": {
+    "put_wall": 150.0,
+    "approx_flip": 40.0,
+    "call_wall": 165.0
+  },
+  "target": {
+    "target_node": "put_wall",
+    "target_price": 150.0,
+    "room_pct": 5.7018965905572205,
+    "reason": "nearest node below (cloud down)"
+  },
+  "guide_bias": "reactive_short_or_stand_aside",
+  "note": "Desk guide only. Historical SIDE = poc_va_macdha/v19_node_cloud."
+}

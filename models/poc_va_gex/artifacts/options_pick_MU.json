@@ -1,0 +1,10 @@
+{
+  "symbol": "MU",
+  "action": "skip",
+  "reason": "spread max_loss $2272 > budget $180 \u2014 wait cheaper IV/DTE",
+  "spot": 979.2999877929688,
+  "expiry": "2026-08-07",
+  "proposed_debit": 22.724999999999994,
+  "long_strike": 1045.0,
+  "short_strike": 1120.0
+}

@@ -1,0 +1,25 @@
+{
+  "model": "v21_mstr_tsla",
+  "window": "2024-08-01..2026-07-11",
+  "interval": "1H",
+  "note": "MSTR+TSLA only, kelly 0.75, DD halt 20%/flatten 35%, compounds",
+  "portfolio": {
+    "final_value": 938585.643999708,
+    "total_return": -0.0614143560002918,
+    "annual_return": -0.0325181937790512,
+    "max_drawdown": -0.2714681132980202,
+    "sharpe": -0.1496636458457533,
+    "calmar": -0.1198,
+    "sortino": -0.0653,
+    "win_rate": 0.5142857142857142,
+    "profit_loss_ratio": 0.8349,
+    "profit_factor": 0.884,
+    "max_consecutive_loss": 6.0,
+    "avg_holding_days": 6.0,
+    "trade_count": 70,
+    "benchmark_return": 0.189543,
+    "excess_return": -0.250957,
+    "information_ratio": -0.5032
+  },
+  "end_per_1000": 938.59
+}

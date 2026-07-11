@@ -1,0 +1,28 @@
+{
+  "source": "yfinance",
+  "codes": [
+    "TSLA.US",
+    "ARM.US",
+    "MU.US",
+    "SPY.US",
+    "IONQ.US",
+    "APLD.US",
+    "QQQ.US",
+    "XLP.US"
+  ],
+  "start_date": "2024-08-01",
+  "end_date": "2026-07-11",
+  "initial_cash": 1000000,
+  "commission": 0.001,
+  "engine": "daily",
+  "interval": "1H",
+  "strategy": {
+    "model_version": "v22_gex_adaptive",
+    "note": "v20b_macro_light + volume-z boosted confidence + sector rank integration + tighter stops for high-beta",
+    "enhancements": {
+      "volume_z_filter": "vol_z >= 2 required on shift(1)",
+      "sector_rank_integration": "0.15 weight in confidence boost",
+      "per_symbol_stops": "ionic/APLD: 2.0 ATR stops, TSLA/MU: tighter volatility scaling"
+    }
+  }
+}

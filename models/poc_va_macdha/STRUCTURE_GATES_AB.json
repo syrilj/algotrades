@@ -1,0 +1,54 @@
+{
+  "window": "2024-08-01 .. 2026-07-11",
+  "codes": [
+    "TSLA.US",
+    "ARM.US",
+    "MU.US",
+    "SPY.US",
+    "IONQ.US",
+    "APLD.US"
+  ],
+  "baseline_poc_va_v15": {
+    "sharpe": 2.128,
+    "pf": 2.677,
+    "dd": -0.132,
+    "calmar": 4.123,
+    "wr": 0.623,
+    "trades": 130,
+    "total_return": 1.305
+  },
+  "structure_full_vol_awake_ema200": {
+    "run": "poc_va_v15_structure_gates",
+    "sharpe": 1.747,
+    "pf": 2.799,
+    "dd": -0.115,
+    "calmar": 3.225,
+    "wr": 0.636,
+    "trades": 88,
+    "total_return": 0.83,
+    "verdict": "FAIL promote \u2014 Sharpe/Calmar/return worse"
+  },
+  "structure_light_ema200_redflag": {
+    "run": "poc_va_v15_struct_light",
+    "sharpe": 1.857,
+    "pf": 2.623,
+    "dd": -0.132,
+    "calmar": 3.191,
+    "wr": 0.616,
+    "trades": 99,
+    "total_return": 0.965,
+    "verdict": "FAIL promote \u2014 Sharpe/Calmar/return worse"
+  },
+  "live_desk_policy": "Keep volume/EMA22/EMA200 as advisory actions in trade_desk; do not hard-gate v15 engine entries.",
+  "model_routing": {
+    "default": "v15_meta_xgb",
+    "per_symbol_auto": {
+      "TSLA": "v13_specialists",
+      "MU": "v1_2h4h",
+      "APLD": "v12_regime_router",
+      "IONQ": "v8_4h_daily",
+      "ARM": "v12_regime_router",
+      "SPY": "v13_specialists"
+    }
+  }
+}

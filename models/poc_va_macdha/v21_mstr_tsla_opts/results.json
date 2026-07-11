@@ -1,0 +1,19 @@
+{
+  "model": "v21_mstr_tsla_opts",
+  "window": "2024-08-01..2026-07-11",
+  "interval": "1D",
+  "note": "ATM calls on v21 entries; 5% premium risk; halt 25%/flatten 40%",
+  "portfolio": {
+    "final_value": 1090770.41,
+    "total_return": 0.09077,
+    "annual_return": 0.046081,
+    "max_drawdown": -0.039133,
+    "sharpe": 0.8465,
+    "calmar": 1.1775,
+    "sortino": 0.4397,
+    "trade_count": 20,
+    "win_rate": 0.4,
+    "profit_loss_ratio": 4.5594
+  },
+  "end_per_1000": 1090.77
+}

@@ -1,0 +1,28 @@
+{
+  "ticker": "INOD",
+  "idea": "react_not_predict",
+  "cloud": {
+    "spot": 67.80000305175781,
+    "ema_fast": 71.51110716273553,
+    "ema_mid": 79.51547235445686,
+    "ema_slow": 78.40415094139026,
+    "direction": "neutral",
+    "cloud_bull": false,
+    "cloud_bear": false
+  },
+  "gex_regime": "negative_gex_amplify",
+  "net_dealer_gex": -2075759.6294146846,
+  "nodes": {
+    "put_wall": 60.0,
+    "approx_flip": 20.0,
+    "call_wall": 78.0
+  },
+  "target": {
+    "target_node": null,
+    "target_price": null,
+    "room_pct": null,
+    "reason": "cloud neutral \u2014 wait, do not force a trade"
+  },
+  "guide_bias": "flat",
+  "note": "Desk guide only. Historical SIDE = poc_va_macdha/v19_node_cloud."
+}

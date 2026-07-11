@@ -1,13 +1,14 @@
 {
   "ticker": "SPY",
   "spot": 754.9500122070312,
-  "asof_utc": "2026-07-11 18:05:29.275007",
+  "asof_utc": "2026-07-11 22:14:11.203189",
   "expiries_used": [
     "2026-07-13",
     "2026-07-14",
-    "2026-07-15"
+    "2026-07-15",
+    "2026-07-16"
   ],
-  "net_dealer_gex": -7051838606.912809,
+  "net_dealer_gex": -7350829743.335735,
   "gex_sign": -1,
   "regime": "negative_gex_amplify",
   "call_wall": 757.0,
@@ -15,8 +16,8 @@
   "dist_call_wall_pct": 0.2715395403433119,
   "dist_put_wall_pct": -0.655674167427366,
   "approx_flip_strike": 500.0,
-  "otm_call_volume": 566838.0,
-  "otm_call_oi": 302128.0,
-  "n_contracts": 543,
+  "otm_call_volume": 573874.0,
+  "otm_call_oi": 310415.0,
+  "n_contracts": 581,
   "sign_convention": "dealer = -customer; customer assumed long calls and puts"
 }

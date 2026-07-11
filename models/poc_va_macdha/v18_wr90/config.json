@@ -1,0 +1,26 @@
+{
+  "source": "yfinance",
+  "codes": ["APLD.US", "IONQ.US", "QQQ.US"],
+  "start_date": "2024-08-01",
+  "end_date": "2026-07-11",
+  "initial_cash": 1000000,
+  "commission": 0.001,
+  "engine": "daily",
+  "interval": "1H",
+  "strategy": {
+    "model_version": "v18_wr90",
+    "target_wr": 0.9,
+    "universe": ["APLD.US", "IONQ.US"],
+    "filters": [
+      "qqq_trend",
+      "vol_expand",
+      "block_red_flag",
+      "block_no_demand",
+      "require_commitment",
+      "vol_z_ge1",
+      "ema200",
+      "min_confidence_0.72"
+    ],
+    "note": "Sniper sleeve from book+v16+vol_z findings. Thin N expected — WR vanity insufficient alone; still require pass bar."
+  }
+}

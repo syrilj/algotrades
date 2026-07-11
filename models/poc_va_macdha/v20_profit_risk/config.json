@@ -1,0 +1,52 @@
+{
+  "source": "yfinance",
+  "codes": [
+    "TSLA.US",
+    "ARM.US",
+    "MU.US",
+    "SPY.US",
+    "IONQ.US",
+    "APLD.US"
+  ],
+  "start_date": "2024-08-01",
+  "end_date": "2026-07-11",
+  "initial_cash": 1000000,
+  "commission": 0.001,
+  "engine": "daily",
+  "interval": "1H",
+  "extra_fields": null,
+  "strategy": {
+    "model_version": "v20_profit_risk",
+    "primary": "v12_regime_router",
+    "routing_ref": "models/poc_va_macdha/ROUTING.json",
+    "status": "draft",
+    "risk": {
+      "stop_atr": 1.5,
+      "trail_atr": 2.5,
+      "arm_trail_atr": 1.0,
+      "kelly_fraction": 0.5,
+      "min_confidence": 0.55,
+      "risk_pct": 0.01,
+      "sizing": "fixed_fractional_half_kelly_vol_scaled",
+      "vol_scale_clip": [0.4, 1.25],
+      "portfolio_dd": {
+        "soft_pct": 0.05,
+        "soft_mult": 0.5,
+        "halt_entries_pct": 0.10,
+        "flatten_pct": 0.15
+      }
+    },
+    "pass_bar": {
+      "min_total_return": 2.5,
+      "max_drawdown": -0.18,
+      "min_sharpe": 1.72,
+      "min_profit_factor": 1.79,
+      "min_trades": 40
+    },
+    "references": [
+      "https://londonstrategicedge.com/machine-learning/risk-management/",
+      "https://londonstrategicedge.com/machine-learning/risk-management/position-sizing/",
+      "https://londonstrategicedge.com/machine-learning/risk-management/drawdown-analysis/"
+    ]
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "ticker": "TSLA",
+  "idea": "react_not_predict",
+  "cloud": {
+    "spot": 407.760009765625,
+    "ema_fast": 404.60397693695626,
+    "ema_mid": 403.8154294755408,
+    "ema_slow": 403.82501460524895,
+    "direction": "neutral",
+    "cloud_bull": false,
+    "cloud_bear": false
+  },
+  "gex_regime": "negative_gex_amplify",
+  "net_dealer_gex": -950035155.7899683,
+  "nodes": {
+    "put_wall": 400.0,
+    "approx_flip": 5.0,
+    "call_wall": 420.0
+  },
+  "target": {
+    "target_node": null,
+    "target_price": null,
+    "room_pct": null,
+    "reason": "cloud neutral \u2014 wait, do not force a trade"
+  },
+  "guide_bias": "flat",
+  "note": "Desk guide only. Historical SIDE = poc_va_macdha/v19_node_cloud."
+}

@@ -1,13 +1,14 @@
 {
   "ticker": "TSLA",
   "spot": 407.760009765625,
-  "asof_utc": "2026-07-11 18:06:21.588469",
+  "asof_utc": "2026-07-11 22:13:14.280277",
   "expiries_used": [
     "2026-07-13",
     "2026-07-15",
-    "2026-07-17"
+    "2026-07-17",
+    "2026-07-20"
   ],
-  "net_dealer_gex": -913573249.6070806,
+  "net_dealer_gex": -950035155.7899683,
   "gex_sign": -1,
   "regime": "negative_gex_amplify",
   "call_wall": 420.0,
@@ -15,8 +16,8 @@
   "dist_call_wall_pct": 3.0017632777207313,
   "dist_put_wall_pct": -1.9030825926469221,
   "approx_flip_strike": 5.0,
-  "otm_call_volume": 425787.0,
-  "otm_call_oi": 447693.0,
-  "n_contracts": 760,
+  "otm_call_volume": 446664.0,
+  "otm_call_oi": 464608.0,
+  "n_contracts": 897,
   "sign_convention": "dealer = -customer; customer assumed long calls and puts"
 }

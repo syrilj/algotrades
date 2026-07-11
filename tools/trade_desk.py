@@ -10,6 +10,9 @@ Usage:
   python3 tools/trade_desk.py rotate
   python3 tools/trade_desk.py rotate --top 3
   python3 tools/trade_desk.py picks --horizon day --model v14_risk_kelly
+  python3 tools/trade_desk.py watch NVDA --every 30
+  python3 tools/trade_desk.py watch NVDA,MU,ANET --every 45
+  python3 tools/trade_desk.py watch rotate --every 90
 """
 from __future__ import annotations
 
@@ -17,6 +20,7 @@ import argparse
 import importlib.util
 import json
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -30,11 +34,14 @@ sys.path.insert(0, str(ROOT / "tools"))
 from model_registry import (  # noqa: E402
     DEFAULT_MODEL,
     engine_path,
+    hist_win_rate,
     list_engine_models,
     rank_models,
     rank_models_for_symbol,
     recommend_model,
 )
+
+_ENGINE_CACHE: dict[str, Any] = {}
 
 DEFAULT_WATCH = [
     # Mag7 + mega tech
@@ -160,18 +167,21 @@ def _basket_series(members: list[str], period: str = "6mo") -> pd.Series:
 
 def rank_sector_flows(period: str = "6mo") -> list[dict[str, Any]]:
     """Rank thematic sectors by where money is rotating (RS vs SPY + trend)."""
-    spy = _download_close(["SPY"], period=period)
-    if spy.empty:
+    # One batched Yahoo pull for SPY + sector ETFs (avoid N serial downloads).
+    etf_by_sec = {sec: SECTOR_ETF.get(sec) for sec in ROTATION_SECTORS}
+    batch = ["SPY"] + sorted({e for e in etf_by_sec.values() if e})
+    panel = _download_close(batch, period=period)
+    if panel.empty or "SPY" not in panel.columns:
         raise RuntimeError("Could not download SPY for sector rotation")
-    spy_px = spy.iloc[:, 0].dropna()
+    spy_px = panel["SPY"].dropna()
 
     rows = []
     for sec in ROTATION_SECTORS:
-        etf = SECTOR_ETF.get(sec)
+        etf = etf_by_sec.get(sec)
         members = [m for m in SECTORS[sec] if m not in ("SPY", "QQQ", "IWM", "ARKK")]
         try:
-            if etf:
-                px = _download_close([etf], period=period).iloc[:, 0].dropna()
+            if etf and etf in panel.columns:
+                px = panel[etf].dropna()
                 proxy = etf
             else:
                 px = _basket_series(members[:8], period=period)  # cap for speed
@@ -290,21 +300,25 @@ def _print_rotate(payload: dict, horizon: str) -> None:
         print("    None live — check BREAKOUT WATCH + PULLBACK ZONE below.")
     for r in buy[:12]:
         tag = "BREAKOUT" if r.get("setup_kind") == "breakout_buy" else "CLASSIC"
+        eng = r.get("best_hist_model") or r.get("model") or ""
         print(
             f"    [{tag}] {r['symbol']:<5} [{r.get('sector'):<9}]  "
             f"~${r['price']:.2f}  stop ${r['stop']:.2f}  "
-            f"risk ${r['dollar_risk']:.0f}  conf {r['confidence']:.0%}"
+            f"risk ${r['dollar_risk']:.0f}  conf {r['confidence']:.0%}  "
+            f"best-model {eng}"
         )
 
-    print("\n  ABOUT TO BREAK OUT (set buy-stop alerts)")
+    print("\n  ABOUT TO BREAK OUT (volume waking — wait for SURGE through level)")
     if not breakouts:
         print("    None pressing highs in top sectors right now.")
     for r in breakouts[:12]:
         lvl = r.get("breakout_level")
+        rv = r.get("rvol")
         tip = f"buy-stop > ${lvl:.2f}" if lvl else (r.get("do_next") or "")[:70]
+        rv_s = f" rvol {rv:.1f}x" if rv is not None else ""
         print(
             f"    {r['symbol']:<5} [{r.get('sector'):<9}]  "
-            f"${r['price']:.2f}  conf {r['confidence']:.0%}  → {tip}"
+            f"${r['price']:.2f}{rv_s}  conf {r['confidence']:.0%}  → {tip}"
         )
 
     print("\n  PULLBACK ZONE (trend ok — wait for dip into value)")
@@ -331,10 +345,12 @@ def _print_rotate(payload: dict, horizon: str) -> None:
 
     print("\n  What this means")
     print("    1) Money is rotating hardest into the sectors marked <<< above")
-    print("    2) BUY / BUY BREAKOUT = trade now (breakout = smaller size)")
-    print("    3) BREAKOUT WATCH = almost breaking — set alerts, don't chase early")
-    print("    4) PULLBACK ZONE = good names, wait for value-area dip")
-    print("    5) Drill in:  .venv/bin/python3 tools/trade_desk.py TICKER")
+    print("    2) BUY / BUY BREAKOUT = trade now (breakout needs VOLUME surge)")
+    print("    3) BREAKOUT WATCH = almost — only take it when volume expands")
+    print("    4) PULLBACK ZONE = prefer dips into 22 EMA / value")
+    print("    5) Lost 200 EMA = structural break → skip longs (advisory; not a promoted hard gate)")
+    print("    6) Different stocks → different engines:  --model auto")
+    print("    7) Drill in:  .venv/bin/python3 tools/trade_desk.py TICKER --model auto")
     print("=" * 72)
     print()
 
@@ -357,12 +373,15 @@ def _resolve_model(model_arg: str, symbol: str | None = None) -> tuple[str, dict
 
 
 def _load_engine(model: str):
+    if model in _ENGINE_CACHE:
+        return _ENGINE_CACHE[model]
     path = engine_path(model)
     spec = importlib.util.spec_from_file_location(f"poc_va_{model}", path)
     if spec is None or spec.loader is None:
         raise RuntimeError(f"Cannot load engine: {path}")
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
+    _ENGINE_CACHE[model] = mod
     return mod
 
 
@@ -395,6 +414,11 @@ def _to_code(symbol: str) -> str:
 
 def _fetch_ohlcv(symbol: str, period: str = "60d", interval: str = "1h") -> pd.DataFrame:
     ysym = _to_yf(symbol)
+    # Yahoo caps: 1m ≤ 7d, 5m/15m ≤ 60d
+    if interval in ("1m", "2m") and period not in ("1d", "5d", "7d"):
+        period = "5d"
+    if interval in ("5m", "15m", "30m") and period in ("60d", "3mo", "6mo", "1y", "2y", "5y", "max"):
+        period = "10d"
     raw = yf.download(ysym, period=period, interval=interval, auto_adjust=True, progress=False)
     if raw is None or raw.empty:
         raise ValueError(f"No data for {ysym}")
@@ -413,7 +437,36 @@ def _fetch_ohlcv(symbol: str, period: str = "60d", interval: str = "1h") -> pd.D
     return df.dropna(subset=["close"])
 
 
-def _compute_state(mod, code: str, df: pd.DataFrame, model_name: str) -> dict[str, Any]:
+def _market_session() -> dict[str, Any]:
+    """US equity session label in America/New_York."""
+    try:
+        from zoneinfo import ZoneInfo
+        now = datetime.now(ZoneInfo("America/New_York"))
+    except Exception:  # noqa: BLE001
+        now = datetime.now(timezone.utc)
+    mins = now.hour * 60 + now.minute
+    wd = now.weekday()  # 0=Mon
+    if wd >= 5:
+        label, open_now = "WEEKEND", False
+    elif mins < 4 * 60:
+        label, open_now = "CLOSED", False
+    elif mins < 9 * 60 + 30:
+        label, open_now = "PRE-MARKET", False
+    elif mins < 16 * 60:
+        label, open_now = "RTH OPEN", True
+    elif mins < 20 * 60:
+        label, open_now = "AFTER-HOURS", False
+    else:
+        label, open_now = "CLOSED", False
+    return {
+        "label": label,
+        "open": open_now,
+        "et": now.strftime("%Y-%m-%d %H:%M:%S ET"),
+        "weekday": now.strftime("%A"),
+    }
+
+
+def _compute_state(mod, code: str, df: pd.DataFrame, model_name: str, live: bool = False) -> dict[str, Any]:
     eng = mod.SignalEngine()
     # routers expose _cfg(code); plain engines use defaults via __dict__/getattr
     if hasattr(eng, "_cfg"):
@@ -433,7 +486,8 @@ def _compute_state(mod, code: str, df: pd.DataFrame, model_name: str) -> dict[st
             if hasattr(eng, k):
                 cfg[k] = getattr(eng, k)
 
-    signal_tf = cfg.get("signal_tf", "2h") or ""
+    # Live watch: keep native bar size (5m/1m) so open tape actually moves
+    signal_tf = "" if live else (cfg.get("signal_tf", "2h") or "")
     frame = mod._resample_ohlcv(df, signal_tf) if signal_tf else df
     if frame.empty:
         frame = df
@@ -545,11 +599,10 @@ def _compute_state(mod, code: str, df: pd.DataFrame, model_name: str) -> dict[st
     missing = [k for k, ok in part_flags.items() if not ok]
 
     prior = _PRIOR_WR.get(_to_yf(code), 0.55)
-    # prefer historical WR for this model+symbol if available
-    hist = rank_models_for_symbol(code, engines_only=False)
-    hist_row = next((r for r in hist if r["model"] == model_name), None)
-    if hist_row:
-        prior = float(hist_row["win_rate"])
+    # prefer historical WR for this model+symbol if available (cached card lookup)
+    hist_wr = hist_win_rate(model_name, code)
+    if hist_wr is not None:
+        prior = float(hist_wr)
     conf_prob = float(np.clip(0.35 + c * 0.45, 0.40, 0.78))
     hit_prob = float(np.clip(0.55 * conf_prob + 0.45 * prior, 0.40, 0.80))
 
@@ -645,7 +698,7 @@ def _compute_state(mod, code: str, df: pd.DataFrame, model_name: str) -> dict[st
         setup_kind = "breakout_watch"
     elif pullback_to_22 or ("in_value_area" in missing and c >= 0.60 and trend_ok and above_200):
         setup_kind = "pullback_watch"
-    elif (not part_flags.get("not_red_flag", True)) or (vol_dry and pressing_high):
+    elif (not part_flags.get("not_red_flag", True)) or vol_dry:
         setup_kind = "avoid"
     else:
         setup_kind = "wait"
@@ -770,14 +823,23 @@ def analyze(
     risk_pct: float,
     period: str = "60d",
     model: str = DEFAULT_MODEL,
+    interval: str = "1h",
+    live: bool = False,
+    ranks: bool = True,
 ) -> dict[str, Any]:
     model_name, selection = _resolve_model(model, symbol)
     mod = _load_engine(model_name)
     code = _to_code(symbol)
-    df = _fetch_ohlcv(symbol, period=period, interval="1h")
-    state = _compute_state(mod, code, df, model_name)
+    if live:
+        interval = interval or "5m"
+        if period in ("60d", ""):
+            period = "10d" if interval != "1m" else "5d"
+    df = _fetch_ohlcv(symbol, period=period, interval=interval)
+    state = _compute_state(mod, code, df, model_name, live=live)
+    state["data_interval"] = interval
+    state["live"] = live
     sizing = _position_math(state, account, risk_pct)
-    symbol_ranks = rank_models_for_symbol(symbol, engines_only=False)[:8]
+    symbol_ranks = rank_models_for_symbol(symbol, engines_only=False)[:8] if ranks else []
     return {
         "model": model_name,
         "model_selection": selection,
@@ -788,6 +850,155 @@ def analyze(
     }
 
 
+def _snapshot_row(out: dict[str, Any]) -> dict[str, Any]:
+    st, plan = out["state"], _plain_plan(out["state"])
+    return {
+        "symbol": st["symbol"],
+        "action": plan["action"],
+        "why": plan["why"],
+        "do_next": plan["do_next"],
+        "setup_kind": st.get("setup_kind"),
+        "price": st["price"],
+        "stop": st["stop"],
+        "rvol": st.get("rvol"),
+        "vol_surge": st.get("vol_surge"),
+        "vol_dry": st.get("vol_dry"),
+        "ema22": st.get("ema22"),
+        "ema200": st.get("ema200"),
+        "above_ema22": st.get("above_ema22"),
+        "above_ema200": st.get("above_ema200"),
+        "near_ema22": st.get("near_ema22"),
+        "breakout_level": st.get("breakout_level"),
+        "confidence": st["confidence"],
+        "asof": st.get("asof"),
+        "interval": st.get("data_interval", "1h"),
+    }
+
+
+def _print_watch_board(
+    rows: list[dict[str, Any]],
+    prev: dict[str, dict],
+    session: dict[str, Any],
+    every: int,
+    tick: int,
+) -> None:
+    print()
+    print("=" * 78)
+    print(f"  LIVE WATCH  ·  {session['et']}  ·  {session['label']}  ·  tick #{tick}  ·  every {every}s")
+    print("  Ctrl+C to stop  ·  Yahoo delay ~1–15m (not a broker feed)")
+    print("=" * 78)
+    print(
+        f"  {'SYM':<6} {'ACTION':<26} {'PX':>9} {'Δ':>7} {'RVOL':>6} "
+        f"{'22':>5} {'200':>5}  NOTE"
+    )
+    alerts: list[str] = []
+    for r in rows:
+        sym = r["symbol"]
+        p = prev.get(sym)
+        px_d = ""
+        if p and p.get("price") is not None:
+            d = float(r["price"]) - float(p["price"])
+            px_d = f"{d:+.2f}" if abs(d) >= 0.005 else ""
+        act_chg = ""
+        if p and p.get("action") != r["action"]:
+            act_chg = " ★"
+            alerts.append(f"{sym}: {p.get('action')} → {r['action']}")
+        e22 = "Y" if r.get("above_ema22") else "n"
+        e200 = "Y" if r.get("above_ema200") else "N"
+        if r.get("near_ema22"):
+            e22 = "~"
+        rv = r.get("rvol")
+        rv_s = f"{rv:.1f}x" if rv is not None else "—"
+        if r.get("vol_surge"):
+            rv_s += "!"
+        elif r.get("vol_dry"):
+            rv_s += "↓"
+        note = ""
+        if "BREAKOUT" in r["action"] or "BUY" in r["action"]:
+            note = (r.get("do_next") or "")[:28]
+        elif "structure" in r["action"].lower():
+            note = "lost 200 EMA"
+        elif r.get("near_ema22"):
+            note = "near 22 EMA"
+        print(
+            f"  {sym:<6} {(r['action'] + act_chg):<26} "
+            f"${r['price']:>8.2f} {px_d:>7} {rv_s:>6} "
+            f"{e22:>5} {e200:>5}  {note}"
+        )
+    if alerts:
+        print("-" * 78)
+        print("  CHANGES THIS TICK")
+        for a in alerts:
+            print(f"    ★ {a}")
+    print("-" * 78)
+    print("  Volume first · 22 EMA = drawdowns · 200 EMA = structure · sector rotate = pond")
+    print("=" * 78)
+    print()
+
+
+def run_watch(
+    symbols: list[str],
+    account: float,
+    risk_pct: float,
+    model: str,
+    every: int = 30,
+    interval: str = "5m",
+    clear: bool = True,
+    max_ticks: int | None = None,
+) -> int:
+    """Refresh board until Ctrl+C. Built for market-open tape watching."""
+    every = max(15, int(every))
+    prev: dict[str, dict] = {}
+    tick = 0
+    print(
+        f"Starting live watch on {', '.join(symbols)}  "
+        f"(interval={interval}, refresh={every}s). Ctrl+C to stop.",
+        flush=True,
+    )
+    try:
+        while True:
+            tick += 1
+            session = _market_session()
+            rows: list[dict[str, Any]] = []
+            errors: list[str] = []
+            for sym in symbols:
+                try:
+                    out = analyze(
+                        sym, account, risk_pct,
+                        model=model, interval=interval, live=True, ranks=False,
+                    )
+                    rows.append(_snapshot_row(out))
+                except Exception as exc:  # noqa: BLE001
+                    errors.append(f"{sym}: {exc}")
+            if clear and tick > 1:
+                # ANSI clear — works in most terminals
+                print("\033[2J\033[H", end="", flush=True)
+            _print_watch_board(rows, prev, session, every, tick)
+            if errors:
+                print("  Fetch issues:")
+                for e in errors[:6]:
+                    print(f"    ! {e}")
+                print()
+            # single-name deep dive when only one symbol
+            if len(rows) == 1 and not errors:
+                r = rows[0]
+                print(f"  {r['symbol']} detail: {r['why']}")
+                print(f"  → {r['do_next']}")
+                if r.get("breakout_level"):
+                    print(f"  Breakout level ${r['breakout_level']:.2f}  |  bar asof {r.get('asof')}")
+                print()
+            prev = {r["symbol"]: r for r in rows}
+            if max_ticks is not None and tick >= max_ticks:
+                return 0
+            # near open: hint if still closed
+            if session["label"] == "PRE-MARKET" and tick == 1:
+                print("  Pre-market: tape is thin — volume signals are noisier until 9:30 ET.\n")
+            time.sleep(every)
+    except KeyboardInterrupt:
+        print("\n  Watch stopped.\n")
+        return 0
+
+
 def scan_picks(
     symbols: list[str],
     account: float,
@@ -796,26 +1007,41 @@ def scan_picks(
     model: str = DEFAULT_MODEL,
 ) -> list[dict[str, Any]]:
     rows = []
+    # Skip per-symbol rank tables during scan (O(symbols × models)); use recommend once.
+    want_auto = (model or "").strip() in ("auto", "best", "")
     for sym in symbols:
         try:
-            out = analyze(sym, account, risk_pct, model=model)
+            out = analyze(sym, account, risk_pct, model=model, ranks=False)
             st, sz = out["state"], out["sizing"]
             kind = st.get("setup_kind") or ("classic_buy" if st["setup_ok"] else "wait")
             kind_mult = {
                 "classic_buy": 1.0,
-                "breakout_buy": 0.88,
-                "breakout_watch": 0.62,
-                "pullback_watch": 0.42,
+                "breakout_buy": 0.90,  # volume-confirmed breakout
+                "breakout_watch": 0.58,
+                "pullback_watch": 0.48,  # 22 EMA / value dip
                 "wait": 0.28,
                 "avoid": 0.10,
+                "structural_break": 0.05,
             }.get(kind, 0.30)
             score = st["hit_probability"] * kind_mult * max(st["sleeve_fraction"], 0.25)
             if horizon == "week":
                 score *= (1.05 if st["flags"].get("mom_pos") else 0.9)
                 score *= (1.05 if st["flags"].get("htf_ha_green") else 0.85)
+            # Volume is the main precipitor — boost / cut score by participation
+            if st.get("vol_surge"):
+                score *= 1.15
+            elif st.get("vol_dry"):
+                score *= 0.70
+            if st.get("near_ema22") and st.get("above_ema200"):
+                score *= 1.06
+            if st.get("lost_200"):
+                score *= 0.40
             if st.get("pressing_high") or st.get("breakout_ready"):
-                score *= 1.08
-            best = (out.get("model_ranks_for_symbol") or [{}])[0]
+                score *= 1.05
+            if want_auto:
+                best = out.get("model_selection") or recommend_model(sym)
+            else:
+                best = recommend_model(sym)
             plan = _plain_plan(st)
             rows.append({
                 "symbol": st["symbol"],
@@ -827,6 +1053,11 @@ def scan_picks(
                 "setup_kind": kind,
                 "breakout_level": st.get("breakout_level"),
                 "pressing_high": st.get("pressing_high"),
+                "rvol": st.get("rvol"),
+                "vol_surge": st.get("vol_surge"),
+                "ema22": st.get("ema22"),
+                "ema200": st.get("ema200"),
+                "above_ema200": st.get("above_ema200"),
                 "price": st["price"],
                 "entry": st["entry"],
                 "stop": st["stop"],
@@ -857,6 +1088,12 @@ _FLAG_LABELS = {
     "not_red_flag": "Not a weak rally (vol drying up)",
     "mom_pos": "Momentum is positive",
     "sqz_off_or_release": "Squeeze released / not crushed",
+    "vol_surge": "Volume SURGE (breakout fuel)",
+    "vol_awake": "Volume waking vs average",
+    "not_vol_dry": "Volume not drying on the push",
+    "above_ema22": "Above 22 EMA (drawdown support)",
+    "above_ema200": "Above 200 EMA (structure intact)",
+    "near_ema22": "Near 22 EMA (pullback zone)",
 }
 
 _MISSING_DO = {
@@ -881,10 +1118,28 @@ def _plain_plan(state: dict) -> dict[str, Any]:
     lvl = state.get("breakout_level")
     vah = state.get("vah")
     val = state.get("val")
+    e22 = state.get("ema22")
+    e200 = state.get("ema200")
+    rvol = state.get("rvol")
 
-    if kind == "classic_buy":
+    if kind == "structural_break":
+        action = "AVOID (structure broken)"
+        why = (
+            f"Lost the 200 EMA"
+            + (f" (${e200:.2f})" if e200 else "")
+            + " — structural break. Don't buy dips until volume reclaims it."
+        )
+        do_next = (
+            f"Stand aside. Watch for a volume surge reclaim of the 200"
+            + (f" (${e200:.2f})" if e200 else "")
+            + ". Until then, longs are fighting broken structure."
+        )
+    elif kind == "classic_buy":
         action = "BUY NOW"
-        why = "Pullback-in-value setup is live. Use the size/stop below."
+        if state.get("near_ema22") and e22:
+            why = f"Pullback into the 22 EMA (~${e22:.2f}) with structure intact — best R:R flavor."
+        else:
+            why = "Pullback-in-value setup is live. Use the size/stop below."
         do_next = (
             f"Buy around ${state['price']:.2f}. "
             f"Hard stop ${state['stop']:.2f}. "
@@ -892,41 +1147,55 @@ def _plain_plan(state: dict) -> dict[str, Any]:
         )
     elif kind == "breakout_buy":
         action = "BUY BREAKOUT"
-        why = "Just breaking / pressing highs with trend + volume — take smaller size."
+        why = (
+            f"Volume-led breakout"
+            + (f" (rvol {rvol:.1f}x)" if rvol else "")
+            + " — participation confirms the move. Smaller size."
+        )
         do_next = (
             f"Buy around ${state['price']:.2f} (½–¾ normal size). "
             f"Stop ${state['stop']:.2f}. "
-            f"Invalid if it fails back under {f'VAH ${lvl:.2f}' if lvl else 'breakout level'}."
+            f"Invalid if it fails back under {f'${lvl:.2f}' if lvl else 'breakout level'} "
+            f"or volume dies."
         )
     elif kind == "breakout_watch":
         action = "BREAKOUT WATCH"
-        why = "Coiling near highs / value top — about to break out if it clears the level."
+        why = "Near highs with volume waking — breakout precipitates when volume SURGES through the level."
         trigger = f"${lvl:.2f}" if lvl else "the 20-bar high"
         px = float(state.get("price") or 0)
         if lvl and px >= float(lvl) * 0.998:
             do_next = (
-                f"Already pressing ${px:.2f}. Hold / buy only on a volume push through {trigger}; "
-                f"abort if it fails under ${state['stop']:.2f}."
+                f"Already pressing ${px:.2f}. Only buy on a VOLUME push through {trigger} "
+                f"(rvol ≥ ~1.3x). Abort under ${state['stop']:.2f}."
             )
         else:
             do_next = (
-                f"Set a buy-stop / alert above {trigger}. "
-                f"Only enter on a close through with volume; stop under ${state['stop']:.2f}."
+                f"Alert above {trigger}. Enter only when volume expands with the break; "
+                f"ignore a quiet drift through. Stop under ${state['stop']:.2f}."
             )
     elif kind == "pullback_watch":
         action = "PULLBACK ZONE"
-        why = "Trend is fine but price is chasing above value — wait for a dip."
-        if vah is not None and val is not None:
+        if state.get("near_ema22") and e22:
+            why = f"Trend OK — wait for / buy the dip into the 22 EMA (~${e22:.2f}), not the extension."
             do_next = (
-                f"Alert near VAH ${vah:.2f} or VAL ${val:.2f}. "
-                f"Buy the pullback if HTF stays green — don't chase ${state['price']:.2f}."
+                f"Alert near 22 EMA ${e22:.2f}"
+                + (f" / VAL ${val:.2f}" if val else "")
+                + ". Prefer quiet volume on the dip (healthy), then buy when volume returns up."
             )
         else:
-            do_next = _MISSING_DO["in_value_area"]
-    elif kind == "avoid" or not flags.get("not_red_flag", True):
+            why = "Trend is fine but price is chasing above value — wait for a dip."
+            if vah is not None and val is not None:
+                do_next = (
+                    f"Alert near VAH ${vah:.2f} or VAL ${val:.2f}"
+                    + (f" / 22 EMA ${e22:.2f}" if e22 else "")
+                    + f". Don't chase ${state['price']:.2f}."
+                )
+            else:
+                do_next = _MISSING_DO["in_value_area"]
+    elif kind == "avoid" or not flags.get("not_red_flag", True) or state.get("vol_dry"):
         action = "AVOID"
-        why = "Weak rally: price up while volume fades — easy trap."
-        do_next = "Stand aside until volume confirms or price resets into value."
+        why = "Weak tape: price push on drying volume — classic trap. Volume is the veto."
+        do_next = "Stand aside until volume confirms (rvol > 1) or price resets into value / 22 EMA."
     elif "poc_hold" in missing:
         action = "WAIT"
         why = "Support (POC) is broken."
@@ -950,9 +1219,9 @@ def _plain_plan(state: dict) -> dict[str, Any]:
         "do_next": do_next,
         "checklist": checklist,
         "confidence_note": (
-            f"Confidence {conf:.0%} = how many quality checks are green. "
-            f"Actions: BUY NOW / BUY BREAKOUT = trade; BREAKOUT WATCH = alert; "
-            f"PULLBACK ZONE / WAIT = stand aside."
+            f"Confidence {conf:.0%} = quality checks. "
+            f"Breakouts need VOLUME first; 22 EMA = drawdown buy zone; "
+            f"lost 200 EMA = structural break."
         ),
     }
 
@@ -991,6 +1260,19 @@ def _print_analyze(payload: dict) -> None:
             print(f"    Breakout lvl  ${st['breakout_level']:.2f}   (buy-stop / alert)")
         if st.get("vwap") is not None:
             print(f"    VWAP          ${st['vwap']:.2f}")
+    # Always show structure stack (volume + EMAs)
+    print("-" * 64)
+    print("  STRUCTURE  (volume first → then EMAs)")
+    rvol = st.get("rvol")
+    vol_note = "SURGE" if st.get("vol_surge") else ("awake" if st.get("vol_awake") else ("DRY" if st.get("vol_dry") else "quiet"))
+    print(f"    Volume        rvol {rvol:.1f}x  [{vol_note}]" if rvol is not None else f"    Volume        [{vol_note}]")
+    if st.get("ema22") is not None:
+        tag22 = "holding" if st.get("above_ema22") else "LOST"
+        near = " ← pullback zone" if st.get("near_ema22") else ""
+        print(f"    22 EMA        ${st['ema22']:.2f}  [{tag22}]{near}")
+    if st.get("ema200") is not None:
+        tag200 = "intact" if st.get("above_ema200") else "BROKEN"
+        print(f"    200 EMA       ${st['ema200']:.2f}  [{tag200}]")
     print("-" * 64)
     print("  CHECKLIST  (green = good)")
     for row in plan["checklist"]:
@@ -1002,16 +1284,16 @@ def _print_analyze(payload: dict) -> None:
         print("    1) Enter near the price above")
         print("    2) Place the stop immediately")
         print("    3) Let winners run with the trail; cut losers at the stop")
+    elif plan["action"].startswith("AVOID"):
+        print("    1) Skip this name — structure/volume says no")
+        print("    2) Re-run later or pick from `rotate` / `picks`")
     elif plan["action"] == "BREAKOUT WATCH":
         print(f"    1) {plan['do_next']}")
-        print("    2) Do not chase early — wait for the break + volume")
-        print("    3) Re-run this command once the alert fires")
+        print("    2) Volume must expand on the break — quiet drift through = ignore")
+        print("    3) Re-run once the alert fires")
     elif plan["action"] == "PULLBACK ZONE":
         print(f"    1) {plan['do_next']}")
-        print("    2) Prefer buying the dip into value, not the extension")
-    elif plan["action"] == "AVOID":
-        print("    1) Skip this name today")
-        print("    2) Re-run the desk later or pick another symbol from `picks` / `rotate`")
+        print("    2) Best dips tag the 22 EMA with quiet volume, then resume with volume")
     else:
         print(f"    1) {plan['do_next']}")
         print("    2) Re-run this command after the alert/condition hits")
@@ -1062,29 +1344,32 @@ def _print_picks(rows: list[dict], horizon: str) -> None:
         and r.get("confidence", 0) >= 0.65
         and r.get("action") in ("WAIT", "WAIT (almost ready)")
     ]
-    avoid = [r for r in rows if r.get("action") == "AVOID"]
+    avoid = [r for r in rows if str(r.get("action", "")).startswith("AVOID")]
 
     print("\n  BUY NOW / BUY BREAKOUT")
     if not playable:
         print("    None live — use BREAKOUT WATCH + PULLBACK ZONE.")
     for r in playable[:12]:
         tag = "BREAKOUT" if r.get("setup_kind") == "breakout_buy" else "CLASSIC"
+        rv = r.get("rvol")
+        rv_s = f" rvol {rv:.1f}x" if rv is not None else ""
         print(
             f"    [{tag}] {r['symbol']:<5} [{r.get('sector','?'):<9}]  "
-            f"~${r['price']:.2f}  stop ${r['stop']:.2f}  "
-            f"risk ${r['dollar_risk']:.0f}  conf {r['confidence']:.0%}  "
-            f"est.win {r['hit_probability']:.0%}"
+            f"~${r['price']:.2f}{rv_s}  stop ${r['stop']:.2f}  "
+            f"risk ${r['dollar_risk']:.0f}  conf {r['confidence']:.0%}"
         )
 
-    print("\n  ABOUT TO BREAK OUT (set buy-stop alerts)")
+    print("\n  ABOUT TO BREAK OUT (volume waking — wait for SURGE)")
     if not breakouts:
         print("    (none)")
     for r in breakouts[:15]:
         lvl = r.get("breakout_level")
+        rv = r.get("rvol")
         tip = f"buy-stop > ${lvl:.2f}" if lvl else (r.get("do_next") or "")[:80]
+        rv_s = f" rvol {rv:.1f}x" if rv is not None else ""
         print(
             f"    {r['symbol']:<5} [{r.get('sector','?'):<9}]  "
-            f"${r['price']:.2f}  conf {r['confidence']:.0%}  → {tip}"
+            f"${r['price']:.2f}{rv_s}  conf {r['confidence']:.0%}  → {tip}"
         )
 
     print("\n  PULLBACK ZONE (wait for dip into value)")
@@ -1125,22 +1410,29 @@ def _print_picks(rows: list[dict], horizon: str) -> None:
             print(f"    {r['symbol']:<5} [{r.get('sector','?'):<9}]  {r.get('do_next','')[:80]}")
 
     print("\n  How to use")
-    print("    • BUY NOW / BUY BREAKOUT = take trade (breakout = smaller size)")
-    print("    • BREAKOUT WATCH = about to break — set buy-stop alerts")
-    print("    • PULLBACK ZONE = good trend, wait for value-area dip")
-    print("    • Drill in:  .venv/bin/python3 tools/trade_desk.py TICKER")
+    print("    • BUY NOW / BUY BREAKOUT = trade (breakout requires volume surge)")
+    print("    • BREAKOUT WATCH = near highs — only take volume-led breaks")
+    print("    • PULLBACK ZONE = prefer 22 EMA / value dips")
+    print("    • Lost 200 EMA = structural break → skip (live advisory)")
+    print("    • Per-stock engines:  --model auto   (see PERF_MODEL_ROUTING.md)")
+    print("    • Drill in:  .venv/bin/python3 tools/trade_desk.py TICKER --model auto")
     print("=" * 72)
     print()
 
 
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description="POC/VA trade desk (multi-model)")
-    p.add_argument("command", nargs="?", help="Symbol, 'picks', 'rotate', or 'rank'")
+    p.add_argument("command", nargs="?", help="Symbol, 'picks', 'rotate', 'rank', or 'watch'")
+    p.add_argument(
+        "rest",
+        nargs="*",
+        help="For watch: tickers, comma-list, or 'rotate'",
+    )
     p.add_argument("--account", type=float, default=100_000, help="Account equity (default 100000)")
     p.add_argument("--risk-pct", type=float, default=0.01, help="Max risk fraction per trade (default 1%%)")
     p.add_argument("--horizon", choices=["day", "week"], default="day", help="For picks/rotate: day or week")
-    p.add_argument("--top", type=int, default=5, help="For rotate: how many hot sectors to dig into")
-    p.add_argument("--symbols", type=str, default="", help="Comma watchlist for picks")
+    p.add_argument("--top", type=int, default=5, help="For rotate/watch rotate: how many hot sectors")
+    p.add_argument("--symbols", type=str, default="", help="Comma watchlist for picks/watch")
     p.add_argument(
         "--sectors",
         type=str,
@@ -1157,6 +1449,15 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--engines-only", action="store_true", help="For rank: only runnable engines")
     p.add_argument("--json", action="store_true", help="Print raw JSON")
     p.add_argument("--period", type=str, default="60d", help="yfinance lookback period")
+    p.add_argument("--every", type=int, default=30, help="For watch: refresh seconds (min 15)")
+    p.add_argument(
+        "--interval",
+        type=str,
+        default="5m",
+        help="For watch: bar size (5m default; use 1m near open for faster tape)",
+    )
+    p.add_argument("--no-clear", action="store_true", help="For watch: don't clear screen each tick")
+    p.add_argument("--ticks", type=int, default=0, help="For watch: stop after N ticks (0=forever)")
     args = p.parse_args(argv)
 
     if not args.command:
@@ -1169,6 +1470,10 @@ def main(argv: list[str] | None = None) -> int:
         print("  python3 tools/trade_desk.py rotate")
         print("  python3 tools/trade_desk.py rotate --top 5 --horizon day")
         print("  python3 tools/trade_desk.py picks --horizon week --model v14_risk_kelly")
+        print("  python3 tools/trade_desk.py watch NVDA --every 30")
+        print("  python3 tools/trade_desk.py watch NVDA,MU,ANET --every 45 --interval 5m")
+        print("  python3 tools/trade_desk.py watch rotate --every 90 --top 3")
+        print("  python3 tools/trade_desk.py watch --symbols NVDA,IBIT,ANET --interval 1m --every 20")
         return 0
 
     cmd = args.command.strip().lower()
@@ -1184,6 +1489,47 @@ def main(argv: list[str] | None = None) -> int:
         else:
             _print_rank(rows, title)
         return 0
+
+    if cmd == "watch":
+        # Resolve symbol list
+        bits: list[str] = []
+        if args.symbols.strip():
+            bits.extend(s.strip() for s in args.symbols.split(",") if s.strip())
+        for tok in args.rest:
+            bits.extend(s.strip() for s in tok.split(",") if s.strip())
+        use_rotate = any(b.lower() == "rotate" for b in bits) or (not bits)
+        symbols: list[str] = []
+        if use_rotate and (not bits or bits == ["rotate"] or "rotate" in [b.lower() for b in bits]):
+            print("Resolving hot sectors for live board…", flush=True)
+            flows = rank_sector_flows()
+            top = [r for r in flows if "error" not in r][: max(1, args.top)]
+            for sec in top:
+                symbols.extend((sec.get("members") or [])[:6])  # cap per sector for speed
+            # drop rotate token from bits if mixed
+            extra = [b for b in bits if b.lower() != "rotate"]
+            symbols.extend(extra)
+            print(f"Hot sectors: {', '.join(t['sector'] for t in top)}", flush=True)
+        else:
+            symbols = bits
+        # unique preserve order
+        seen: set[str] = set()
+        symbols = [s.upper() for s in symbols if not (s.upper() in seen or seen.add(s.upper()))]
+        if not symbols:
+            raise SystemExit("watch: pass tickers, --symbols, or 'rotate'")
+        # keep board readable
+        if len(symbols) > 18:
+            symbols = symbols[:18]
+            print(f"Watching first 18 names for speed: {', '.join(symbols)}", flush=True)
+        return run_watch(
+            symbols,
+            args.account,
+            args.risk_pct,
+            args.model,
+            every=args.every,
+            interval=args.interval,
+            clear=not args.no_clear,
+            max_ticks=(args.ticks or None),
+        )
 
     if cmd == "rotate":
         payload = rotate_picks(

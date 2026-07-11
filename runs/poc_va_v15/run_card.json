@@ -80,7 +80,7 @@
   "data_sources": [
     "yfinance"
   ],
-  "generated_at": "2026-07-11T18:07:49.117641Z",
+  "generated_at": "2026-07-11T22:19:51.150179Z",
   "metrics": {
     "annual_return": 0.545859302486791,
     "avg_holding_days": 12.9,

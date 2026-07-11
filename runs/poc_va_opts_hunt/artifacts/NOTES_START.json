@@ -1,0 +1,15 @@
+{
+  "prior_notes": [
+    "v20 stock leaders MU/APLD/IONQ/TSLA",
+    "v21 MSTR+TSLA equity failed; options small win",
+    "Diversified equity compounds better than 2-name focus",
+    "Account floor required (flatten before blowup)",
+    "$1k\u2192$1M = 1000x; report years-to-target at realized CAGR"
+  ],
+  "n_jobs": 65,
+  "window": {
+    "start_date": "2024-08-01",
+    "end_date": "2026-07-11",
+    "interval": "1D"
+  }
+}

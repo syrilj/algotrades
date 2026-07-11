@@ -1,0 +1,64 @@
+{
+  "model": "v18_wr90",
+  "target_wr": 0.9,
+  "achieved_stable_wr": 0.8333333333333334,
+  "hit_90_robust": false,
+  "window": "2024-08-01..2026-07-11",
+  "universe": [
+    "APLD.US",
+    "IONQ.US"
+  ],
+  "portfolio": {
+    "final_value": 1711956.9012478457,
+    "total_return": 0.7119569012478457,
+    "annual_return": 0.32369010916713714,
+    "max_drawdown": -0.11312622260719349,
+    "sharpe": 1.389291882915245,
+    "calmar": 2.8613,
+    "sortino": 0.6505,
+    "win_rate": 0.8333333333333334,
+    "profit_loss_ratio": 3.9372,
+    "profit_factor": 19.6862,
+    "max_consecutive_loss": 1,
+    "avg_holding_days": 12.7,
+    "trade_count": 12,
+    "benchmark_return": 4.928149,
+    "excess_return": -4.216192,
+    "information_ratio": -1.2423
+  },
+  "why_not_90": [
+    "Engine feedback loop: adding vol_z/book gates either stays ~83% or collapses to n<=4 with non-reproducible 100% spikes",
+    "Full-book meta threshold 0.70 peaks at WR 68.8% (n=16); higher thr \u2192 0 trades",
+    "Offline trade filters that looked like 100% did not hold when re-applied as entry gates (timing mismatch)"
+  ],
+  "best_practical_high_wr": {
+    "wr": 0.8333333333333334,
+    "n": 12,
+    "sharpe": 1.389291882915245,
+    "pf": 19.6862,
+    "dd": -0.11312622260719349,
+    "filters": [
+      "APLD+IONQ",
+      "qqq_trend",
+      "vol_expand",
+      "block_red_flag"
+    ]
+  },
+  "compare": {
+    "v15_full_book": {
+      "wr": 0.623,
+      "n": 130,
+      "sharpe": 2.13
+    },
+    "v16_wr80": {
+      "wr": 0.833,
+      "n": 12,
+      "sharpe": 1.39
+    },
+    "v18_wr90_stable": {
+      "wr": 0.8333333333333334,
+      "n": 12,
+      "sharpe": 1.389291882915245
+    }
+  }
+}

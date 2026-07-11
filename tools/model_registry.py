@@ -7,7 +7,11 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 MODELS_ROOT = ROOT / "models" / "poc_va_macdha"
+# Keep aligned with WINNER.json: v15 beats v14 on Sharpe/PF/DD (risk-adj), not raw return.
 DEFAULT_MODEL = "v15_meta_xgb"
+
+# Process-local card cache — scan/watch call rank_models_for_symbol per symbol.
+_CARD_CACHE: dict[str, Any] = {"mtime_key": None, "cards": None}
 
 
 def _safe_float(x: Any, default: float = 0.0) -> float:
@@ -137,26 +141,60 @@ def load_leaderboard_cards() -> list[dict[str, Any]]:
     return cards
 
 
+def _leaderboard_mtime_key() -> tuple[Any, ...]:
+    """Invalidate cache when leaderboard or any results.json changes."""
+    parts: list[Any] = []
+    lb = MODELS_ROOT / "TRAINING_LEADERBOARD.json"
+    parts.append(lb.stat().st_mtime_ns if lb.exists() else 0)
+    if MODELS_ROOT.exists():
+        for p in sorted(MODELS_ROOT.glob("v*/results.json")):
+            parts.append((p.as_posix(), p.stat().st_mtime_ns))
+    return tuple(parts)
+
+
+def clear_model_card_cache() -> None:
+    _CARD_CACHE["mtime_key"] = None
+    _CARD_CACHE["cards"] = None
+
+
 def all_model_cards(engines_only: bool = False) -> list[dict[str, Any]]:
     """Merge frozen version results + leaderboard; prefer folder results for same name."""
-    by_name: dict[str, dict[str, Any]] = {}
-    for card in load_leaderboard_cards():
-        by_name[card["model"]] = card
-    for name in list_engine_models():
-        card = load_version_card(name)
-        if card["portfolio"] or card["per_symbol"]:
-            by_name[name] = card
-        else:
-            by_name.setdefault(name, card)
-    for p in sorted(MODELS_ROOT.glob("v*")):
-        if not (p / "results.json").exists():
-            continue
-        if p.name not in by_name:
-            by_name[p.name] = load_version_card(p.name)
-    cards = list(by_name.values())
+    key = _leaderboard_mtime_key()
+    if _CARD_CACHE["cards"] is None or _CARD_CACHE["mtime_key"] != key:
+        by_name: dict[str, dict[str, Any]] = {}
+        for card in load_leaderboard_cards():
+            by_name[card["model"]] = card
+        for name in list_engine_models():
+            card = load_version_card(name)
+            if card["portfolio"] or card["per_symbol"]:
+                by_name[name] = card
+            else:
+                by_name.setdefault(name, card)
+        for p in sorted(MODELS_ROOT.glob("v*")):
+            if not (p / "results.json").exists():
+                continue
+            if p.name not in by_name:
+                by_name[p.name] = load_version_card(p.name)
+        _CARD_CACHE["mtime_key"] = key
+        _CARD_CACHE["cards"] = list(by_name.values())
+    cards = _CARD_CACHE["cards"] or []
     if engines_only:
-        cards = [c for c in cards if c.get("has_engine")]
-    return cards
+        return [c for c in cards if c.get("has_engine")]
+    return list(cards)
+
+
+def hist_win_rate(model: str, symbol: str) -> float | None:
+    """O(1) cached lookup of historical WR for model+symbol (no full re-rank)."""
+    code = symbol.strip().upper()
+    if not code.endswith(".US"):
+        code = f"{code}.US"
+    for card in all_model_cards(engines_only=False):
+        if card.get("model") != model:
+            continue
+        row = (card.get("per_symbol") or {}).get(code)
+        if row and row.get("win_rate") is not None:
+            return _safe_float(row.get("win_rate"))
+    return None
 
 
 def rank_models(engines_only: bool = False) -> list[dict[str, Any]]:

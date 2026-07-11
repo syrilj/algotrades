@@ -1,0 +1,45 @@
+{
+  "model": "v20_profit_risk",
+  "window": "2024-08-01..2026-07-11",
+  "interval": "1H",
+  "note": "v12 routing + v14 half-Kelly/ATR stop-trail + portfolio DD throttle (soft 5%/halt 10%/flatten 15%). risk_pct=1% keeps full Kelly.",
+  "portfolio": {
+    "final_value": 3587037.0947718597,
+    "total_return": 2.5870370947718597,
+    "annual_return": 0.946891865523474,
+    "max_drawdown": -0.2315221116987678,
+    "sharpe": 1.818887519901916,
+    "calmar": 4.0899,
+    "sortino": 1.7001,
+    "win_rate": 0.6143497757847534,
+    "profit_loss_ratio": 1.1693,
+    "profit_factor": 1.8628,
+    "max_consecutive_loss": 4.0,
+    "avg_holding_days": 7.7,
+    "trade_count": 223,
+    "benchmark_return": 4.251131,
+    "excess_return": -1.664094,
+    "information_ratio": -0.468
+  },
+  "end_per_1000": 3587.04,
+  "pass_bar": {
+    "min_total_return_2.5": true,
+    "max_dd_le_18pct": false,
+    "min_sharpe_1.72": true,
+    "min_pf_1.79": true,
+    "min_trades_40": true
+  },
+  "vs_v14": {
+    "total_return": 0.06288109477185966,
+    "sharpe": 0.09686951990191606,
+    "profit_factor": 0.07410000000000005,
+    "max_drawdown": 0.00808488830123219
+  },
+  "rejected_variant": {
+    "note": "Aggressive fixed-fractional shrink: +49% / DD -13.7% / Sharpe 1.43."
+  },
+  "paths": {
+    "engine": "models/poc_va_macdha/v20_profit_risk/signal_engine.py",
+    "run": "runs/poc_va_v20_profit_risk"
+  }
+}

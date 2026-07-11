@@ -1,0 +1,73 @@
+{
+  "artifacts": [
+    {
+      "path": "artifacts/equity.csv",
+      "sha256": "e9a80f70fb95d7e42da659c179ada9fc885425778f521ea3fb7678f901f51ab6",
+      "size_bytes": 18145
+    },
+    {
+      "path": "artifacts/greeks.csv",
+      "sha256": "bd94972b816960767ee1a7219faa3e9a7b5cb42dd49a24dd0e5dc09197281e65",
+      "size_bytes": 14252
+    },
+    {
+      "path": "artifacts/metrics.csv",
+      "sha256": "532e06f26a85330a01a769195f242b380ea408db5beabbd5718d9e420f5ba0ea",
+      "size_bytes": 186
+    },
+    {
+      "path": "artifacts/ohlcv_SPY.US.csv",
+      "sha256": "977e4d60263fd5a8bd04f0d305f9f71b5f31c5e32bb784c3a4e944e5ceef5493",
+      "size_bytes": 43355
+    },
+    {
+      "path": "artifacts/trades.csv",
+      "sha256": "d8f2c263e2c6210c1aa294a8fa7137bb015ecd8629b40a5a30abf69b6652becc",
+      "size_bytes": 366
+    },
+    {
+      "path": "code/signal_engine.py",
+      "sha256": "b9c142ea18aa8f6f27e245984799193ea780109abb5a34e63f5241d30da230d1",
+      "size_bytes": 8718
+    },
+    {
+      "path": "config.json",
+      "sha256": "4239dd349edb5d7737884b38a0e231be7d502a8898c439ac3d2d68a16f01f2ce",
+      "size_bytes": 453
+    }
+  ],
+  "backtest": {
+    "codes": [
+      "SPY.US"
+    ],
+    "end_date": "2026-07-11",
+    "engine": "options",
+    "initial_cash": 1000000.0,
+    "interval": "1D",
+    "source": "yfinance",
+    "start_date": "2024-08-01"
+  },
+  "data_sources": [
+    "yfinance"
+  ],
+  "generated_at": "2026-07-11T22:59:00.420375Z",
+  "metrics": {
+    "annual_return": -0.00365,
+    "calmar": -0.5194,
+    "final_value": 992971.71,
+    "max_drawdown": -0.007028,
+    "profit_loss_ratio": 0.0,
+    "sharpe": -1.0203,
+    "sortino": -0.1378,
+    "total_return": -0.007028,
+    "trade_count": 4,
+    "win_rate": 0.0
+  },
+  "reproducibility": {
+    "config_hash": "4239dd349edb5d7737884b38a0e231be7d502a8898c439ac3d2d68a16f01f2ce",
+    "strategy_hash": "b9c142ea18aa8f6f27e245984799193ea780109abb5a34e63f5241d30da230d1"
+  },
+  "run_dir": "/Users/syriljacob/Desktop/TradingAlgoWork/runs/poc_va_opts_hunt/loops/solo_spy__atm5_30",
+  "schema_version": "0.1",
+  "warnings": []
+}

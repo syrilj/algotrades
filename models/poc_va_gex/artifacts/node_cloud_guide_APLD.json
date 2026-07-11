@@ -1,0 +1,28 @@
+{
+  "ticker": "APLD",
+  "idea": "react_not_predict",
+  "cloud": {
+    "spot": 31.149999618530273,
+    "ema_fast": 33.48940968334631,
+    "ema_mid": 37.35352965107073,
+    "ema_slow": 38.40855893550249,
+    "direction": "down",
+    "cloud_bull": false,
+    "cloud_bear": true
+  },
+  "gex_regime": "negative_gex_amplify",
+  "net_dealer_gex": -6799942.907265258,
+  "nodes": {
+    "put_wall": 30.0,
+    "approx_flip": 10.0,
+    "call_wall": 32.0
+  },
+  "target": {
+    "target_node": "put_wall",
+    "target_price": 30.0,
+    "room_pct": 3.6918126247621865,
+    "reason": "nearest node below (cloud down)"
+  },
+  "guide_bias": "reactive_short_or_stand_aside",
+  "note": "Desk guide only. Historical SIDE = poc_va_macdha/v19_node_cloud."
+}

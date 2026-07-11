@@ -1,0 +1,37 @@
+{
+  "model": "v16_meta_risk",
+  "window": "2024-08-01..2026-07-11",
+  "interval": "1H",
+  "note": "v15 meta gate/size + v14 ATR stop/trail + half-Kelly vol-scale; full-sample booster caveat inherits from v15",
+  "portfolio": {
+    "final_value": 2164599.836734161,
+    "total_return": 1.1645998367341606,
+    "annual_return": 0.49598724272115335,
+    "max_drawdown": -0.10770676940728942,
+    "sharpe": 2.0622426609769735,
+    "calmar": 4.605,
+    "sortino": 1.9778,
+    "win_rate": 0.5864661654135338,
+    "profit_loss_ratio": 1.7216,
+    "profit_factor": 2.4416,
+    "max_consecutive_loss": 5,
+    "avg_holding_days": 12.7,
+    "trade_count": 133,
+    "benchmark_return": 4.251131,
+    "excess_return": -3.086531,
+    "information_ratio": -1.1722
+  },
+  "vs_v15": {
+    "sharpe": -0.06576699078598747,
+    "profit_factor": -0.23519999999999985,
+    "max_drawdown": 0.024695292178264952,
+    "win_rate": -0.03661075766338928
+  },
+  "vs_v14": {
+    "sharpe": 0.3402248021343486,
+    "profit_factor": 0.6529000000000003,
+    "max_drawdown": 0.1319000129909796
+  },
+  "pass_bar": true,
+  "beats_v15_sharpe_pf_dd": false
+}

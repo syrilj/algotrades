@@ -1,0 +1,26 @@
+{
+  "v15_meta_xgb": {
+    "sharpe": 2.128009651762961,
+    "profit_factor": 2.6768,
+    "max_drawdown": -0.13240206158555437,
+    "total_return": 1.305064079643825,
+    "win_rate": 0.6230769230769231,
+    "trade_count": 130
+  },
+  "v17_book_vpa": {
+    "sharpe": 1.6206930560659647,
+    "profit_factor": 2.6324,
+    "max_drawdown": -0.09446262461168681,
+    "total_return": 0.6228030259820181,
+    "win_rate": 0.5934065934065934,
+    "trade_count": 91
+  },
+  "v17b_book_vpa_light": {
+    "sharpe": 1.8151885969312838,
+    "profit_factor": 2.8785,
+    "max_drawdown": -0.09562453199639025,
+    "total_return": 0.7344900409343058,
+    "win_rate": 0.6020408163265306,
+    "trade_count": 98
+  }
+}

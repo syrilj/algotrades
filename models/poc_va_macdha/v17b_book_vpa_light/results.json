@@ -1,0 +1,34 @@
+{
+  "model": "v17b_book_vpa_light",
+  "window": "2024-08-01..2026-07-11",
+  "interval": "1H",
+  "note": "Light Coulling gates; PASS bar; best book PF (2.88>v15); better DD; still lower Sharpe/return than v15.",
+  "portfolio": {
+    "final_value": 1734490.0409343059,
+    "total_return": 0.7344900409343058,
+    "annual_return": 0.33274909279891385,
+    "max_drawdown": -0.09562453199639025,
+    "sharpe": 1.8151885969312838,
+    "calmar": 3.4797,
+    "sortino": 1.3034,
+    "win_rate": 0.6020408163265306,
+    "profit_loss_ratio": 1.9028,
+    "profit_factor": 2.8785,
+    "max_consecutive_loss": 5,
+    "avg_holding_days": 8.2,
+    "trade_count": 98,
+    "benchmark_return": 4.251131,
+    "excess_return": -3.516641,
+    "information_ratio": -1.3893
+  },
+  "vs_v15": {
+    "sharpe_delta": -0.3128210548316772,
+    "pf_delta": 0.20169999999999977,
+    "dd_delta": 0.036777529589164124,
+    "return_delta": -0.5705740387095193,
+    "trades_delta": -32
+  },
+  "pass_bar": true,
+  "beats_winner_sharpe": false,
+  "beats_winner_pf": true
+}

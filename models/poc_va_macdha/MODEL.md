@@ -9,6 +9,10 @@ If a research finding fails OOS → `models/_shared/FAILURE_PROTOCOL.md` (re-res
 | **v1_2h4h** | `models/poc_va_macdha/v1_2h4h/` | Frozen: POC/VA + 2H signals + 4H St.MACD-HA |
 | **v2_vwap** | `models/poc_va_macdha/v2_vwap/` | Active: + swing-anchored VWAP + volume expand |
 | **v13_long_oos** | `models/poc_va_macdha/v13_long_oos/` | Phase A frozen v13 on 2020–2026 **1D** (Yahoo 1H 730d cap). **FAIL** bar: PF 1.24 ✓, DD −36% ✗, Sharpe 0.45 ✗. See `OOS_REPORT.md`. |
+| **v17b_book_vpa_light** | `models/poc_va_macdha/v17b_book_vpa_light/` | Book-derived Coulling light gates on v15 meta. PASS bar; PF 2.88 (>v15), DD −9.6% better; Sharpe 1.82 < v15. Full stack v17 FAIL vs winner (over-filter). See BOOK_INSIGHTS.md. |
+| **v18_wr90** | `models/poc_va_macdha/v18_wr90/` | High-WR sniper sleeve (APLD+IONQ). Stable **83.3% WR**, Sharpe 1.39, PF 19.7, n=12. **90% target not robust** (sample_noise). Satellite beside v15, not WINNER. |
+| **v20b_macro_light** | `models/poc_va_macdha/v20b_macro_light/` | **WINNER** risk-adj book: v16 meta+Kelly + XLP/SPY defensive block + drop ARM. Sharpe **2.23**, PF **3.04**, DD **−10%**, ret +114%. See BOOK_RECIPE.md. |
+| **v19_node_cloud** | `models/poc_va_macdha/v19_node_cloud/` | Explore: **react not predict** — VAL/POC/VAH nodes + EMA cloud compass; target = nearest upside node. Live GEX walls: `poc_va_gex/v1_node_cloud`. |
 | Active run | `runs/poc_va_macdha/code/signal_engine.py` | What backtest loads |
 | Pine v1 | `pine/poc_va_macdha_v1.pine` | TradingView overlay |
 | Pine v2 | `pine/poc_va_macdha_v2_vwap.pine` | TradingView + VWAP |

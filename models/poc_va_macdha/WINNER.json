@@ -1,26 +1,48 @@
 {
-  "winner": "v15_meta_xgb",
-  "selection_rule": "PASS_BAR + best portfolio Sharpe/PF/DD among engines on 2024-08..2026-07 window; meta-gate on v13 specialists",
-  "updated_at": "2026-07-11T18:09:28Z",
-  "caveat": "Booster trained full-sample; WF candidate proxy still shows positive lift. Long OOS of raw v13 FAILED \u2014 meta+size is the active edge claim.",
+  "winner": "v20b_macro_light",
+  "selection_rule": "PASS_BAR + best portfolio Sharpe/PF/DD among engines on 2024-08..2026-07 window",
+  "updated_at": "2026-07-11T22:33:27Z",
+  "caveat": "Same meta booster as v15/v16 (full-sample train). Adds causal XLP/SPY defensive block + drops ARM. Raw return slightly below v15; Sharpe/PF/DD improve. Prefer for risk-adjusted book.",
   "portfolio": {
-    "final_value": 2305064.079643825,
-    "total_return": 1.305064079643825,
-    "annual_return": 0.545859302486791,
-    "max_drawdown": -0.13240206158555437,
-    "sharpe": 2.128009651762961,
-    "calmar": 4.1227,
-    "sortino": 2.0161,
-    "win_rate": 0.6230769230769231,
-    "profit_loss_ratio": 1.6193,
-    "profit_factor": 2.6768,
+    "annual_return": 0.48534068695699806,
+    "avg_holding_days": 12.5,
+    "benchmark_return": 2.930867,
+    "calmar": 4.8298,
+    "excess_return": -1.795706,
+    "final_value": 2135161.4630623506,
+    "information_ratio": -0.9693,
     "max_consecutive_loss": 4,
-    "avg_holding_days": 12.9,
-    "trade_count": 130,
-    "benchmark_return": 4.251131,
-    "excess_return": -2.946067,
-    "information_ratio": -1.1095
+    "max_drawdown": -0.10048826980005673,
+    "profit_factor": 3.04,
+    "profit_loss_ratio": 1.6837,
+    "sharpe": 2.2344823691454345,
+    "sortino": 1.8448,
+    "total_return": 1.1351614630623508,
+    "trade_count": 101,
+    "win_rate": 0.6435643564356436
   },
-  "previous_winner": "v13_specialists",
-  "pass_bar": true
+  "previous_winner": "v15_meta_xgb",
+  "pass_bar": true,
+  "compare": {
+    "v15_meta_xgb": {
+      "total_return": 1.305,
+      "max_drawdown": -0.1324,
+      "sharpe": 2.128,
+      "profit_factor": 2.6768,
+      "trade_count": 130
+    },
+    "v16_meta_risk": {
+      "total_return": 1.165,
+      "max_drawdown": -0.108,
+      "sharpe": 2.062,
+      "profit_factor": 2.442
+    },
+    "v20_book_macro": {
+      "total_return": 0.365,
+      "max_drawdown": -0.051,
+      "sharpe": 1.673,
+      "profit_factor": 6.035,
+      "note": "too few trades / over-gated"
+    }
+  }
 }

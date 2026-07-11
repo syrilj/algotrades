@@ -1,0 +1,36 @@
+{
+  "version": "v19_node_cloud",
+  "run": "runs/poc_va_v19_node_cloud",
+  "window": {
+    "start": "2024-08-01",
+    "end": "2026-07-11",
+    "interval": "1H"
+  },
+  "portfolio": {
+    "final_value": 619781.6638071471,
+    "total_return": -0.38021833619285295,
+    "annual_return": -0.22082526226126886,
+    "max_drawdown": -0.6767764973676629,
+    "sharpe": -0.12077423079105684,
+    "calmar": -0.3263,
+    "sortino": -0.1277,
+    "win_rate": 0.5,
+    "profit_loss_ratio": 0.9091,
+    "profit_factor": 0.9091,
+    "max_consecutive_loss": 7,
+    "avg_holding_days": 9.1,
+    "trade_count": 374,
+    "benchmark_return": 4.251131,
+    "excess_return": -4.631349,
+    "information_ratio": -1.8848
+  },
+  "pass_bar": false,
+  "gates": {
+    "profit_factor_min": false,
+    "max_drawdown_max_abs": false,
+    "sharpe_min": false,
+    "min_trades": true
+  },
+  "status": "fail",
+  "note": "Reactive node+MA-cloud primary failed PASS_BAR on research window."
+}

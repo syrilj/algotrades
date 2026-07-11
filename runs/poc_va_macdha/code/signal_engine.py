@@ -1,9 +1,18 @@
 from __future__ import annotations
-from typing import Dict
+
+import json
+from pathlib import Path
+from typing import Dict, Optional
+
 import numpy as np
 import pandas as pd
+from xgboost import XGBClassifier
 
-_ROUTING = {'TSLA.US': {'value_area_pct': 0.7, 'profile_rows': 25, 'profile_lookback': 30, 'macd_fast': 12, 'macd_slow': 26, 'macd_signal': 9, 'macd_htf': '4h', 'signal_tf': '2h', 'require_htf_green': True, 'require_vwap_uptrend': False, 'require_above_vwap': False, 'require_volume_expand': False, 'require_vol_confirm': True, 'block_red_flag': True, 'block_dump': True, 'require_sqz_release': False, 'require_mom_pos': False, 'require_mom_pos_inc': False, 'allow_healthy_pull_entry': False, 'exit_on_poc_break': False, 'exit_on_val_break': False, 'exit_below_vwap': False, 'exit_on_sqz_neg': False, 'soft_confidence': False, 'swing_period': 50, 'vol_look': 3, 'vol_sma': 20, 'min_confidence': 0.6}, 'ARM.US': {'value_area_pct': 0.7, 'profile_rows': 25, 'profile_lookback': 20, 'macd_fast': 12, 'macd_slow': 26, 'macd_signal': 9, 'macd_htf': '1D', 'signal_tf': '4h', 'require_htf_green': True, 'require_vwap_uptrend': False, 'require_above_vwap': True, 'require_volume_expand': False, 'require_vol_confirm': False, 'block_red_flag': True, 'block_dump': False, 'require_sqz_release': False, 'require_mom_pos': True, 'require_mom_pos_inc': False, 'allow_healthy_pull_entry': False, 'exit_on_poc_break': False, 'exit_on_val_break': False, 'exit_below_vwap': True, 'exit_on_sqz_neg': False, 'soft_confidence': False, 'swing_period': 50, 'vol_look': 5, 'vol_sma': 20, 'min_confidence': 0.6}, 'MU.US': {'value_area_pct': 0.7, 'profile_rows': 25, 'profile_lookback': 20, 'macd_fast': 12, 'macd_slow': 26, 'macd_signal': 9, 'macd_htf': '4h', 'signal_tf': '2h', 'require_htf_green': True, 'require_vwap_uptrend': False, 'require_above_vwap': False, 'require_volume_expand': False, 'require_vol_confirm': False, 'block_red_flag': True, 'block_dump': True, 'require_sqz_release': False, 'require_mom_pos': False, 'require_mom_pos_inc': False, 'allow_healthy_pull_entry': False, 'exit_on_poc_break': False, 'exit_on_val_break': False, 'exit_below_vwap': False, 'exit_on_sqz_neg': False, 'soft_confidence': False, 'swing_period': 50, 'vol_look': 5, 'vol_sma': 20, 'min_confidence': 0.6}, 'SPY.US': {'value_area_pct': 0.7, 'profile_rows': 25, 'profile_lookback': 20, 'macd_fast': 12, 'macd_slow': 26, 'macd_signal': 9, 'macd_htf': '4h', 'signal_tf': '2h', 'require_htf_green': True, 'require_vwap_uptrend': True, 'require_above_vwap': True, 'require_volume_expand': False, 'require_vol_confirm': False, 'block_red_flag': False, 'block_dump': False, 'require_sqz_release': False, 'require_mom_pos': False, 'require_mom_pos_inc': False, 'allow_healthy_pull_entry': False, 'exit_on_poc_break': False, 'exit_on_val_break': False, 'exit_below_vwap': True, 'exit_on_sqz_neg': False, 'soft_confidence': False, 'swing_period': 50, 'vol_look': 5, 'vol_sma': 20, 'min_confidence': 0.6}, 'IONQ.US': {'value_area_pct': 0.7, 'profile_rows': 25, 'profile_lookback': 20, 'macd_fast': 12, 'macd_slow': 26, 'macd_signal': 9, 'macd_htf': '1D', 'signal_tf': '4h', 'require_htf_green': True, 'require_vwap_uptrend': False, 'require_above_vwap': True, 'require_volume_expand': False, 'require_vol_confirm': False, 'block_red_flag': True, 'block_dump': False, 'require_sqz_release': False, 'require_mom_pos': True, 'require_mom_pos_inc': False, 'allow_healthy_pull_entry': False, 'exit_on_poc_break': False, 'exit_on_val_break': False, 'exit_below_vwap': True, 'exit_on_sqz_neg': False, 'soft_confidence': False, 'swing_period': 50, 'vol_look': 5, 'vol_sma': 20, 'min_confidence': 0.6}, 'APLD.US': {'value_area_pct': 0.7, 'profile_rows': 25, 'profile_lookback': 20, 'macd_fast': 12, 'macd_slow': 26, 'macd_signal': 9, 'macd_htf': '4h', 'signal_tf': '2h', 'require_htf_green': True, 'require_vwap_uptrend': True, 'require_above_vwap': True, 'require_volume_expand': True, 'require_vol_confirm': True, 'block_red_flag': True, 'block_dump': True, 'require_sqz_release': False, 'require_mom_pos': True, 'require_mom_pos_inc': False, 'allow_healthy_pull_entry': False, 'exit_on_poc_break': False, 'exit_on_val_break': False, 'exit_below_vwap': True, 'exit_on_sqz_neg': False, 'soft_confidence': False, 'swing_period': 50, 'vol_look': 5, 'vol_sma': 20, 'min_confidence': 0.6}}
+# Literal-only top-level assigns (backtest runner AST sandbox).
+# MODEL: v17_book_vpa — Coulling VPA + Soros reflexivity + commitment gates
+_SYM_ONEHOT = ["TSLA", "ARM", "MU", "SPY", "IONQ", "APLD"]
+
+_ROUTING = {'TSLA.US': {'value_area_pct': 0.7, 'profile_rows': 25, 'profile_lookback': 30, 'macd_fast': 12, 'macd_slow': 26, 'macd_signal': 9, 'macd_htf': '4h', 'signal_tf': '2h', 'require_htf_green': True, 'require_vwap_uptrend': False, 'require_above_vwap': False, 'require_volume_expand': False, 'require_vol_confirm': True, 'block_red_flag': True, 'block_dump': True, 'require_sqz_release': False, 'require_mom_pos': False, 'require_mom_pos_inc': False, 'allow_healthy_pull_entry': False, 'exit_on_poc_break': False, 'exit_on_val_break': False, 'exit_below_vwap': False, 'exit_on_sqz_neg': False, 'soft_confidence': False, 'swing_period': 50, 'vol_look': 3, 'vol_sma': 20, 'min_confidence': 0.6, 'block_no_demand': True, 'block_topping_volume': True, 'block_buying_climax': True, 'require_effort_ok': True, 'require_commitment': True, 'allow_stopping_reclaim': True, 'prefer_reflexive': False}, 'ARM.US': {'value_area_pct': 0.7, 'profile_rows': 25, 'profile_lookback': 20, 'macd_fast': 12, 'macd_slow': 26, 'macd_signal': 9, 'macd_htf': '1D', 'signal_tf': '4h', 'require_htf_green': True, 'require_vwap_uptrend': False, 'require_above_vwap': True, 'require_volume_expand': False, 'require_vol_confirm': False, 'block_red_flag': True, 'block_dump': False, 'require_sqz_release': False, 'require_mom_pos': True, 'require_mom_pos_inc': False, 'allow_healthy_pull_entry': False, 'exit_on_poc_break': False, 'exit_on_val_break': False, 'exit_below_vwap': True, 'exit_on_sqz_neg': False, 'soft_confidence': False, 'swing_period': 50, 'vol_look': 5, 'vol_sma': 20, 'min_confidence': 0.6, 'block_no_demand': True, 'block_topping_volume': True, 'block_buying_climax': True, 'require_effort_ok': True, 'require_commitment': True, 'allow_stopping_reclaim': True, 'prefer_reflexive': False}, 'MU.US': {'value_area_pct': 0.7, 'profile_rows': 25, 'profile_lookback': 20, 'macd_fast': 12, 'macd_slow': 26, 'macd_signal': 9, 'macd_htf': '4h', 'signal_tf': '2h', 'require_htf_green': True, 'require_vwap_uptrend': False, 'require_above_vwap': False, 'require_volume_expand': False, 'require_vol_confirm': False, 'block_red_flag': True, 'block_dump': True, 'require_sqz_release': False, 'require_mom_pos': False, 'require_mom_pos_inc': False, 'allow_healthy_pull_entry': False, 'exit_on_poc_break': False, 'exit_on_val_break': False, 'exit_below_vwap': False, 'exit_on_sqz_neg': False, 'soft_confidence': False, 'swing_period': 50, 'vol_look': 5, 'vol_sma': 20, 'min_confidence': 0.6, 'block_no_demand': True, 'block_topping_volume': True, 'block_buying_climax': True, 'require_effort_ok': True, 'require_commitment': True, 'allow_stopping_reclaim': True, 'prefer_reflexive': False}, 'SPY.US': {'value_area_pct': 0.7, 'profile_rows': 25, 'profile_lookback': 20, 'macd_fast': 12, 'macd_slow': 26, 'macd_signal': 9, 'macd_htf': '4h', 'signal_tf': '2h', 'require_htf_green': True, 'require_vwap_uptrend': True, 'require_above_vwap': True, 'require_volume_expand': False, 'require_vol_confirm': False, 'block_red_flag': True, 'block_dump': False, 'require_sqz_release': False, 'require_mom_pos': False, 'require_mom_pos_inc': False, 'allow_healthy_pull_entry': False, 'exit_on_poc_break': False, 'exit_on_val_break': False, 'exit_below_vwap': True, 'exit_on_sqz_neg': False, 'soft_confidence': False, 'swing_period': 50, 'vol_look': 5, 'vol_sma': 20, 'min_confidence': 0.6, 'block_no_demand': True, 'block_topping_volume': True, 'block_buying_climax': True, 'require_effort_ok': True, 'require_commitment': True, 'allow_stopping_reclaim': True, 'prefer_reflexive': False}, 'IONQ.US': {'value_area_pct': 0.7, 'profile_rows': 25, 'profile_lookback': 20, 'macd_fast': 12, 'macd_slow': 26, 'macd_signal': 9, 'macd_htf': '1D', 'signal_tf': '4h', 'require_htf_green': True, 'require_vwap_uptrend': False, 'require_above_vwap': True, 'require_volume_expand': False, 'require_vol_confirm': False, 'block_red_flag': True, 'block_dump': False, 'require_sqz_release': False, 'require_mom_pos': True, 'require_mom_pos_inc': False, 'allow_healthy_pull_entry': False, 'exit_on_poc_break': False, 'exit_on_val_break': False, 'exit_below_vwap': True, 'exit_on_sqz_neg': False, 'soft_confidence': False, 'swing_period': 50, 'vol_look': 5, 'vol_sma': 20, 'min_confidence': 0.6, 'block_no_demand': True, 'block_topping_volume': True, 'block_buying_climax': True, 'require_effort_ok': True, 'require_commitment': True, 'allow_stopping_reclaim': True, 'prefer_reflexive': False}, 'APLD.US': {'value_area_pct': 0.7, 'profile_rows': 25, 'profile_lookback': 20, 'macd_fast': 12, 'macd_slow': 26, 'macd_signal': 9, 'macd_htf': '4h', 'signal_tf': '2h', 'require_htf_green': True, 'require_vwap_uptrend': True, 'require_above_vwap': True, 'require_volume_expand': True, 'require_vol_confirm': True, 'block_red_flag': True, 'block_dump': True, 'require_sqz_release': False, 'require_mom_pos': True, 'require_mom_pos_inc': False, 'allow_healthy_pull_entry': False, 'exit_on_poc_break': False, 'exit_on_val_break': False, 'exit_below_vwap': True, 'exit_on_sqz_neg': False, 'soft_confidence': False, 'swing_period': 50, 'vol_look': 5, 'vol_sma': 20, 'min_confidence': 0.6, 'block_no_demand': True, 'block_topping_volume': True, 'block_buying_climax': True, 'require_effort_ok': True, 'require_commitment': True, 'allow_stopping_reclaim': True, 'prefer_reflexive': False}}
 
 def _ema(s, n):
     return s.ewm(span=n, adjust=False).mean()
@@ -131,28 +140,63 @@ def squeeze_momentum(df, length=20, mult_bb=2.0, length_kc=20, mult_kc=1.5, use_
 
 
 def volume_price_state(df, look=5, vol_sma=20):
-    """Volume-price confirmation / red-flag logic.
+    """Volume-price confirmation + Coulling/Wyckoff VPA extensions.
 
-    Confirm long: price rising AND volume expanding
-    Red flag:     price rising AND volume drying up
-    Healthy dip:  price falling AND volume drying up (not a panic)
-    Dump:         price falling AND volume expanding
+    Base:
+      Confirm long: price rising AND volume expanding
+      Red flag:     price rising AND volume drying up (no demand)
+      Healthy dip:  price falling AND volume drying up (not a panic)
+      Dump:         price falling AND volume expanding
+
+    Book extensions (Coulling VPA / Wyckoff effort-vs-result):
+      stopping_volume: after decline, high vol + narrow spread (absorption)
+      topping_volume:  after rally, high vol + narrow spread (distribution)
+      no_demand / no_supply: directional bar with low volume
+      effort_ok:       spread and volume are in harmony (not anomalous)
+      buying_climax:   extreme volume into an advance (Soros self-defeating risk)
+      reflexive_up:    sustained confirm_up (Soros self-reinforcing phase)
     """
     close = df["close"]
+    high = df["high"]
+    low = df["low"]
     vol = df["volume"]
     price_up = close > close.shift(look)
     price_dn = close < close.shift(look)
     vsma = _sma(vol, vol_sma)
     vol_up = vol > vsma
     vol_dn = vol < vsma
-    # also short-term volume trend
     vol_rising = vol > vol.shift(look)
     vol_falling = vol < vol.shift(look)
 
-    confirm_up = price_up & (vol_up | vol_rising)          # price↑ volume↑
-    red_flag_up = price_up & vol_falling & ~vol_up         # price↑ volume drying — weak
-    healthy_pull = price_dn & vol_falling                  # price↓ volume↓
-    dump = price_dn & vol_rising & vol_up                  # price↓ volume↑ — avoid longs
+    confirm_up = price_up & (vol_up | vol_rising)
+    red_flag_up = price_up & vol_falling & ~vol_up
+    healthy_pull = price_dn & vol_falling
+    dump = price_dn & vol_rising & vol_up
+
+    spread = (high - low).replace(0, np.nan)
+    spread_sma = _sma(spread, vol_sma)
+    narrow = spread < (spread_sma * 0.75)
+    wide = spread > (spread_sma * 1.25)
+    vol_high = vol > (vsma * 1.5)
+    vol_low = vol < (vsma * 0.7)
+    vol_climax = vol > (vsma * 2.0)
+
+    prior_dn = close.shift(1) < close.shift(look + 1)
+    prior_up = close.shift(1) > close.shift(look + 1)
+    stopping_volume = (prior_dn & vol_high & narrow).fillna(False)
+    topping_volume = (prior_up & vol_high & narrow).fillna(False)
+    no_demand = (price_up & vol_low).fillna(False)
+    no_supply = (price_dn & vol_low).fillna(False)
+    # Effort vs result anomaly: wide move on thin volume = weak / trap
+    effort_anomaly = (wide & vol_low) | (wide & ~vol_up & price_up)
+    effort_ok = (~effort_anomaly).fillna(True)
+    buying_climax = (price_up & vol_climax).fillna(False)
+    # Recent stopping absorption then reclaim (test of supply)
+    stop_recent = stopping_volume.rolling(look, min_periods=1).max().astype(bool)
+    stopping_reclaim = (stop_recent & price_up & ~dump).fillna(False)
+    reflexive_up = (
+        confirm_up & confirm_up.shift(1).fillna(False) & confirm_up.shift(2).fillna(False)
+    ).fillna(False)
 
     return pd.DataFrame({
         "confirm_up": confirm_up.fillna(False),
@@ -160,6 +204,14 @@ def volume_price_state(df, look=5, vol_sma=20):
         "healthy_pull": healthy_pull.fillna(False),
         "dump": dump.fillna(False),
         "vol_expand": vol_up.fillna(False),
+        "stopping_volume": stopping_volume,
+        "topping_volume": topping_volume,
+        "no_demand": no_demand,
+        "no_supply": no_supply,
+        "effort_ok": effort_ok,
+        "buying_climax": buying_climax,
+        "stopping_reclaim": stopping_reclaim,
+        "reflexive_up": reflexive_up,
     }, index=df.index)
 
 
@@ -233,13 +285,68 @@ def _htf_ha_green(df, htf, fast, slow, sig):
 
 
 
+def _atr(df, n=14):
+    h, l, c = df["high"], df["low"], df["close"]
+    prev = c.shift(1)
+    tr = pd.concat([(h - l), (h - prev).abs(), (l - prev).abs()], axis=1).max(axis=1)
+    return tr.ewm(span=n, adjust=False).mean()
+
+
+def _prob_to_size(p: float, thr: float) -> float:
+    """Map P(win) → {0.25, 0.5, 1.0}; 0 if below threshold."""
+    if p < thr:
+        return 0.0
+    if p < thr + 0.05:
+        return 0.25
+    if p < thr + 0.15:
+        return 0.5
+    return 1.0
+
+
 class SignalEngine:
-    """v13: feedback-tuned specialist per symbol."""
+    """v15: v13 specialist primary side + frozen meta-XGB gate/size."""
+
     def __init__(self):
         self.routing = _ROUTING
+        model_dir = Path(__file__).resolve().parent
+        meta_cfg_path = model_dir / "meta_config.json"
+        meta_booster_path = model_dir / "meta_xgb_final.json"
+        self._meta_cfg = json.loads(meta_cfg_path.read_text(encoding="utf-8"))
+        self._thr = float(self._meta_cfg.get("threshold", 0.6))
+        self._feat_cols = list(self._meta_cfg["feat_cols"])
+        self._booster = XGBClassifier()
+        self._booster.load_model(str(meta_booster_path))
+        self._spy_htf: Optional[pd.Series] = None
+        self._active_code = "SPY.US"
+
     def _cfg(self, code):
         return self.routing.get(code, self.routing.get("SPY.US", {}))
-    def _signals_on_frame(self, data, cfg):
+
+    def _meta_row(self, code, i, close, poc, val, vwap, atr, local_ha, macd_hist, above_vwap, vp, htf, conf, spy_reg):
+        a0 = float(atr.iloc[i]) if pd.notna(atr.iloc[i]) else np.nan
+        px = float(close.iloc[i])
+        dist_poc = (px - float(poc.iloc[i])) / a0 if pd.notna(poc.iloc[i]) and a0 == a0 and a0 else 0.0
+        dist_val = (px - float(val.iloc[i])) / a0 if pd.notna(val.iloc[i]) and a0 == a0 and a0 else 0.0
+        dist_vwap = (px - float(vwap.iloc[i])) / a0 if pd.notna(vwap.iloc[i]) and a0 == a0 and a0 else 0.0
+        row = {
+            "dist_poc": dist_poc,
+            "dist_val": dist_val,
+            "dist_vwap": dist_vwap,
+            "ha_green": float(bool(local_ha["ha_green"].iloc[i])),
+            "above_vwap": float(bool(above_vwap.iloc[i])),
+            "vol_expand": float(bool(vp["vol_expand"].iloc[i])),
+            "macd_hist": float(macd_hist.iloc[i]) if pd.notna(macd_hist.iloc[i]) else 0.0,
+            "block_red_flag_on": float(bool(vp["red_flag_up"].iloc[i])),
+            "htf_green": float(bool(htf.iloc[i])),
+            "atr_pct": float(a0 / px) if px and a0 == a0 else 0.0,
+            "conf": float(conf.iloc[i]),
+            "spy_htf_green": float(spy_reg.iloc[i]) if pd.notna(spy_reg.iloc[i]) else 0.0,
+        }
+        for s in _SYM_ONEHOT:
+            row[f"sym_{s}"] = 1.0 if code.startswith(s) else 0.0
+        return [row.get(c, 0.0) for c in self._feat_cols]
+
+    def _signals_on_frame(self, data, cfg, code: str):
         value_area_pct=cfg.get("value_area_pct",0.7); profile_rows=int(cfg.get("profile_rows",25))
         profile_lookback=int(cfg.get("profile_lookback",20))
         macd_fast=int(cfg.get("macd_fast",12)); macd_slow=int(cfg.get("macd_slow",26)); macd_signal=int(cfg.get("macd_signal",9))
@@ -249,6 +356,14 @@ class SignalEngine:
         block_red_flag=bool(cfg.get("block_red_flag",False)); block_dump=bool(cfg.get("block_dump",False))
         require_sqz_release=bool(cfg.get("require_sqz_release",False)); require_mom_pos=bool(cfg.get("require_mom_pos",False))
         require_mom_pos_inc=bool(cfg.get("require_mom_pos_inc",False)); allow_healthy_pull_entry=bool(cfg.get("allow_healthy_pull_entry",False))
+        # Book-derived VPA / reflexivity / commitment gates (v17)
+        block_no_demand=bool(cfg.get("block_no_demand",False))
+        block_topping_volume=bool(cfg.get("block_topping_volume",False))
+        block_buying_climax=bool(cfg.get("block_buying_climax",False))
+        require_effort_ok=bool(cfg.get("require_effort_ok",False))
+        require_commitment=bool(cfg.get("require_commitment",False))
+        allow_stopping_reclaim=bool(cfg.get("allow_stopping_reclaim",False))
+        prefer_reflexive=bool(cfg.get("prefer_reflexive",False))
         exit_on_poc_break=bool(cfg.get("exit_on_poc_break",False)); exit_on_val_break=bool(cfg.get("exit_on_val_break",False))
         exit_below_vwap=bool(cfg.get("exit_below_vwap",False)); exit_on_sqz_neg=bool(cfg.get("exit_on_sqz_neg",False))
         soft_confidence=bool(cfg.get("soft_confidence",False)); swing_period=int(cfg.get("swing_period",50))
@@ -258,37 +373,60 @@ class SignalEngine:
         poc_ok=(close>=poc)&poc.notna(); in_va=(close>=val)&(close<=vah)&val.notna()
         htf=_htf_ha_green(data,macd_htf,macd_fast,macd_slow,macd_signal)
         local_ha=_standardized_macd_ha(data,macd_fast,macd_slow,macd_signal)
+        macd_hist=local_ha["macd"]-_ema(local_ha["macd"], macd_signal)
         swing=dynamic_swing_anchored_vwap(data,swing_period); vwap=swing["vwap"].shift(1)
         uptrend=swing["uptrend"].shift(1).fillna(False).astype(bool); above_vwap=(close>=vwap).fillna(False)
         vp=volume_price_state(data,vol_look,vol_sma); sqz=squeeze_momentum(data)
+        atr=_atr(data).replace(0,np.nan)
         gates=[poc_ok,in_va]
         if require_htf_green: gates.append(htf)
         if require_vwap_uptrend: gates.append(uptrend)
         if require_above_vwap: gates.append(above_vwap)
         if require_volume_expand: gates.append(vp["vol_expand"])
-        if require_vol_confirm: gates.append(vp["confirm_up"]|(allow_healthy_pull_entry&vp["healthy_pull"]&above_vwap))
+        vol_confirm = vp["confirm_up"] | (allow_healthy_pull_entry & vp["healthy_pull"] & above_vwap)
+        if allow_stopping_reclaim:
+            vol_confirm = vol_confirm | vp["stopping_reclaim"]
+        if require_vol_confirm: gates.append(vol_confirm)
         if block_red_flag: gates.append(~vp["red_flag_up"])
         if block_dump: gates.append(~vp["dump"])
+        if block_no_demand: gates.append(~vp["no_demand"])
+        if block_topping_volume: gates.append(~vp["topping_volume"])
+        if block_buying_climax: gates.append(~vp["buying_climax"])
+        if require_effort_ok: gates.append(vp["effort_ok"])
+        if prefer_reflexive: gates.append(vp["reflexive_up"] | vp["stopping_reclaim"])
+        # Thinking Strategically: credible commitment = confirm OR stopping reclaim OR reflexive
+        if require_commitment:
+            gates.append(vp["confirm_up"] | vp["stopping_reclaim"] | vp["reflexive_up"])
         if require_sqz_release: gates.append(sqz["sqz_release"]|sqz["sqz_off"])
         if require_mom_pos: gates.append(sqz["mom_pos"])
         if require_mom_pos_inc: gates.append(sqz["mom_pos_inc"])
         long_hard=gates[0]
         for g in gates[1:]: long_hard=long_hard&g
         if soft_confidence:
-            parts=[poc_ok,in_va,htf,uptrend,above_vwap,vp["confirm_up"]|vp["healthy_pull"],~vp["red_flag_up"],sqz["mom_pos"],sqz["sqz_off"]|sqz["sqz_release"]]
+            parts=[poc_ok,in_va,htf,uptrend,above_vwap,vp["confirm_up"]|vp["healthy_pull"]|vp["stopping_reclaim"],~vp["red_flag_up"],~vp["no_demand"],vp["effort_ok"],sqz["mom_pos"],sqz["sqz_off"]|sqz["sqz_release"]]
             total=None
             for p in parts: total=p.astype(float) if total is None else total+p.astype(float)
             conf=total/float(len(parts)); long_entry=poc_ok&in_va&(conf>=min_confidence)
             if block_red_flag: long_entry=long_entry&(~vp["red_flag_up"])
             if block_dump: long_entry=long_entry&(~vp["dump"])
+            if block_no_demand: long_entry=long_entry&(~vp["no_demand"])
+            if block_buying_climax: long_entry=long_entry&(~vp["buying_climax"])
+            if require_effort_ok: long_entry=long_entry&vp["effort_ok"]
             if require_htf_green: long_entry=long_entry&htf
-            size=conf.clip(0,1)
         else:
-            long_entry=long_hard; size=pd.Series(1.0,index=data.index)
-        signal=pd.Series(0.0,index=data.index); in_pos=False
+            long_entry=long_hard; conf=pd.Series(1.0,index=data.index)
+        spy_reg=pd.Series(0.0,index=data.index)
+        if self._spy_htf is not None and not self._spy_htf.empty:
+            spy_reg=self._spy_htf.reindex(data.index,method="ffill").fillna(0.0)
+        signal=pd.Series(0.0,index=data.index); in_pos=False; entry_size=0.0
         for i in range(len(data)):
             if not in_pos:
-                if bool(long_entry.iloc[i]): in_pos=True; signal.iloc[i]=float(size.iloc[i]) if soft_confidence else 1.0
+                if bool(long_entry.iloc[i]):
+                    feats=self._meta_row(code,i,close,poc,val,vwap,atr,local_ha,macd_hist,above_vwap,vp,htf,conf,spy_reg)
+                    proba=float(self._booster.predict_proba(np.asarray([feats],dtype=float))[0,1])
+                    sz=_prob_to_size(proba,self._thr)
+                    if sz>0:
+                        in_pos=True; entry_size=sz; signal.iloc[i]=sz
             else:
                 exit_now=False
                 if require_htf_green and not bool(htf.iloc[i]): exit_now=True
@@ -298,9 +436,10 @@ class SignalEngine:
                 if exit_on_sqz_neg and bool(sqz["mom_neg"].iloc[i]): exit_now=True
                 if bool(local_ha["ha_red"].iloc[i]) and not bool(htf.iloc[i]): exit_now=True
                 if block_red_flag and bool(vp["red_flag_up"].iloc[i]): exit_now=True
-                if exit_now: in_pos=False; signal.iloc[i]=0.0
-                else: signal.iloc[i]=float(size.iloc[i]) if soft_confidence else 1.0; in_pos=True
+                if exit_now: in_pos=False; signal.iloc[i]=0.0; entry_size=0.0
+                else: signal.iloc[i]=entry_size; in_pos=True
         return signal.fillna(0.0)
+
     def _one(self, code, df):
         cfg=self._cfg(code); data=df.copy(); data.index=pd.to_datetime(data.index)
         if getattr(data.index,"tz",None) is not None: data.index=data.index.tz_localize(None)
@@ -308,7 +447,17 @@ class SignalEngine:
         if signal_tf:
             frame=_resample_ohlcv(data,signal_tf)
             if frame.empty: return pd.Series(0.0,index=data.index)
-            return self._signals_on_frame(frame,cfg).reindex(data.index,method="ffill").fillna(0.0)
-        return self._signals_on_frame(data,cfg)
+            return self._signals_on_frame(frame,cfg,code).reindex(data.index,method="ffill").fillna(0.0)
+        return self._signals_on_frame(data,cfg,code)
+
     def generate(self, data_map: Dict[str, pd.DataFrame]) -> Dict[str, pd.Series]:
+        spy_df = data_map.get("SPY.US")
+        if spy_df is not None and not spy_df.empty:
+            sdf = spy_df.copy()
+            sdf.index = pd.to_datetime(sdf.index)
+            if getattr(sdf.index, "tz", None) is not None:
+                sdf.index = sdf.index.tz_localize(None)
+            self._spy_htf = _htf_ha_green(sdf, "4h", 12, 26, 9).astype(float)
+        else:
+            self._spy_htf = None
         return {code: self._one(code, df) for code, df in data_map.items()}

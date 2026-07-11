@@ -17,6 +17,8 @@ Do **not** replace primary side with raw price ML (LSTM/XGB on close). That path
 
 See `PASS_BAR.json`. Win rate alone is vanity.
 
+**Anti-overfit:** Freeze rules on early data, then score later ranges — see `research/ANTI_OVERFIT.md` and run `runs/poc_va_antioverfit/stress_holdout_ranges.py` before promoting feedback-loop models.
+
 ## New version checklist
 
 1. Copy from current WINNER engine (or `_engine_template.py`), not from a random old variant.

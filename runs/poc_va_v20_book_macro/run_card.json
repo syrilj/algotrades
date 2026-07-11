@@ -1,0 +1,151 @@
+{
+  "artifacts": [
+    {
+      "path": "artifacts/equity.csv",
+      "sha256": "51f86aff95802f8af6e4283eb3c93105d1423db5d45100fbf4b112fdb54e3c13",
+      "size_bytes": 364560
+    },
+    {
+      "path": "artifacts/metrics.csv",
+      "sha256": "f011b72a1245600e1863cff404695483cd7f273f7b7426c9788137cab22f057d",
+      "size_bytes": 383
+    },
+    {
+      "path": "artifacts/ohlcv_AAPL.US.csv",
+      "sha256": "9bc1482ac54043152d8967e935aa9441beb54ce585a6f16f114b736aef1c53d3",
+      "size_bytes": 337669
+    },
+    {
+      "path": "artifacts/ohlcv_AMZN.US.csv",
+      "sha256": "f71eefb02aa0b2bcf160c26180f31abcc78f379be6a5cf6995e0a939cabd2ea7",
+      "size_bytes": 338989
+    },
+    {
+      "path": "artifacts/ohlcv_APLD.US.csv",
+      "sha256": "18bbdb31c157df97d98821d423e8dbc8b15d3f449bf4b59ff3cec9f13df2e6ff",
+      "size_bytes": 334326
+    },
+    {
+      "path": "artifacts/ohlcv_GOOGL.US.csv",
+      "sha256": "3eff3461c42123073365954fdae820288efea2bdfe60a60efc5063f24e87fdf5",
+      "size_bytes": 336807
+    },
+    {
+      "path": "artifacts/ohlcv_IONQ.US.csv",
+      "sha256": "752bff78443c724ad2aec84994c150df66690ba7a42eb97e5f4cded51c3d4fcf",
+      "size_bytes": 340563
+    },
+    {
+      "path": "artifacts/ohlcv_META.US.csv",
+      "sha256": "b96ed9ebacad62cfbdcf53efac1b7d8c133e20ae9cb1d0de0a6d80084e6d46c7",
+      "size_bytes": 320678
+    },
+    {
+      "path": "artifacts/ohlcv_MSFT.US.csv",
+      "sha256": "d18b0e0014a5f79fa71a14807c4f614950739429ed6e0e47f6b10c2e84b103ef",
+      "size_bytes": 330598
+    },
+    {
+      "path": "artifacts/ohlcv_MU.US.csv",
+      "sha256": "5900c4a64c6af4f1f975bcd9840aeda517454428594f2a04f4903fe9fd23dc22",
+      "size_bytes": 332670
+    },
+    {
+      "path": "artifacts/ohlcv_NVDA.US.csv",
+      "sha256": "27b00906965c49b5f1d404dec376e95f28e9ed1c7e37807498e71d8fa787788b",
+      "size_bytes": 342799
+    },
+    {
+      "path": "artifacts/ohlcv_QQQ.US.csv",
+      "sha256": "f48983c0371f565a273a628e3e3a25c2349f5548743d628cac8f01d123e7475a",
+      "size_bytes": 329756
+    },
+    {
+      "path": "artifacts/ohlcv_SPY.US.csv",
+      "sha256": "bd540fe5bf6d3f5c040b1bb4e191c3ae18f0f5d2fe4bd9f225e45f36b99e9801",
+      "size_bytes": 328018
+    },
+    {
+      "path": "artifacts/ohlcv_TSLA.US.csv",
+      "sha256": "fabdff03d04b583010008822d51b83b3f90d38abc636ed7738f33a0060ea7bf2",
+      "size_bytes": 333607
+    },
+    {
+      "path": "artifacts/ohlcv_XLP.US.csv",
+      "sha256": "e8388eb68a644750bb22742a96c6e6f86e18037f5d8f824a56f3dc8599737949",
+      "size_bytes": 328762
+    },
+    {
+      "path": "artifacts/positions.csv",
+      "sha256": "994ded1041c22c6c4fc32fbb3cb5da2cbf11cdfabd08e149419b807acbe44fc0",
+      "size_bytes": 251188
+    },
+    {
+      "path": "artifacts/trades.csv",
+      "sha256": "045dd31c10c636daae2212ff8e07773ecda862c5f5715b8a2249e6d4ea39e69b",
+      "size_bytes": 6035
+    },
+    {
+      "path": "code/signal_engine.py",
+      "sha256": "15fe521bce1ecde1c75a4479ef73b17bae9ad63a7abdddf0afe99bfca2296855",
+      "size_bytes": 30370
+    },
+    {
+      "path": "config.json",
+      "sha256": "36990b82116784c358aeab67b9b31ed72866992467e92714254e7322df87358d",
+      "size_bytes": 572
+    }
+  ],
+  "backtest": {
+    "codes": [
+      "TSLA.US",
+      "MU.US",
+      "SPY.US",
+      "IONQ.US",
+      "APLD.US",
+      "XLP.US",
+      "QQQ.US",
+      "AAPL.US",
+      "MSFT.US",
+      "NVDA.US",
+      "GOOGL.US",
+      "AMZN.US",
+      "META.US"
+    ],
+    "end_date": "2026-07-11",
+    "engine": "daily",
+    "initial_cash": 1000000,
+    "interval": "1H",
+    "source": "yfinance",
+    "start_date": "2024-08-01"
+  },
+  "data_sources": [
+    "yfinance"
+  ],
+  "generated_at": "2026-07-11T22:31:49.560503Z",
+  "metrics": {
+    "annual_return": 0.17638724493128644,
+    "avg_holding_days": 16.4,
+    "benchmark_return": 1.581971,
+    "calmar": 3.4583,
+    "excess_return": -1.216566,
+    "final_value": 1365404.7716409508,
+    "information_ratio": -1.2143,
+    "max_consecutive_loss": 4,
+    "max_drawdown": -0.05100476211841244,
+    "profit_factor": 6.0345,
+    "profit_loss_ratio": 4.3698,
+    "sharpe": 1.6726044236624424,
+    "sortino": 1.2233,
+    "total_return": 0.36540477164095075,
+    "trade_count": 50,
+    "win_rate": 0.58
+  },
+  "reproducibility": {
+    "config_hash": "36990b82116784c358aeab67b9b31ed72866992467e92714254e7322df87358d",
+    "strategy_hash": "15fe521bce1ecde1c75a4479ef73b17bae9ad63a7abdddf0afe99bfca2296855"
+  },
+  "run_dir": "/Users/syriljacob/Desktop/TradingAlgoWork/runs/poc_va_v20_book_macro",
+  "schema_version": "0.1",
+  "warnings": []
+}

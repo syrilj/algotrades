@@ -1,0 +1,111 @@
+{
+  "model": "v18_dual_sleeve",
+  "source_cache": "runs/poc_va_wr80/artifacts",
+  "window": [
+    "2024-08-01",
+    "2026-07-10"
+  ],
+  "overall": {
+    "trade_count": 53,
+    "win_rate": 0.6415094339622641,
+    "expectancy": 1.8835666165154763,
+    "profit_factor": 5.82286932931027,
+    "avg_return": 1.8835666165154763,
+    "total_return_sum_pct": 99.82903067532024,
+    "sharpe_trade_proxy": 3.5896505350291203,
+    "max_loss_pct": -4.121668268846268
+  },
+  "by_sleeve": {
+    "large": {
+      "trade_count": 46,
+      "win_rate": 0.6304347826086957,
+      "expectancy": 2.046332291041147,
+      "profit_factor": 6.482977700185645,
+      "avg_return": 2.046332291041147,
+      "total_return_sum_pct": 94.13128538789276,
+      "sharpe_trade_proxy": 3.455533433315212,
+      "max_loss_pct": -4.121668268846268
+    },
+    "sniper": {
+      "trade_count": 7,
+      "win_rate": 0.7142857142857143,
+      "expectancy": 0.8139636124896384,
+      "profit_factor": 2.613551940937503,
+      "avg_return": 0.8139636124896384,
+      "total_return_sum_pct": 5.697745287427469,
+      "sharpe_trade_proxy": 1.0844031743236748,
+      "max_loss_pct": -2.2284462114842585
+    }
+  },
+  "by_code": {
+    "APLD.US": {
+      "trade_count": 3,
+      "win_rate": 0.6666666666666666,
+      "expectancy": 0.5661334058082742,
+      "profit_factor": 1.7621454844510702,
+      "avg_return": 0.5661334058082742,
+      "total_return_sum_pct": 1.6984002174248225,
+      "sharpe_trade_proxy": 0.36707797638984047,
+      "max_loss_pct": -2.2284462114842585
+    },
+    "IONQ.US": {
+      "trade_count": 4,
+      "win_rate": 0.75,
+      "expectancy": 0.9998362675006617,
+      "profit_factor": 4.069959114273631,
+      "avg_return": 0.9998362675006617,
+      "total_return_sum_pct": 3.9993450700026467,
+      "sharpe_trade_proxy": 1.1500861817320822,
+      "max_loss_pct": -1.3027356134509671
+    },
+    "MU.US": {
+      "trade_count": 32,
+      "win_rate": 0.65625,
+      "expectancy": 2.313453942658188,
+      "profit_factor": 7.89737148771257,
+      "avg_return": 2.313453942658188,
+      "total_return_sum_pct": 74.03052616506201,
+      "sharpe_trade_proxy": 2.988601508776568,
+      "max_loss_pct": -4.121668268846268
+    },
+    "TSLA.US": {
+      "trade_count": 14,
+      "win_rate": 0.5714285714285714,
+      "expectancy": 1.4357685159164824,
+      "profit_factor": 4.123776282381016,
+      "avg_return": 1.4357685159164824,
+      "total_return_sum_pct": 20.100759222830753,
+      "sharpe_trade_proxy": 1.7394504143141967,
+      "max_loss_pct": -1.9223162002110161
+    }
+  },
+  "oos_60_40": {
+    "train": {
+      "trade_count": 31,
+      "win_rate": 0.5483870967741935,
+      "expectancy": 1.0047443303701027,
+      "profit_factor": 2.9166811107951593,
+      "avg_return": 1.0047443303701027,
+      "total_return_sum_pct": 31.14707424147318,
+      "sharpe_trade_proxy": 1.630677136780144,
+      "max_loss_pct": -4.121668268846268
+    },
+    "test": {
+      "trade_count": 22,
+      "win_rate": 0.7727272727272727,
+      "expectancy": 3.121907110629412,
+      "profit_factor": 16.43910854061529,
+      "avg_return": 3.121907110629412,
+      "total_return_sum_pct": 68.68195643384706,
+      "sharpe_trade_proxy": 3.596728979922307,
+      "max_loss_pct": -2.2284462114842585
+    }
+  },
+  "pass_bar": {
+    "passed": true,
+    "reasons": [],
+    "note": "Local proxy: DD/equity Sharpe not fully evaluated; trade Sharpe is proxy only"
+  },
+  "promote": false,
+  "promote_reason": "PASS_BAR cleared on local proxy \u2014 still need official run harness equity/DD"
+}

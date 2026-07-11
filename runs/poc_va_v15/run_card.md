@@ -1,6 +1,6 @@
 # Backtest Run Card
 
-Generated: 2026-07-11T18:07:49.117641Z
+Generated: 2026-07-11T22:19:51.150179Z
 Run directory: `/Users/syriljacob/Desktop/TradingAlgoWork/runs/poc_va_v15`
 
 ## Backtest Summary

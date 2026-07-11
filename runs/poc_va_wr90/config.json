@@ -1,0 +1,24 @@
+{
+  "source": "yfinance",
+  "codes": [
+    "APLD.US",
+    "IONQ.US",
+    "QQQ.US"
+  ],
+  "start_date": "2024-08-01",
+  "end_date": "2026-07-11",
+  "initial_cash": 1000000,
+  "commission": 0.001,
+  "engine": "daily",
+  "interval": "1H",
+  "strategy": {
+    "model_version": "v18_wr90",
+    "target_wr": 0.9,
+    "achieved_stable_wr": 0.833,
+    "universe": [
+      "APLD.US",
+      "IONQ.US"
+    ],
+    "note": "Best stable high-WR sleeve; 90%+ not robust on this window"
+  }
+}

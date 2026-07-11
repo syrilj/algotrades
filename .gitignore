@@ -28,3 +28,7 @@ books/
 **/lottie/
 *.lottie
 *lottie*.json
+
+# Graphify knowledge graph (local / regenerated)
+graphify-out/
+.gstack/
