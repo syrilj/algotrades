@@ -1,0 +1,73 @@
+{
+  "artifacts": [
+    {
+      "path": "artifacts/equity.csv",
+      "sha256": "e163f0ed96d839d5a2d83663cd5f1c5a67e0f51017344b053442e86816606465",
+      "size_bytes": 19870
+    },
+    {
+      "path": "artifacts/greeks.csv",
+      "sha256": "198ca9c891458416f01e5f4e94fd3f1cdad20e181ac6085c46554687ab8c5f6e",
+      "size_bytes": 14765
+    },
+    {
+      "path": "artifacts/metrics.csv",
+      "sha256": "fdfc22d421b794d0553d0693032572c47fd9fabe4ea7891357a1772dae8283de",
+      "size_bytes": 187
+    },
+    {
+      "path": "artifacts/ohlcv_IONQ.US.csv",
+      "sha256": "b5849ba5dc88d2b777131fb44d4167b2d12f9995aed2f3af48b4a6b965af0e52",
+      "size_bytes": 43526
+    },
+    {
+      "path": "artifacts/trades.csv",
+      "sha256": "06dc6041cb68b7d426b6b635dd380c69d409c59c22e741c40c2a7e8daa91fe97",
+      "size_bytes": 825
+    },
+    {
+      "path": "code/signal_engine.py",
+      "sha256": "b9c142ea18aa8f6f27e245984799193ea780109abb5a34e63f5241d30da230d1",
+      "size_bytes": 8718
+    },
+    {
+      "path": "config.json",
+      "sha256": "f966220c60ebc83e70028e2cec6af08d8ce2ea4f922ff7a48a6b242bcffd7d7d",
+      "size_bytes": 461
+    }
+  ],
+  "backtest": {
+    "codes": [
+      "IONQ.US"
+    ],
+    "end_date": "2026-07-11",
+    "engine": "options",
+    "initial_cash": 1000000.0,
+    "interval": "1D",
+    "source": "yfinance",
+    "start_date": "2024-08-01"
+  },
+  "data_sources": [
+    "yfinance"
+  ],
+  "generated_at": "2026-07-11T23:13:23.377429Z",
+  "metrics": {
+    "annual_return": 0.470463,
+    "calmar": 3.6278,
+    "final_value": 2103523.44,
+    "max_drawdown": -0.129682,
+    "profit_loss_ratio": 5.1838,
+    "sharpe": 1.3073,
+    "sortino": 0.7108,
+    "total_return": 1.103523,
+    "trade_count": 10,
+    "win_rate": 0.6
+  },
+  "reproducibility": {
+    "config_hash": "f966220c60ebc83e70028e2cec6af08d8ce2ea4f922ff7a48a6b242bcffd7d7d",
+    "strategy_hash": "b9c142ea18aa8f6f27e245984799193ea780109abb5a34e63f5241d30da230d1"
+  },
+  "run_dir": "/Users/syriljacob/Desktop/TradingAlgoWork/runs/poc_va_opts_hunt/loops_agg/agg_ionq__week_atm20",
+  "schema_version": "0.1",
+  "warnings": []
+}

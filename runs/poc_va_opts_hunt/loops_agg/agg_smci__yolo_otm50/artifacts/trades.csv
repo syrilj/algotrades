@@ -1,0 +1,5 @@
+timestamp,code,option_type,strike,expiry,side,price,qty,pnl,entry_date
+2024-10-08,SMCI.US,call,51.0,2024-10-15,buy,0.7057,937,0.0,2024-10-08
+2024-10-15,SMCI.US,call,51.0,2024-10-15,expire,0.0,937,-66122.5783,2024-10-08
+2025-02-25,SMCI.US,call,51.0,2025-03-04,buy,1.161,772,0.0,2025-02-25
+2025-03-03,SMCI.US,call,51.0,2025-03-04,close,0.0,772,-89625.9943,2025-02-25

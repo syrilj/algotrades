@@ -1,0 +1,91 @@
+{
+  "artifacts": [
+    {
+      "path": "artifacts/equity.csv",
+      "sha256": "d18b3aa9fc3dc720b1310795791f1cf8790dfa8836ca7db5eaa5517d51d76cbd",
+      "size_bytes": 28064
+    },
+    {
+      "path": "artifacts/greeks.csv",
+      "sha256": "2a7993a8f6c35694c83a7b41afc6fe7165285ca039330d59099e9796a970ba5b",
+      "size_bytes": 22230
+    },
+    {
+      "path": "artifacts/metrics.csv",
+      "sha256": "aa5cbd4423ac420ede4e21306a9081dc260e3734da52708f09447ffa24fffc3a",
+      "size_bytes": 191
+    },
+    {
+      "path": "artifacts/ohlcv_AVGO.US.csv",
+      "sha256": "4ee080413d6a946f45a33795c3d80abe64a170d7b7cd1cf535e0c93256a7fa42",
+      "size_bytes": 68770
+    },
+    {
+      "path": "artifacts/ohlcv_HOOD.US.csv",
+      "sha256": "b3f79b6430651b455bb4e24b28af26896888cf98742a84e5e5592fde70c6ae88",
+      "size_bytes": 56154
+    },
+    {
+      "path": "artifacts/ohlcv_IONQ.US.csv",
+      "sha256": "1515b8dfc473ca685470f6284dc46a7225bf4f804f655a23736c9cca60027976",
+      "size_bytes": 66839
+    },
+    {
+      "path": "artifacts/ohlcv_MU.US.csv",
+      "sha256": "00aa61ab87b33ad1eb54047983dfba983464b02a6a60a7ac8bd5a69f10031a15",
+      "size_bytes": 67097
+    },
+    {
+      "path": "artifacts/trades.csv",
+      "sha256": "d83b086a9ca6f9b1b249c697734606192b79ae17e3ce19b615b1fe49c1d8d612",
+      "size_bytes": 802
+    },
+    {
+      "path": "code/signal_engine.py",
+      "sha256": "b9c142ea18aa8f6f27e245984799193ea780109abb5a34e63f5241d30da230d1",
+      "size_bytes": 8718
+    },
+    {
+      "path": "config.json",
+      "sha256": "193c02f38b8bc546600259d3197cc45ce61be610c562dde87933e4f0f4daf3c6",
+      "size_bytes": 642
+    }
+  ],
+  "backtest": {
+    "codes": [
+      "IONQ.US",
+      "AVGO.US",
+      "HOOD.US",
+      "MU.US"
+    ],
+    "end_date": "2023-12-31",
+    "engine": "options",
+    "initial_cash": 1000000,
+    "interval": "1D",
+    "source": "yfinance",
+    "start_date": "2021-01-01"
+  },
+  "data_sources": [
+    "yfinance"
+  ],
+  "generated_at": "2026-07-12T00:01:28.522748Z",
+  "metrics": {
+    "annual_return": -0.011658,
+    "calmar": -0.0906,
+    "final_value": 965567.08,
+    "max_drawdown": -0.128686,
+    "profit_loss_ratio": 2.3777,
+    "sharpe": -0.1313,
+    "sortino": -0.0376,
+    "total_return": -0.034433,
+    "trade_count": 10,
+    "win_rate": 0.2
+  },
+  "reproducibility": {
+    "config_hash": "193c02f38b8bc546600259d3197cc45ce61be610c562dde87933e4f0f4daf3c6",
+    "strategy_hash": "b9c142ea18aa8f6f27e245984799193ea780109abb5a34e63f5241d30da230d1"
+  },
+  "run_dir": "/Users/syriljacob/Desktop/TradingAlgoWork/runs/v22_oos_2021_2023",
+  "schema_version": "0.1",
+  "warnings": []
+}

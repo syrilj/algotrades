@@ -1,0 +1,31 @@
+{
+  "name": "v22_robust_conservative",
+  "purpose": "Live-trading recommended variant of v22.",
+  "why": "Positive returns across all OOS windows, worst drawdown < 2%, small risk-per-trade.",
+  "files": {
+    "signal_engine.py": "/Users/syriljacob/Desktop/TradingAlgoWork/models/poc_va_macdha/v22_robust_conservative/code/signal_engine.py",
+    "hunt_config.json": "/Users/syriljacob/Desktop/TradingAlgoWork/models/poc_va_macdha/v22_robust_conservative/code/hunt_config.json",
+    "config.json": "/Users/syriljacob/Desktop/TradingAlgoWork/models/poc_va_macdha/v22_robust_conservative/config.json"
+  },
+  "hashes": {
+    "signal_engine.py": "6ec6f330dc5fbfcaa2cb3429c477955da0b9241c82c75fe76617fda9e3658d90",
+    "hunt_config.json": "2a4b0d226baf95b61b18f82acbb289021ca006024b4b6e56df725ef4b65adfdc",
+    "config.json": "82ee4a1c34eddd0bf6ac5a03c2a032aa2021c5c2175eb8e4a0c1b8ec2b9b9fed"
+  },
+  "parameters": {
+    "risk_pct": 0.02,
+    "dte_days": 21,
+    "otm_pct": 0.0,
+    "halt_dd": 0.1,
+    "flatten_dd": 0.2,
+    "initial_cash": 1000000,
+    "contract_multiplier": 100,
+    "max_contracts": 50,
+    "require_uptrend": true,
+    "require_low_vol": true,
+    "vol_percentile_max": 0.6,
+    "stock_stop_pct": -0.03,
+    "stock_tp_pct": 0.07,
+    "max_position_pct": 0.1
+  }
+}

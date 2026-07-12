@@ -1,0 +1,73 @@
+{
+  "artifacts": [
+    {
+      "path": "artifacts/equity.csv",
+      "sha256": "912cd46a9019b0611a0d332ed89c1186257cd1d127e8b6bdb8eff4360faecb5b",
+      "size_bytes": 18594
+    },
+    {
+      "path": "artifacts/greeks.csv",
+      "sha256": "4b1201d3296d5e6c624d780dd4eccc62327fc62377c0277a51fe4d8958c34400",
+      "size_bytes": 14323
+    },
+    {
+      "path": "artifacts/metrics.csv",
+      "sha256": "b691e411352fd1dae2942ef717f363f3c8786d847f065e622bb90234197c6f62",
+      "size_bytes": 190
+    },
+    {
+      "path": "artifacts/ohlcv_NVDA.US.csv",
+      "sha256": "943b981b7c2ad03a289cfae42131c4dc6b4bb45385f79e03f0e758edf675ad1a",
+      "size_bytes": 44738
+    },
+    {
+      "path": "artifacts/trades.csv",
+      "sha256": "ecbb8f02a7b25eda88bba4ba12cd56e5207d227a56d17db4b495fd273b852770",
+      "size_bytes": 517
+    },
+    {
+      "path": "code/signal_engine.py",
+      "sha256": "b9c142ea18aa8f6f27e245984799193ea780109abb5a34e63f5241d30da230d1",
+      "size_bytes": 8718
+    },
+    {
+      "path": "config.json",
+      "sha256": "5ac7ae06b2c2dd3d373080b0e92a8beda43a2923337a0af971e76d761863bc74",
+      "size_bytes": 458
+    }
+  ],
+  "backtest": {
+    "codes": [
+      "NVDA.US"
+    ],
+    "end_date": "2026-07-11",
+    "engine": "options",
+    "initial_cash": 1000000.0,
+    "interval": "1D",
+    "source": "yfinance",
+    "start_date": "2024-08-01"
+  },
+  "data_sources": [
+    "yfinance"
+  ],
+  "generated_at": "2026-07-11T23:00:26.536738Z",
+  "metrics": {
+    "annual_return": -0.037828,
+    "calmar": -0.5022,
+    "final_value": 928329.2,
+    "max_drawdown": -0.07532,
+    "profit_loss_ratio": 0.0018,
+    "sharpe": -0.983,
+    "sortino": -0.1544,
+    "total_return": -0.071671,
+    "trade_count": 6,
+    "win_rate": 0.3333
+  },
+  "reproducibility": {
+    "config_hash": "5ac7ae06b2c2dd3d373080b0e92a8beda43a2923337a0af971e76d761863bc74",
+    "strategy_hash": "b9c142ea18aa8f6f27e245984799193ea780109abb5a34e63f5241d30da230d1"
+  },
+  "run_dir": "/Users/syriljacob/Desktop/TradingAlgoWork/runs/poc_va_opts_hunt/loops/solo_nvda__atm10_21",
+  "schema_version": "0.1",
+  "warnings": []
+}

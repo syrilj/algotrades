@@ -126,3 +126,32 @@ Catching **big moves**: sniper names already have the vol asymmetry; options **l
 4. Live: use `tools/options_picker.py` (debit spreads). Backtest used naked calls for simplicity.
 
 Full table: `models/poc_va_gex/artifacts/OPTIONS_SWING_BACKTEST.json`
+
+
+---
+
+## React doctrine (risk) — catch big moves
+
+Wired into `tools/options_picker.py` (`exit_plan`) and `research/options_react_lse.py`:
+
+1. **Cut losers fast** — premium ≤ **−30%** → exit (no hope)
+2. **Stuck / not moving** — after ~2 sessions, if option & underlying barely moved → **get out**
+3. **Big move** — after **+40%**, trail; exit on ~25% giveback from peak premium
+4. **Flat by 5 DTE** — no lottery holds
+5. **Risk budget** — max ~18% of $1k per idea; prefer **debit spreads** from LSE marks
+
+## LSE real-premium test (partial)
+
+- Vault: `lse.history(symbol, dataset="options", timeframe="1d")` — **real closes**, not BS proxy
+- Cached: `artifacts/lse_options_daily/APLD_1d_recent.parquet` (2026-04 → 2026-07)
+- IONQ export hit LSE **429 rate limits** — retry later, then re-run
+- On 3 APLD v20b signals in that window: all stopped out; **react −12%** vs old-style hold **−17%** (cut-fast hurt less)
+- Too few trades to promote — doctrine validated directionally
+
+```bash
+# live pick + exit plan
+.venv/bin/python tools/options_picker.py --symbol APLD --account 1000
+
+# LSE react research (needs parquet cache)
+.venv/bin/python models/poc_va_gex/research/options_react_lse.py
+```

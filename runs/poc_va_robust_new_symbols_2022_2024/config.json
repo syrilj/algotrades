@@ -1,0 +1,25 @@
+{
+  "source": "yfinance",
+  "codes": [
+    "TSLA.US",
+    "SPY.US",
+    "APLD.US",
+    "ARM.US"
+  ],
+  "start_date": "2022-01-01",
+  "end_date": "2024-07-31",
+  "initial_cash": 1000000,
+  "commission": 0.001,
+  "engine": "options",
+  "interval": "1D",
+  "options_config": {
+    "risk_free_rate": 0.05,
+    "contract_multiplier": 100,
+    "exercise_style": "american"
+  },
+  "strategy": {
+    "model_version": "robust_new_symbols_2022_2024",
+    "style": "atm21_robust",
+    "note": "v22_robust test 2022-01-01 to 2024-07-31 codes ['TSLA.US', 'SPY.US', 'APLD.US', 'ARM.US']"
+  }
+}

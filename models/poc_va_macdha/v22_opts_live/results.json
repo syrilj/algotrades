@@ -1,0 +1,26 @@
+{
+  "model": "v22_opts_live",
+  "window": "2024-08-01..2026-07-11",
+  "codes": [
+    "IONQ.US",
+    "AVGO.US",
+    "HOOD.US",
+    "MU.US"
+  ],
+  "style": "atm10_21",
+  "evolution": "solo-rank feedback \u2192 IONQ/AVGO/HOOD/MU beat MU/APLD/IONQ/TSLA bag",
+  "portfolio": {
+    "final_value": 1598114.68,
+    "total_return": 0.598115,
+    "max_drawdown": -0.111753,
+    "sharpe": 1.281,
+    "win_rate": 0.8182,
+    "trade_count": 22
+  },
+  "end_per_1000": 1598.12,
+  "vs_prior_bag_v20winners": {
+    "prior_ret": 0.533452,
+    "evolved_ret": 0.598115
+  },
+  "goal_note": "$1k\u2192$1M not reachable in this window at this CAGR (~30y). Live model optimizes robust options growth, not lottery."
+}

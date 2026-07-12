@@ -107,7 +107,7 @@ function runPythonSnippet(code: string, timeoutMs = 15_000): Promise<string> {
 
 /**
  * Dynamically discover models from filesystem + registry.
- * New models/poc_va_macdha/v*_*/signal_engine.py appear automatically.
+ * New models/poc_va_macdha/v* folders with signal_engine.py appear automatically.
  */
 export async function loadModelsCatalog(): Promise<ModelsCatalog> {
   const root = modelsRoot();

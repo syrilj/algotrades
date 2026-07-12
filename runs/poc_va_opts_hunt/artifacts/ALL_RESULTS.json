@@ -1,0 +1,1279 @@
+[
+  {
+    "name": "solo_apld__atm5_30",
+    "ok": true,
+    "codes": [
+      "APLD.US"
+    ],
+    "style": "atm5_30",
+    "elapsed": 19.189351797103882,
+    "final_value": 1029074.05,
+    "total_return": 0.029074,
+    "max_drawdown": -0.050117,
+    "sharpe": 0.2825,
+    "win_rate": 0.6667,
+    "profit_factor": null,
+    "trade_count": 6,
+    "end_per_1000": 1029.074,
+    "years_to_1000x_at_cagr": 465.18706697514546,
+    "survived": true
+  },
+  {
+    "name": "solo_mu__atm10_21",
+    "ok": true,
+    "codes": [
+      "MU.US"
+    ],
+    "style": "atm10_21",
+    "elapsed": 21.109896898269653,
+    "final_value": 1139786.76,
+    "total_return": 0.139787,
+    "max_drawdown": -0.067754,
+    "sharpe": 0.6,
+    "win_rate": 0.8,
+    "profit_factor": null,
+    "trade_count": 10,
+    "end_per_1000": 1139.787,
+    "years_to_1000x_at_cagr": 101.8941053722346,
+    "survived": true
+  },
+  {
+    "name": "solo_mu__atm5_30",
+    "ok": true,
+    "codes": [
+      "MU.US"
+    ],
+    "style": "atm5_30",
+    "elapsed": 21.956880807876587,
+    "final_value": 1043880.49,
+    "total_return": 0.04388,
+    "max_drawdown": -0.043556,
+    "sharpe": 0.3727,
+    "win_rate": 0.6667,
+    "profit_factor": null,
+    "trade_count": 12,
+    "end_per_1000": 1043.8799999999999,
+    "years_to_1000x_at_cagr": 310.44616119868834,
+    "survived": true
+  },
+  {
+    "name": "solo_apld__atm10_21",
+    "ok": true,
+    "codes": [
+      "APLD.US"
+    ],
+    "style": "atm10_21",
+    "elapsed": 25.539061069488525,
+    "final_value": 1045652.53,
+    "total_return": 0.045653,
+    "max_drawdown": -0.087436,
+    "sharpe": 0.2657,
+    "win_rate": 0.6667,
+    "profit_factor": null,
+    "trade_count": 6,
+    "end_per_1000": 1045.653,
+    "years_to_1000x_at_cagr": 298.6446824423418,
+    "survived": true
+  },
+  {
+    "name": "solo_tsla__atm5_30",
+    "ok": true,
+    "codes": [
+      "TSLA.US"
+    ],
+    "style": "atm5_30",
+    "elapsed": 105.18490886688232,
+    "final_value": 1059360.59,
+    "total_return": 0.059361,
+    "max_drawdown": -0.041224,
+    "sharpe": 0.7625,
+    "win_rate": 0.5,
+    "profit_factor": null,
+    "trade_count": 12,
+    "end_per_1000": 1059.361,
+    "years_to_1000x_at_cagr": 231.19328019140556,
+    "survived": true
+  },
+  {
+    "name": "solo_ionq__atm5_30",
+    "ok": true,
+    "codes": [
+      "IONQ.US"
+    ],
+    "style": "atm5_30",
+    "elapsed": 107.95935988426208,
+    "final_value": 1236947.78,
+    "total_return": 0.236948,
+    "max_drawdown": -0.124123,
+    "sharpe": 0.9862,
+    "win_rate": 0.6,
+    "profit_factor": null,
+    "trade_count": 10,
+    "end_per_1000": 1236.9479999999999,
+    "years_to_1000x_at_cagr": 62.695284762433104,
+    "survived": true
+  },
+  {
+    "name": "solo_ionq__atm10_21",
+    "ok": true,
+    "codes": [
+      "IONQ.US"
+    ],
+    "style": "atm10_21",
+    "elapsed": 106.18067908287048,
+    "final_value": 1208793.43,
+    "total_return": 0.208793,
+    "max_drawdown": -0.14692,
+    "sharpe": 0.8579,
+    "win_rate": 0.6,
+    "profit_factor": null,
+    "trade_count": 10,
+    "end_per_1000": 1208.7930000000001,
+    "years_to_1000x_at_cagr": 70.30800069028514,
+    "survived": true
+  },
+  {
+    "name": "solo_tsla__atm10_21",
+    "ok": true,
+    "codes": [
+      "TSLA.US"
+    ],
+    "style": "atm10_21",
+    "elapsed": 99.163245677948,
+    "final_value": 1123278.46,
+    "total_return": 0.123278,
+    "max_drawdown": -0.075088,
+    "sharpe": 0.7915,
+    "win_rate": 0.3333,
+    "profit_factor": null,
+    "trade_count": 12,
+    "end_per_1000": 1123.278,
+    "years_to_1000x_at_cagr": 114.682412828058,
+    "survived": true
+  },
+  {
+    "name": "solo_arm__atm5_30",
+    "ok": true,
+    "codes": [
+      "ARM.US"
+    ],
+    "style": "atm5_30",
+    "elapsed": 13.244495868682861,
+    "final_value": 1065194.08,
+    "total_return": 0.065194,
+    "max_drawdown": -0.069029,
+    "sharpe": 0.4085,
+    "win_rate": 0.5,
+    "profit_factor": null,
+    "trade_count": 20,
+    "end_per_1000": 1065.194,
+    "years_to_1000x_at_cagr": 211.09267207558378,
+    "survived": true
+  },
+  {
+    "name": "solo_arm__atm10_21",
+    "ok": true,
+    "codes": [
+      "ARM.US"
+    ],
+    "style": "atm10_21",
+    "elapsed": 16.66837501525879,
+    "final_value": 1053666.65,
+    "total_return": 0.053667,
+    "max_drawdown": -0.121547,
+    "sharpe": 0.246,
+    "win_rate": 0.3333,
+    "profit_factor": null,
+    "trade_count": 12,
+    "end_per_1000": 1053.667,
+    "years_to_1000x_at_cagr": 255.0281226689596,
+    "survived": true
+  },
+  {
+    "name": "solo_mstr__atm5_30",
+    "ok": true,
+    "codes": [
+      "MSTR.US"
+    ],
+    "style": "atm5_30",
+    "elapsed": 20.38800597190857,
+    "final_value": 1023474.05,
+    "total_return": 0.023474,
+    "max_drawdown": -0.027836,
+    "sharpe": 0.3208,
+    "win_rate": 0.375,
+    "profit_factor": null,
+    "trade_count": 16,
+    "end_per_1000": 1023.474,
+    "years_to_1000x_at_cagr": 574.5863458310121,
+    "survived": true
+  },
+  {
+    "name": "solo_mstr__atm10_21",
+    "ok": true,
+    "codes": [
+      "MSTR.US"
+    ],
+    "style": "atm10_21",
+    "elapsed": 33.62592005729675,
+    "final_value": 1040363.1,
+    "total_return": 0.040363,
+    "max_drawdown": -0.047596,
+    "sharpe": 0.3436,
+    "win_rate": 0.3333,
+    "profit_factor": null,
+    "trade_count": 12,
+    "end_per_1000": 1040.3629999999998,
+    "years_to_1000x_at_cagr": 336.92372741643203,
+    "survived": true
+  },
+  {
+    "name": "solo_nvda__atm5_30",
+    "ok": true,
+    "codes": [
+      "NVDA.US"
+    ],
+    "style": "atm5_30",
+    "elapsed": 85.55340790748596,
+    "final_value": 950312.23,
+    "total_return": -0.049688,
+    "max_drawdown": -0.049688,
+    "sharpe": -1.124,
+    "win_rate": 0.0,
+    "profit_factor": null,
+    "trade_count": 10,
+    "end_per_1000": 950.312,
+    "years_to_1000x_at_cagr": null,
+    "survived": true
+  },
+  {
+    "name": "solo_nvda__atm10_21",
+    "ok": true,
+    "codes": [
+      "NVDA.US"
+    ],
+    "style": "atm10_21",
+    "elapsed": 92.79777932167053,
+    "final_value": 928329.2,
+    "total_return": -0.071671,
+    "max_drawdown": -0.07532,
+    "sharpe": -0.983,
+    "win_rate": 0.3333,
+    "profit_factor": null,
+    "trade_count": 6,
+    "end_per_1000": 928.329,
+    "years_to_1000x_at_cagr": null,
+    "survived": true
+  },
+  {
+    "name": "solo_amd__atm5_30",
+    "ok": true,
+    "codes": [
+      "AMD.US"
+    ],
+    "style": "atm5_30",
+    "elapsed": 92.19329524040222,
+    "final_value": 968768.99,
+    "total_return": -0.031231,
+    "max_drawdown": -0.039531,
+    "sharpe": -0.9704,
+    "win_rate": 0.2,
+    "profit_factor": null,
+    "trade_count": 10,
+    "end_per_1000": 968.769,
+    "years_to_1000x_at_cagr": null,
+    "survived": true
+  },
+  {
+    "name": "solo_amd__atm10_21",
+    "ok": true,
+    "codes": [
+      "AMD.US"
+    ],
+    "style": "atm10_21",
+    "elapsed": 88.4778528213501,
+    "final_value": 989933.25,
+    "total_return": -0.010067,
+    "max_drawdown": -0.034172,
+    "sharpe": -0.2479,
+    "win_rate": 0.25,
+    "profit_factor": null,
+    "trade_count": 8,
+    "end_per_1000": 989.933,
+    "years_to_1000x_at_cagr": null,
+    "survived": true
+  },
+  {
+    "name": "solo_coin__atm5_30",
+    "ok": true,
+    "codes": [
+      "COIN.US"
+    ],
+    "style": "atm5_30",
+    "elapsed": 79.57747912406921,
+    "final_value": 1070385.37,
+    "total_return": 0.070385,
+    "max_drawdown": -0.059141,
+    "sharpe": 0.5281,
+    "win_rate": 0.75,
+    "profit_factor": null,
+    "trade_count": 8,
+    "end_per_1000": 1070.385,
+    "years_to_1000x_at_cagr": 196.00532073190024,
+    "survived": true
+  },
+  {
+    "name": "solo_coin__atm10_21",
+    "ok": true,
+    "codes": [
+      "COIN.US"
+    ],
+    "style": "atm10_21",
+    "elapsed": 70.31698703765869,
+    "final_value": 1121390.0,
+    "total_return": 0.12139,
+    "max_drawdown": -0.112568,
+    "sharpe": 0.5156,
+    "win_rate": 0.75,
+    "profit_factor": null,
+    "trade_count": 8,
+    "end_per_1000": 1121.3899999999999,
+    "years_to_1000x_at_cagr": 116.36628732830978,
+    "survived": true
+  },
+  {
+    "name": "solo_mara__atm5_30",
+    "ok": true,
+    "codes": [
+      "MARA.US"
+    ],
+    "style": "atm5_30",
+    "elapsed": 70.8569598197937,
+    "final_value": 927309.27,
+    "total_return": -0.072691,
+    "max_drawdown": -0.11639,
+    "sharpe": -0.6345,
+    "win_rate": 0.2857,
+    "profit_factor": null,
+    "trade_count": 14,
+    "end_per_1000": 927.309,
+    "years_to_1000x_at_cagr": null,
+    "survived": true
+  },
+  {
+    "name": "solo_mara__atm10_21",
+    "ok": true,
+    "codes": [
+      "MARA.US"
+    ],
+    "style": "atm10_21",
+    "elapsed": 60.93575096130371,
+    "final_value": 893673.07,
+    "total_return": -0.106327,
+    "max_drawdown": -0.168298,
+    "sharpe": -0.6496,
+    "win_rate": 0.1667,
+    "profit_factor": null,
+    "trade_count": 12,
+    "end_per_1000": 893.6729999999999,
+    "years_to_1000x_at_cagr": null,
+    "survived": true
+  },
+  {
+    "name": "solo_smci__atm5_30",
+    "ok": true,
+    "codes": [
+      "SMCI.US"
+    ],
+    "style": "atm5_30",
+    "elapsed": 30.451618909835815,
+    "final_value": 1054424.52,
+    "total_return": 0.054425,
+    "max_drawdown": -0.068402,
+    "sharpe": 0.5099,
+    "win_rate": 0.4286,
+    "profit_factor": null,
+    "trade_count": 14,
+    "end_per_1000": 1054.425,
+    "years_to_1000x_at_cagr": 251.56747039060738,
+    "survived": true
+  },
+  {
+    "name": "solo_smci__atm10_21",
+    "ok": true,
+    "codes": [
+      "SMCI.US"
+    ],
+    "style": "atm10_21",
+    "elapsed": 29.333858728408813,
+    "final_value": 1089187.63,
+    "total_return": 0.089188,
+    "max_drawdown": -0.128585,
+    "sharpe": 0.4713,
+    "win_rate": 0.4286,
+    "profit_factor": null,
+    "trade_count": 14,
+    "end_per_1000": 1089.188,
+    "years_to_1000x_at_cagr": 156.05271095740133,
+    "survived": true
+  },
+  {
+    "name": "solo_pltr__atm5_30",
+    "ok": true,
+    "codes": [
+      "PLTR.US"
+    ],
+    "style": "atm5_30",
+    "elapsed": 25.57563591003418,
+    "final_value": 953735.89,
+    "total_return": -0.046264,
+    "max_drawdown": -0.047318,
+    "sharpe": -1.1148,
+    "win_rate": 0.2,
+    "profit_factor": null,
+    "trade_count": 10,
+    "end_per_1000": 953.736,
+    "years_to_1000x_at_cagr": null,
+    "survived": true
+  },
+  {
+    "name": "solo_pltr__atm10_21",
+    "ok": true,
+    "codes": [
+      "PLTR.US"
+    ],
+    "style": "atm10_21",
+    "elapsed": 27.923721075057983,
+    "final_value": 921451.95,
+    "total_return": -0.078548,
+    "max_drawdown": -0.080491,
+    "sharpe": -1.0998,
+    "win_rate": 0.2,
+    "profit_factor": null,
+    "trade_count": 10,
+    "end_per_1000": 921.4519999999999,
+    "years_to_1000x_at_cagr": null,
+    "survived": true
+  },
+  {
+    "name": "solo_sofi__atm5_30",
+    "ok": true,
+    "codes": [
+      "SOFI.US"
+    ],
+    "style": "atm5_30",
+    "elapsed": 23.09309434890747,
+    "final_value": 935707.39,
+    "total_return": -0.064293,
+    "max_drawdown": -0.072158,
+    "sharpe": -1.1645,
+    "win_rate": 0.1429,
+    "profit_factor": null,
+    "trade_count": 14,
+    "end_per_1000": 935.707,
+    "years_to_1000x_at_cagr": null,
+    "survived": true
+  },
+  {
+    "name": "solo_sofi__atm10_21",
+    "ok": true,
+    "codes": [
+      "SOFI.US"
+    ],
+    "style": "atm10_21",
+    "elapsed": 23.376524925231934,
+    "final_value": 921954.34,
+    "total_return": -0.078046,
+    "max_drawdown": -0.084519,
+    "sharpe": -1.2001,
+    "win_rate": 0.1429,
+    "profit_factor": null,
+    "trade_count": 14,
+    "end_per_1000": 921.954,
+    "years_to_1000x_at_cagr": null,
+    "survived": true
+  },
+  {
+    "name": "solo_hood__atm5_30",
+    "ok": true,
+    "codes": [
+      "HOOD.US"
+    ],
+    "style": "atm5_30",
+    "elapsed": 25.216369152069092,
+    "final_value": 1097968.97,
+    "total_return": 0.097969,
+    "max_drawdown": -0.054833,
+    "sharpe": 0.6299,
+    "win_rate": 1.0,
+    "profit_factor": null,
+    "trade_count": 10,
+    "end_per_1000": 1097.969,
+    "years_to_1000x_at_cagr": 142.64569625483588,
+    "survived": true
+  },
+  {
+    "name": "solo_hood__atm10_21",
+    "ok": true,
+    "codes": [
+      "HOOD.US"
+    ],
+    "style": "atm10_21",
+    "elapsed": 28.040107011795044,
+    "final_value": 1192273.69,
+    "total_return": 0.192274,
+    "max_drawdown": -0.103844,
+    "sharpe": 0.6381,
+    "win_rate": 1.0,
+    "profit_factor": null,
+    "trade_count": 10,
+    "end_per_1000": 1192.2740000000001,
+    "years_to_1000x_at_cagr": 75.80908188431323,
+    "survived": true
+  },
+  {
+    "name": "solo_meta__atm5_30",
+    "ok": true,
+    "codes": [
+      "META.US"
+    ],
+    "style": "atm5_30",
+    "elapsed": 42.466784954071045,
+    "final_value": 1037529.33,
+    "total_return": 0.037529,
+    "max_drawdown": -0.022411,
+    "sharpe": 0.4581,
+    "win_rate": 0.2857,
+    "profit_factor": null,
+    "trade_count": 14,
+    "end_per_1000": 1037.529,
+    "years_to_1000x_at_cagr": 361.8694695010794,
+    "survived": true
+  },
+  {
+    "name": "solo_meta__atm10_21",
+    "ok": true,
+    "codes": [
+      "META.US"
+    ],
+    "style": "atm10_21",
+    "elapsed": 44.4696159362793,
+    "final_value": 1025681.41,
+    "total_return": 0.025681,
+    "max_drawdown": -0.02396,
+    "sharpe": 0.393,
+    "win_rate": 0.25,
+    "profit_factor": null,
+    "trade_count": 8,
+    "end_per_1000": 1025.681,
+    "years_to_1000x_at_cagr": 525.7752174644793,
+    "survived": true
+  },
+  {
+    "name": "solo_amzn__atm5_30",
+    "ok": true,
+    "codes": [
+      "AMZN.US"
+    ],
+    "style": "atm5_30",
+    "elapsed": 46.12178111076355,
+    "final_value": 1036999.43,
+    "total_return": 0.036999,
+    "max_drawdown": -0.015045,
+    "sharpe": 0.6253,
+    "win_rate": 0.5,
+    "profit_factor": null,
+    "trade_count": 12,
+    "end_per_1000": 1036.999,
+    "years_to_1000x_at_cagr": 366.9588109015979,
+    "survived": true
+  },
+  {
+    "name": "solo_amzn__atm10_21",
+    "ok": true,
+    "codes": [
+      "AMZN.US"
+    ],
+    "style": "atm10_21",
+    "elapsed": 45.77685189247131,
+    "final_value": 1041961.96,
+    "total_return": 0.041962,
+    "max_drawdown": -0.025411,
+    "sharpe": 0.4277,
+    "win_rate": 0.4,
+    "profit_factor": null,
+    "trade_count": 10,
+    "end_per_1000": 1041.962,
+    "years_to_1000x_at_cagr": 324.33557582722113,
+    "survived": true
+  },
+  {
+    "name": "solo_qqq__atm5_30",
+    "ok": true,
+    "codes": [
+      "QQQ.US"
+    ],
+    "style": "atm5_30",
+    "elapsed": 38.797415256500244,
+    "final_value": 978739.11,
+    "total_return": -0.021261,
+    "max_drawdown": -0.030239,
+    "sharpe": -0.9289,
+    "win_rate": 0.6667,
+    "profit_factor": null,
+    "trade_count": 12,
+    "end_per_1000": 978.739,
+    "years_to_1000x_at_cagr": null,
+    "survived": true
+  },
+  {
+    "name": "solo_qqq__atm10_21",
+    "ok": true,
+    "codes": [
+      "QQQ.US"
+    ],
+    "style": "atm10_21",
+    "elapsed": 37.50897288322449,
+    "final_value": 953834.87,
+    "total_return": -0.046165,
+    "max_drawdown": -0.05362,
+    "sharpe": -1.1796,
+    "win_rate": 0.5,
+    "profit_factor": null,
+    "trade_count": 8,
+    "end_per_1000": 953.835,
+    "years_to_1000x_at_cagr": null,
+    "survived": true
+  },
+  {
+    "name": "solo_spy__atm5_30",
+    "ok": true,
+    "codes": [
+      "SPY.US"
+    ],
+    "style": "atm5_30",
+    "elapsed": 35.87397003173828,
+    "final_value": 992971.71,
+    "total_return": -0.007028,
+    "max_drawdown": -0.007028,
+    "sharpe": -1.0203,
+    "win_rate": 0.0,
+    "profit_factor": null,
+    "trade_count": 4,
+    "end_per_1000": 992.972,
+    "years_to_1000x_at_cagr": null,
+    "survived": true
+  },
+  {
+    "name": "solo_spy__atm10_21",
+    "ok": true,
+    "codes": [
+      "SPY.US"
+    ],
+    "style": "atm10_21",
+    "elapsed": 34.07488012313843,
+    "final_value": 986076.23,
+    "total_return": -0.013924,
+    "max_drawdown": -0.013924,
+    "sharpe": -1.0281,
+    "win_rate": 0.0,
+    "profit_factor": null,
+    "trade_count": 4,
+    "end_per_1000": 986.0759999999999,
+    "years_to_1000x_at_cagr": null,
+    "survived": true
+  },
+  {
+    "name": "solo_gme__atm5_30",
+    "ok": true,
+    "codes": [
+      "GME.US"
+    ],
+    "style": "atm5_30",
+    "elapsed": 45.39843463897705,
+    "final_value": 1092479.03,
+    "total_return": 0.092479,
+    "max_drawdown": -0.078699,
+    "sharpe": 0.5939,
+    "win_rate": 0.8,
+    "profit_factor": null,
+    "trade_count": 10,
+    "end_per_1000": 1092.479,
+    "years_to_1000x_at_cagr": 150.72983869133296,
+    "survived": true
+  },
+  {
+    "name": "solo_gme__atm10_21",
+    "ok": true,
+    "codes": [
+      "GME.US"
+    ],
+    "style": "atm10_21",
+    "elapsed": 54.99837374687195,
+    "final_value": 1170200.24,
+    "total_return": 0.1702,
+    "max_drawdown": -0.139848,
+    "sharpe": 0.6136,
+    "win_rate": 0.8,
+    "profit_factor": null,
+    "trade_count": 10,
+    "end_per_1000": 1170.1999999999998,
+    "years_to_1000x_at_cagr": 84.8226200671593,
+    "survived": true
+  },
+  {
+    "name": "solo_rklb__atm5_30",
+    "ok": true,
+    "codes": [
+      "RKLB.US"
+    ],
+    "style": "atm5_30",
+    "elapsed": 57.95480298995972,
+    "final_value": 1142167.01,
+    "total_return": 0.142167,
+    "max_drawdown": -0.069883,
+    "sharpe": 0.9229,
+    "win_rate": 0.3636,
+    "profit_factor": null,
+    "trade_count": 22,
+    "end_per_1000": 1142.167,
+    "years_to_1000x_at_cagr": 100.295154992111,
+    "survived": true
+  },
+  {
+    "name": "solo_rklb__atm10_21",
+    "ok": true,
+    "codes": [
+      "RKLB.US"
+    ],
+    "style": "atm10_21",
+    "elapsed": 61.66569209098816,
+    "final_value": 1013959.81,
+    "total_return": 0.01396,
+    "max_drawdown": -0.045155,
+    "sharpe": 0.1645,
+    "win_rate": 0.3333,
+    "profit_factor": null,
+    "trade_count": 12,
+    "end_per_1000": 1013.9599999999999,
+    "years_to_1000x_at_cagr": 961.662593696113,
+    "survived": true
+  },
+  {
+    "name": "solo_avgo__atm5_30",
+    "ok": true,
+    "codes": [
+      "AVGO.US"
+    ],
+    "style": "atm5_30",
+    "elapsed": 48.17762303352356,
+    "final_value": 1126987.19,
+    "total_return": 0.126987,
+    "max_drawdown": -0.09151,
+    "sharpe": 0.5897,
+    "win_rate": 0.4,
+    "profit_factor": null,
+    "trade_count": 10,
+    "end_per_1000": 1126.9869999999999,
+    "years_to_1000x_at_cagr": 111.52006851549078,
+    "survived": true
+  },
+  {
+    "name": "solo_avgo__atm10_21",
+    "ok": true,
+    "codes": [
+      "AVGO.US"
+    ],
+    "style": "atm10_21",
+    "elapsed": 44.208226919174194,
+    "final_value": 1247197.77,
+    "total_return": 0.247198,
+    "max_drawdown": -0.152117,
+    "sharpe": 0.6308,
+    "win_rate": 0.4,
+    "profit_factor": null,
+    "trade_count": 10,
+    "end_per_1000": 1247.198,
+    "years_to_1000x_at_cagr": 60.35310899862784,
+    "survived": true
+  },
+  {
+    "name": "solo_crm__atm5_30",
+    "ok": true,
+    "codes": [
+      "CRM.US"
+    ],
+    "style": "atm5_30",
+    "elapsed": 39.64347505569458,
+    "final_value": 979278.44,
+    "total_return": -0.020722,
+    "max_drawdown": -0.029182,
+    "sharpe": -0.8604,
+    "win_rate": 0.2,
+    "profit_factor": null,
+    "trade_count": 10,
+    "end_per_1000": 979.278,
+    "years_to_1000x_at_cagr": null,
+    "survived": true
+  },
+  {
+    "name": "solo_crm__atm10_21",
+    "ok": true,
+    "codes": [
+      "CRM.US"
+    ],
+    "style": "atm10_21",
+    "elapsed": 32.789538860321045,
+    "final_value": 978858.53,
+    "total_return": -0.021141,
+    "max_drawdown": -0.036599,
+    "sharpe": -0.5133,
+    "win_rate": 0.25,
+    "profit_factor": null,
+    "trade_count": 8,
+    "end_per_1000": 978.859,
+    "years_to_1000x_at_cagr": null,
+    "survived": true
+  },
+  {
+    "name": "bag_v20winners__atm5_30",
+    "ok": true,
+    "codes": [
+      "MU.US",
+      "APLD.US",
+      "IONQ.US",
+      "TSLA.US"
+    ],
+    "style": "atm5_30",
+    "elapsed": 19.897064924240112,
+    "final_value": 1400776.74,
+    "total_return": 0.400777,
+    "max_drawdown": -0.108116,
+    "sharpe": 1.379,
+    "win_rate": 0.8333,
+    "profit_factor": null,
+    "trade_count": 24,
+    "end_per_1000": 1400.777,
+    "years_to_1000x_at_cagr": 39.55755597736531,
+    "survived": true
+  },
+  {
+    "name": "bag_crypto_beta__atm5_30",
+    "ok": true,
+    "codes": [
+      "COIN.US",
+      "MSTR.US",
+      "MARA.US"
+    ],
+    "style": "atm5_30",
+    "elapsed": 18.561697006225586,
+    "final_value": 1000967.38,
+    "total_return": 0.000967,
+    "max_drawdown": -0.08267,
+    "sharpe": 0.0402,
+    "win_rate": 0.5,
+    "profit_factor": null,
+    "trade_count": 16,
+    "end_per_1000": 1000.967,
+    "years_to_1000x_at_cagr": 13793.601506138806,
+    "survived": true
+  },
+  {
+    "name": "bag_v20winners__atm10_21",
+    "ok": true,
+    "codes": [
+      "MU.US",
+      "APLD.US",
+      "IONQ.US",
+      "TSLA.US"
+    ],
+    "style": "atm10_21",
+    "elapsed": 20.00977897644043,
+    "final_value": 1533451.71,
+    "total_return": 0.533452,
+    "max_drawdown": -0.107427,
+    "sharpe": 1.4012,
+    "win_rate": 0.8182,
+    "profit_factor": null,
+    "trade_count": 22,
+    "end_per_1000": 1533.452,
+    "years_to_1000x_at_cagr": 31.18432806081415,
+    "survived": true
+  },
+  {
+    "name": "bag_v20winners__otm8_14",
+    "ok": true,
+    "codes": [
+      "MU.US",
+      "APLD.US",
+      "IONQ.US",
+      "TSLA.US"
+    ],
+    "style": "otm8_14",
+    "elapsed": 19.441751956939697,
+    "final_value": 1469462.11,
+    "total_return": 0.469462,
+    "max_drawdown": -0.062833,
+    "sharpe": 1.5739,
+    "win_rate": 0.8182,
+    "profit_factor": null,
+    "trade_count": 22,
+    "end_per_1000": 1469.462,
+    "years_to_1000x_at_cagr": 34.6378129547371,
+    "survived": true
+  },
+  {
+    "name": "bag_crypto_beta__atm10_21",
+    "ok": true,
+    "codes": [
+      "COIN.US",
+      "MSTR.US",
+      "MARA.US"
+    ],
+    "style": "atm10_21",
+    "elapsed": 54.04283881187439,
+    "final_value": 1070003.94,
+    "total_return": 0.070004,
+    "max_drawdown": -0.082517,
+    "sharpe": 0.4014,
+    "win_rate": 0.5,
+    "profit_factor": null,
+    "trade_count": 12,
+    "end_per_1000": 1070.004,
+    "years_to_1000x_at_cagr": 197.03661549629237,
+    "survived": true
+  },
+  {
+    "name": "bag_crypto_beta__otm8_14",
+    "ok": true,
+    "codes": [
+      "COIN.US",
+      "MSTR.US",
+      "MARA.US"
+    ],
+    "style": "otm8_14",
+    "elapsed": 59.700066804885864,
+    "final_value": 984047.14,
+    "total_return": -0.015953,
+    "max_drawdown": -0.094882,
+    "sharpe": -0.0869,
+    "win_rate": 0.4286,
+    "profit_factor": null,
+    "trade_count": 14,
+    "end_per_1000": 984.047,
+    "years_to_1000x_at_cagr": null,
+    "survived": true
+  },
+  {
+    "name": "bag_semi__atm5_30",
+    "ok": true,
+    "codes": [
+      "MU.US",
+      "NVDA.US",
+      "AMD.US",
+      "AVGO.US",
+      "ARM.US"
+    ],
+    "style": "atm5_30",
+    "elapsed": 68.71996808052063,
+    "final_value": 1099914.21,
+    "total_return": 0.099914,
+    "max_drawdown": -0.030644,
+    "sharpe": 0.924,
+    "win_rate": 0.7778,
+    "profit_factor": null,
+    "trade_count": 18,
+    "end_per_1000": 1099.914,
+    "years_to_1000x_at_cagr": 139.99462783768408,
+    "survived": true
+  },
+  {
+    "name": "bag_semi__atm10_21",
+    "ok": true,
+    "codes": [
+      "MU.US",
+      "NVDA.US",
+      "AMD.US",
+      "AVGO.US",
+      "ARM.US"
+    ],
+    "style": "atm10_21",
+    "elapsed": 68.95330309867859,
+    "final_value": 1113983.64,
+    "total_return": 0.113984,
+    "max_drawdown": -0.052312,
+    "sharpe": 0.6555,
+    "win_rate": 0.8333,
+    "profit_factor": null,
+    "trade_count": 12,
+    "end_per_1000": 1113.9840000000002,
+    "years_to_1000x_at_cagr": 123.50958390600789,
+    "survived": true
+  },
+  {
+    "name": "bag_semi__otm8_14",
+    "ok": true,
+    "codes": [
+      "MU.US",
+      "NVDA.US",
+      "AMD.US",
+      "AVGO.US",
+      "ARM.US"
+    ],
+    "style": "otm8_14",
+    "elapsed": 37.53463006019592,
+    "final_value": 1082597.86,
+    "total_return": 0.082598,
+    "max_drawdown": -0.046612,
+    "sharpe": 0.6055,
+    "win_rate": 0.625,
+    "profit_factor": null,
+    "trade_count": 16,
+    "end_per_1000": 1082.598,
+    "years_to_1000x_at_cagr": 167.9856955864024,
+    "survived": true
+  },
+  {
+    "name": "bag_ai_retail__atm5_30",
+    "ok": true,
+    "codes": [
+      "PLTR.US",
+      "SMCI.US",
+      "SOFI.US",
+      "HOOD.US"
+    ],
+    "style": "atm5_30",
+    "elapsed": 24.986238956451416,
+    "final_value": 988647.62,
+    "total_return": -0.011352,
+    "max_drawdown": -0.117195,
+    "sharpe": -0.0311,
+    "win_rate": 0.3333,
+    "profit_factor": null,
+    "trade_count": 18,
+    "end_per_1000": 988.648,
+    "years_to_1000x_at_cagr": null,
+    "survived": true
+  },
+  {
+    "name": "bag_ai_retail__otm8_14",
+    "ok": true,
+    "codes": [
+      "PLTR.US",
+      "SMCI.US",
+      "SOFI.US",
+      "HOOD.US"
+    ],
+    "style": "otm8_14",
+    "elapsed": 18.096144914627075,
+    "final_value": 1024751.17,
+    "total_return": 0.024751,
+    "max_drawdown": -0.106707,
+    "sharpe": 0.1686,
+    "win_rate": 0.25,
+    "profit_factor": null,
+    "trade_count": 16,
+    "end_per_1000": 1024.751,
+    "years_to_1000x_at_cagr": 545.2824183838111,
+    "survived": true
+  },
+  {
+    "name": "bag_ai_retail__atm10_21",
+    "ok": true,
+    "codes": [
+      "PLTR.US",
+      "SMCI.US",
+      "SOFI.US",
+      "HOOD.US"
+    ],
+    "style": "atm10_21",
+    "elapsed": 18.688777923583984,
+    "final_value": 1062646.64,
+    "total_return": 0.062647,
+    "max_drawdown": -0.130539,
+    "sharpe": 0.2875,
+    "win_rate": 0.5,
+    "profit_factor": null,
+    "trade_count": 12,
+    "end_per_1000": 1062.647,
+    "years_to_1000x_at_cagr": 219.4094321639302,
+    "survived": true
+  },
+  {
+    "name": "bag_mega__atm5_30",
+    "ok": true,
+    "codes": [
+      "META.US",
+      "AMZN.US",
+      "QQQ.US"
+    ],
+    "style": "atm5_30",
+    "elapsed": 16.949142932891846,
+    "final_value": 986894.63,
+    "total_return": -0.013105,
+    "max_drawdown": -0.042404,
+    "sharpe": -0.3329,
+    "win_rate": 0.1667,
+    "profit_factor": null,
+    "trade_count": 12,
+    "end_per_1000": 986.895,
+    "years_to_1000x_at_cagr": null,
+    "survived": true
+  },
+  {
+    "name": "bag_mega__atm10_21",
+    "ok": true,
+    "codes": [
+      "META.US",
+      "AMZN.US",
+      "QQQ.US"
+    ],
+    "style": "atm10_21",
+    "elapsed": 17.37658405303955,
+    "final_value": 963840.87,
+    "total_return": -0.036159,
+    "max_drawdown": -0.041291,
+    "sharpe": -1.1337,
+    "win_rate": 0.0,
+    "profit_factor": null,
+    "trade_count": 8,
+    "end_per_1000": 963.8409999999999,
+    "years_to_1000x_at_cagr": null,
+    "survived": true
+  },
+  {
+    "name": "lotto_apld__lotto15_10",
+    "ok": true,
+    "codes": [
+      "APLD.US"
+    ],
+    "style": "lotto15_10",
+    "elapsed": 16.55838108062744,
+    "final_value": 1076028.13,
+    "total_return": 0.076028,
+    "max_drawdown": -0.08263,
+    "sharpe": 0.3519,
+    "win_rate": 0.3333,
+    "profit_factor": null,
+    "trade_count": 6,
+    "end_per_1000": 1076.028,
+    "years_to_1000x_at_cagr": 181.94060378160552,
+    "survived": true
+  },
+  {
+    "name": "bag_mega__otm8_14",
+    "ok": true,
+    "codes": [
+      "META.US",
+      "AMZN.US",
+      "QQQ.US"
+    ],
+    "style": "otm8_14",
+    "elapsed": 18.99410891532898,
+    "final_value": 994602.82,
+    "total_return": -0.005397,
+    "max_drawdown": -0.006224,
+    "sharpe": -1.1129,
+    "win_rate": 0.0,
+    "profit_factor": null,
+    "trade_count": 8,
+    "end_per_1000": 994.6030000000001,
+    "years_to_1000x_at_cagr": null,
+    "survived": true
+  },
+  {
+    "name": "lotto_ionq__lotto15_10",
+    "ok": true,
+    "codes": [
+      "IONQ.US"
+    ],
+    "style": "lotto15_10",
+    "elapsed": 29.993733882904053,
+    "final_value": 1137120.35,
+    "total_return": 0.13712,
+    "max_drawdown": -0.069016,
+    "sharpe": 0.7294,
+    "win_rate": 0.6,
+    "profit_factor": null,
+    "trade_count": 10,
+    "end_per_1000": 1137.12,
+    "years_to_1000x_at_cagr": 103.75173049098827,
+    "survived": true
+  },
+  {
+    "name": "lotto_mara__lotto15_10",
+    "ok": true,
+    "codes": [
+      "MARA.US"
+    ],
+    "style": "lotto15_10",
+    "elapsed": 29.71629309654236,
+    "final_value": 904514.31,
+    "total_return": -0.095486,
+    "max_drawdown": -0.135283,
+    "sharpe": -0.8139,
+    "win_rate": 0.1667,
+    "profit_factor": null,
+    "trade_count": 12,
+    "end_per_1000": 904.514,
+    "years_to_1000x_at_cagr": null,
+    "survived": true
+  },
+  {
+    "name": "lotto_gme__lotto15_10",
+    "ok": true,
+    "codes": [
+      "GME.US"
+    ],
+    "style": "lotto15_10",
+    "elapsed": 28.207362174987793,
+    "final_value": 1065127.61,
+    "total_return": 0.065128,
+    "max_drawdown": -0.145194,
+    "sharpe": 0.304,
+    "win_rate": 0.8,
+    "profit_factor": null,
+    "trade_count": 10,
+    "end_per_1000": 1065.1280000000002,
+    "years_to_1000x_at_cagr": 211.2999757648883,
+    "survived": true
+  },
+  {
+    "name": "lotto_mstr__lotto15_10",
+    "ok": true,
+    "codes": [
+      "MSTR.US"
+    ],
+    "style": "lotto15_10",
+    "elapsed": 27.03815507888794,
+    "final_value": 1003852.54,
+    "total_return": 0.003853,
+    "max_drawdown": -0.05449,
+    "sharpe": 0.0666,
+    "win_rate": 0.4,
+    "profit_factor": null,
+    "trade_count": 10,
+    "end_per_1000": 1003.8530000000001,
+    "years_to_1000x_at_cagr": 3466.814238892275,
+    "survived": true
+  },
+  {
+    "name": "lotto_smci__lotto15_10",
+    "ok": true,
+    "codes": [
+      "SMCI.US"
+    ],
+    "style": "lotto15_10",
+    "elapsed": 11.312259912490845,
+    "final_value": 908494.21,
+    "total_return": -0.091506,
+    "max_drawdown": -0.134647,
+    "sharpe": -0.5046,
+    "win_rate": 0.0,
+    "profit_factor": null,
+    "trade_count": 8,
+    "end_per_1000": 908.494,
+    "years_to_1000x_at_cagr": null,
+    "survived": true
+  }
+]

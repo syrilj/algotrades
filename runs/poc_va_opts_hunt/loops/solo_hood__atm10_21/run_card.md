@@ -1,6 +1,6 @@
 # Backtest Run Card
 
-Generated: 2026-07-11T22:56:48.514866Z
+Generated: 2026-07-11T23:02:48.991092Z
 Run directory: `/Users/syriljacob/Desktop/TradingAlgoWork/runs/poc_va_opts_hunt/loops/solo_hood__atm10_21`
 
 ## Backtest Summary

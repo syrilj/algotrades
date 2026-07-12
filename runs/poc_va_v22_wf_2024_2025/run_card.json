@@ -1,0 +1,91 @@
+{
+  "artifacts": [
+    {
+      "path": "artifacts/equity.csv",
+      "sha256": "2339719508493c5cb21f6fc6b1fc9d00dc13d0d789b8e4973661d7eb73c32f00",
+      "size_bytes": 10290
+    },
+    {
+      "path": "artifacts/greeks.csv",
+      "sha256": "3b0ff8e2944d691ea8d9bb6d3c0358ab874a45ea120d83d1aa45bcef302d0049",
+      "size_bytes": 8338
+    },
+    {
+      "path": "artifacts/metrics.csv",
+      "sha256": "c9a6455cff7404118bf6097997fe089048c497ab256927f39b543cf4236e6ad1",
+      "size_bytes": 190
+    },
+    {
+      "path": "artifacts/ohlcv_AVGO.US.csv",
+      "sha256": "8bb5203fb798a0855b8d8f4df37b3b62cbda0e1202a127adb075064daacaa91d",
+      "size_bytes": 22597
+    },
+    {
+      "path": "artifacts/ohlcv_HOOD.US.csv",
+      "sha256": "79fb31f4c130059aea0d0d908fd1b09ff72c814f4d8c687f1977c7caf24ab80d",
+      "size_bytes": 22614
+    },
+    {
+      "path": "artifacts/ohlcv_IONQ.US.csv",
+      "sha256": "0a2f70969364f1fce391ef926ba9a77b2b677829d423380f8096a50474f24bf7",
+      "size_bytes": 22422
+    },
+    {
+      "path": "artifacts/ohlcv_MU.US.csv",
+      "sha256": "b5d67a9ba2f8c86640e7819843442801832ec0320ed77bc3090484512ee1fbc6",
+      "size_bytes": 22330
+    },
+    {
+      "path": "artifacts/trades.csv",
+      "sha256": "6332363c43be27f3a6a86669c74300b14a9f7ee7ae6eadd3b8ba1babebabdd97",
+      "size_bytes": 1696
+    },
+    {
+      "path": "code/signal_engine.py",
+      "sha256": "b9c142ea18aa8f6f27e245984799193ea780109abb5a34e63f5241d30da230d1",
+      "size_bytes": 8718
+    },
+    {
+      "path": "config.json",
+      "sha256": "72779327ecb2019b3f45e6f7e5aa369a85d8ba7de9b868123e80701aba623e8f",
+      "size_bytes": 652
+    }
+  ],
+  "backtest": {
+    "codes": [
+      "IONQ.US",
+      "AVGO.US",
+      "HOOD.US",
+      "MU.US"
+    ],
+    "end_date": "2025-07-31",
+    "engine": "options",
+    "initial_cash": 1000000,
+    "interval": "1D",
+    "source": "yfinance",
+    "start_date": "2024-08-01"
+  },
+  "data_sources": [
+    "yfinance"
+  ],
+  "generated_at": "2026-07-12T00:02:49.972455Z",
+  "metrics": {
+    "annual_return": 0.599183,
+    "calmar": 5.3296,
+    "final_value": 1593235.08,
+    "max_drawdown": -0.112425,
+    "profit_loss_ratio": 1.8341,
+    "sharpe": 1.8208,
+    "sortino": 1.5273,
+    "total_return": 0.593235,
+    "trade_count": 22,
+    "win_rate": 0.8182
+  },
+  "reproducibility": {
+    "config_hash": "72779327ecb2019b3f45e6f7e5aa369a85d8ba7de9b868123e80701aba623e8f",
+    "strategy_hash": "b9c142ea18aa8f6f27e245984799193ea780109abb5a34e63f5241d30da230d1"
+  },
+  "run_dir": "/Users/syriljacob/Desktop/TradingAlgoWork/runs/poc_va_v22_wf_2024_2025",
+  "schema_version": "0.1",
+  "warnings": []
+}

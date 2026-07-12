@@ -1,0 +1,73 @@
+{
+  "artifacts": [
+    {
+      "path": "artifacts/equity.csv",
+      "sha256": "ebde51651b8dc10374994ebd5de8793c227024e120e13f75a32afb9023ad31a8",
+      "size_bytes": 19849
+    },
+    {
+      "path": "artifacts/greeks.csv",
+      "sha256": "6bc16b5e87ae1782799fd8edd3194e62db5937abecc00492b7f7120b2ad5fc59",
+      "size_bytes": 14549
+    },
+    {
+      "path": "artifacts/metrics.csv",
+      "sha256": "049253fd78be5a4496474a0640d1b8fcfea529fd10e6b7dfa863d3112bb7e0df",
+      "size_bytes": 182
+    },
+    {
+      "path": "artifacts/ohlcv_TSLA.US.csv",
+      "sha256": "a24f357d9b5cc0948a5090473539b2ae2677ec960eb65ded14ac1dc8fe1761b3",
+      "size_bytes": 43183
+    },
+    {
+      "path": "artifacts/trades.csv",
+      "sha256": "ec07d0cfcc984b49484e89f43b99384c84228de37d73237cb0c2acebdd36d124",
+      "size_bytes": 676
+    },
+    {
+      "path": "code/signal_engine.py",
+      "sha256": "b9c142ea18aa8f6f27e245984799193ea780109abb5a34e63f5241d30da230d1",
+      "size_bytes": 8718
+    },
+    {
+      "path": "config.json",
+      "sha256": "9e6b3afc016bb19fcb61cabf22eb0c6e209b4f08506cac0099022930d635a789",
+      "size_bytes": 461
+    }
+  ],
+  "backtest": {
+    "codes": [
+      "TSLA.US"
+    ],
+    "end_date": "2026-07-11",
+    "engine": "options",
+    "initial_cash": 1000000.0,
+    "interval": "1D",
+    "source": "yfinance",
+    "start_date": "2024-08-01"
+  },
+  "data_sources": [
+    "yfinance"
+  ],
+  "generated_at": "2026-07-11T23:14:36.901493Z",
+  "metrics": {
+    "annual_return": 0.03789,
+    "calmar": 0.4312,
+    "final_value": 1074357.5,
+    "max_drawdown": -0.08788,
+    "profit_loss_ratio": 2.719,
+    "sharpe": 0.4151,
+    "sortino": 0.1168,
+    "total_return": 0.074358,
+    "trade_count": 8,
+    "win_rate": 0.5
+  },
+  "reproducibility": {
+    "config_hash": "9e6b3afc016bb19fcb61cabf22eb0c6e209b4f08506cac0099022930d635a789",
+    "strategy_hash": "b9c142ea18aa8f6f27e245984799193ea780109abb5a34e63f5241d30da230d1"
+  },
+  "run_dir": "/Users/syriljacob/Desktop/TradingAlgoWork/runs/poc_va_opts_hunt/loops_agg/agg_tsla__yolo_otm50",
+  "schema_version": "0.1",
+  "warnings": []
+}

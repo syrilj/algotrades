@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Trading Algo Live Signals</title>
+  <style>
+    body { font-family: -apple-system, sans-serif; margin: 20px; background: #1a1a2e; color: #eee; }
+    .signal-card { background: #16213e; padding: 15px; margin: 10px 0; border-radius: 8px; border-left: 4px solid #00ff88; }
+    .signal-card.high { border-left-color: #ff4444; }
+    .signal-card.low { border-left-color: #4488ff; }
+    .vol-z { font-size: 1.5em; font-weight: bold; color: #00ff88; }
+    .no-signal { opacity: 0.5; }
+    button { background: #0f3460; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; }
+    button:hover { background: #1a53ff; }
+  </style>
+</head>
+<body>
+  <h1>📈 Live Trading Signals ($1K → $1M)</h1>
+  
+  <div id="signals"></div>
+  <button onclick="scan()">Refresh Signals</button>
+  
+  <script>
+    async function scan() {
+      const symbols = ['IONQ.US', 'APLD.US', 'TSLA.US', 'META.US', 'NVDA.US'];
+      
+      const container = document.getElementById('signals');
+      container.innerHTML = '<p>Loading...</p>';
+      
+      for (const symbol of symbols) {
+        try {
+          const res = await fetch(`/signal/${symbol}`);
+          const data = await res.json();
+          
+          const card = document.createElement('div');
+          card.className = `signal-card ${data.signal_strength > 5 ? 'high' : data.signal_strength > 0 ? 'low' : ''}`;
+          card.innerHTML = `
+            <strong>${symbol}</strong> ${data.go_long ? '🚀 GO LONG' : '⏸️ No Signal'}
+            <div class="vol-z">vol_z: ${data.vol_z || 0}</div>
+            <small>Confidence: ${(data.confidence * 100).toFixed(0)}% | Leverage: ${data.signal_strength}x | Price: $${data.price}</small>
+          `;
+          container.appendChild(card);
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    }
+    
+    scan();
+    setInterval(scan, 60000); // Auto-refresh every minute
+  </script>
+</body>
+</html>

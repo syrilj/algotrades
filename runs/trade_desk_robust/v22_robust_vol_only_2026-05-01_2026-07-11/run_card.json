@@ -1,0 +1,101 @@
+{
+  "artifacts": [
+    {
+      "path": "artifacts/equity.csv",
+      "sha256": "9d7d9d8eee466cf980187348aa63f30e58b712dd4e1203c81faaf8bac2d92c2b",
+      "size_bytes": 1430
+    },
+    {
+      "path": "artifacts/greeks.csv",
+      "sha256": "d0a70ba42acb8b31c574f3b8162c159d427929c869e316d1ee25c6d21a0fa2ec",
+      "size_bytes": 1439
+    },
+    {
+      "path": "artifacts/metrics.csv",
+      "sha256": "efc068b9d003014a7942dd214dadb0d8f90d7f4859b5357ebd75936e186d76a5",
+      "size_bytes": 154
+    },
+    {
+      "path": "artifacts/ohlcv_AVGO.US.csv",
+      "sha256": "1e71f5097d3446cb2f634c1fbe62dd1751136fb33888edca314c4d4f6e1fd14c",
+      "size_bytes": 4294
+    },
+    {
+      "path": "artifacts/ohlcv_HOOD.US.csv",
+      "sha256": "66e0ebe804316c53829fd1e78d1ebccdf0da2296bf937fa8ba0306630464e31f",
+      "size_bytes": 4367
+    },
+    {
+      "path": "artifacts/ohlcv_IONQ.US.csv",
+      "sha256": "2daa8992d121b9058ef5d82f0493082fa6067124bafb17bd40aff39fdcda7251",
+      "size_bytes": 4313
+    },
+    {
+      "path": "artifacts/ohlcv_META.US.csv",
+      "sha256": "524566c846045dfbbee52461e01d1f1f3fdad7290dae8c0acac9c76f59d05082",
+      "size_bytes": 4062
+    },
+    {
+      "path": "artifacts/ohlcv_MU.US.csv",
+      "sha256": "0bbabc7d658bdc13e2284e4d8891ee53ea6ca4a8914c55d14c2c22adc153385e",
+      "size_bytes": 4051
+    },
+    {
+      "path": "artifacts/ohlcv_TSLA.US.csv",
+      "sha256": "ef049939a4023051fea53431d64a4261541aefcf827db03aebeac07949d0ca8e",
+      "size_bytes": 4293
+    },
+    {
+      "path": "artifacts/trades.csv",
+      "sha256": "b81cca25faa710f42804df6a90d5054bd5616fcc609692f5a62b77c7f5e8798b",
+      "size_bytes": 71
+    },
+    {
+      "path": "code/signal_engine.py",
+      "sha256": "6ec6f330dc5fbfcaa2cb3429c477955da0b9241c82c75fe76617fda9e3658d90",
+      "size_bytes": 11075
+    },
+    {
+      "path": "config.json",
+      "sha256": "82e39a0b5eb778380407932ae4333c9fe12334d0ec404291a0a817af826333cc",
+      "size_bytes": 500
+    }
+  ],
+  "backtest": {
+    "codes": [
+      "IONQ.US",
+      "MU.US",
+      "TSLA.US",
+      "META.US"
+    ],
+    "end_date": "2026-07-11",
+    "engine": "options",
+    "initial_cash": 1000,
+    "interval": "1D",
+    "source": "yfinance",
+    "start_date": "2026-05-01"
+  },
+  "data_sources": [
+    "yfinance"
+  ],
+  "generated_at": "2026-07-12T00:36:25.133247Z",
+  "metrics": {
+    "annual_return": 0.0,
+    "calmar": 0.0,
+    "final_value": 1000.0,
+    "max_drawdown": 0.0,
+    "profit_loss_ratio": 0.0,
+    "sharpe": 0.0,
+    "sortino": 0.0,
+    "total_return": 0.0,
+    "trade_count": 0,
+    "win_rate": 0.0
+  },
+  "reproducibility": {
+    "config_hash": "82e39a0b5eb778380407932ae4333c9fe12334d0ec404291a0a817af826333cc",
+    "strategy_hash": "6ec6f330dc5fbfcaa2cb3429c477955da0b9241c82c75fe76617fda9e3658d90"
+  },
+  "run_dir": "/Users/syriljacob/Desktop/TradingAlgoWork/runs/trade_desk_robust/v22_robust_vol_only_2026-05-01_2026-07-11",
+  "schema_version": "0.1",
+  "warnings": []
+}

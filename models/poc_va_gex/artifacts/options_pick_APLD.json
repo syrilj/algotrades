@@ -13,12 +13,19 @@
   "debit_per_share": 0.8,
   "max_loss_1_contract": 80.0,
   "contracts": 1,
-  "account": 1000.0,
-  "budget": 180.0,
+  "account": 10000.0,
+  "budget": 1800.0,
   "theta_day_approx": -0.0687,
   "note": "OIC bull call spread \u2014 defined risk",
   "warnings": [
     "very high IV \u2014 prefer spread; watch earnings crush"
   ],
-  "asof_utc": "2026-07-11T22:46:45.098017+00:00"
+  "asof_utc": "2026-07-11T23:21:04.518507+00:00",
+  "exit_plan": {
+    "cut_loser": "exit if premium \u2264 -30% from entry (do not hope)",
+    "stagnant": "if 2 sessions pass with |opt| <8% and underlying <2% move \u2192 exit",
+    "big_move": "after +40% premium, trail: exit if give back 25% of peak premium",
+    "time": "flat by 5 DTE \u2014 no lottery holds",
+    "goal": "catch big moves; cut dead trades; react"
+  }
 }

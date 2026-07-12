@@ -1,0 +1,16 @@
+{
+  "source": "yfinance",
+  "codes": ["TSLA.US", "MU.US", "SPY.US", "IONQ.US", "APLD.US", "XLP.US", "QQQ.US"],
+  "start_date": "2024-08-01",
+  "end_date": "2026-07-11",
+  "initial_cash": 1000000,
+  "commission": 0.001,
+  "engine": "daily",
+  "extra_fields": null,
+  "interval": "1H",
+  "strategy": {
+    "name": "v22_volz_meta",
+    "model_version": "v22_volz_meta",
+    "note": "v20b + vol_z filtering: SPY vol_z>=1.8, TSLA vol_z>=1.6 for entry quality"
+  }
+}

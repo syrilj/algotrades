@@ -1,0 +1,32 @@
+{
+  "source": "yfinance",
+  "codes": [
+    "IONQ.US",
+    "AVGO.US",
+    "HOOD.US",
+    "MU.US"
+  ],
+  "start_date": "2025-01-01",
+  "end_date": "2026-07-11",
+  "initial_cash": 1000000,
+  "commission": 0.001,
+  "engine": "options",
+  "interval": "1D",
+  "options_config": {
+    "risk_free_rate": 0.05,
+    "contract_multiplier": 100,
+    "exercise_style": "american"
+  },
+  "strategy": {
+    "model_version": "v22_oos_2025_2026",
+    "style": "atm10_21",
+    "from_hunt": "evolve_top_solos__atm10_21",
+    "codes": [
+      "IONQ.US",
+      "AVGO.US",
+      "HOOD.US",
+      "MU.US"
+    ],
+    "note": "OOS test 2025-01-01 to 2026-07-11"
+  }
+}

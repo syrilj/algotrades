@@ -1,0 +1,91 @@
+{
+  "artifacts": [
+    {
+      "path": "artifacts/equity.csv",
+      "sha256": "ec42d2add908d1c2fa264985e02e169431d591e90315a1b944a21e770597f3ef",
+      "size_bytes": 18757
+    },
+    {
+      "path": "artifacts/greeks.csv",
+      "sha256": "a78f436c383e5a9b6b016a7404490045ffaec9ae31277bdcf024983f55545851",
+      "size_bytes": 15002
+    },
+    {
+      "path": "artifacts/metrics.csv",
+      "sha256": "f4d7833dc09d1907dec45e283863fd0a55f40be327cd8787cf6cc9f2004eaab2",
+      "size_bytes": 194
+    },
+    {
+      "path": "artifacts/ohlcv_HOOD.US.csv",
+      "sha256": "36aa3f4fce88fcc38c5ed2403c553144e81c8520ee71080cbb40ea8f26dc8be3",
+      "size_bytes": 43876
+    },
+    {
+      "path": "artifacts/ohlcv_PLTR.US.csv",
+      "sha256": "93c7ceadc4233a1baa1c63d37e104ade4579e601872ece072aaf7fcd28a3a3b2",
+      "size_bytes": 44288
+    },
+    {
+      "path": "artifacts/ohlcv_SMCI.US.csv",
+      "sha256": "3e4fb1952b7d450e9a2a42e00c3e208abdf37f214bf2832414b83df913a98988",
+      "size_bytes": 44170
+    },
+    {
+      "path": "artifacts/ohlcv_SOFI.US.csv",
+      "sha256": "99664399e32777f404f7f8227681c861d713fb48d38fbc54ac845c1259a15554",
+      "size_bytes": 44685
+    },
+    {
+      "path": "artifacts/trades.csv",
+      "sha256": "81ed64bde26f7d40921c9cf514bb6dcf89e70b576458377fa7df9cd1528cb679",
+      "size_bytes": 1396
+    },
+    {
+      "path": "code/signal_engine.py",
+      "sha256": "b9c142ea18aa8f6f27e245984799193ea780109abb5a34e63f5241d30da230d1",
+      "size_bytes": 8718
+    },
+    {
+      "path": "config.json",
+      "sha256": "ae94c53ca3c13720ec65da582d2cc005300a319ad3941a196270d981f01ed08d",
+      "size_bytes": 556
+    }
+  ],
+  "backtest": {
+    "codes": [
+      "PLTR.US",
+      "SMCI.US",
+      "SOFI.US",
+      "HOOD.US"
+    ],
+    "end_date": "2026-07-11",
+    "engine": "options",
+    "initial_cash": 1000000.0,
+    "interval": "1D",
+    "source": "yfinance",
+    "start_date": "2024-08-01"
+  },
+  "data_sources": [
+    "yfinance"
+  ],
+  "generated_at": "2026-07-11T23:07:30.005078Z",
+  "metrics": {
+    "annual_return": -0.005903,
+    "calmar": -0.0504,
+    "final_value": 988647.62,
+    "max_drawdown": -0.117195,
+    "profit_loss_ratio": 1.7424,
+    "sharpe": -0.0311,
+    "sortino": -0.0144,
+    "total_return": -0.011352,
+    "trade_count": 18,
+    "win_rate": 0.3333
+  },
+  "reproducibility": {
+    "config_hash": "ae94c53ca3c13720ec65da582d2cc005300a319ad3941a196270d981f01ed08d",
+    "strategy_hash": "b9c142ea18aa8f6f27e245984799193ea780109abb5a34e63f5241d30da230d1"
+  },
+  "run_dir": "/Users/syriljacob/Desktop/TradingAlgoWork/runs/poc_va_opts_hunt/loops/bag_ai_retail__atm5_30",
+  "schema_version": "0.1",
+  "warnings": []
+}

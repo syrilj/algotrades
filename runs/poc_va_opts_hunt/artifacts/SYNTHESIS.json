@@ -1,0 +1,324 @@
+{
+  "best_experiment": {
+    "name": "bag_v20winners__atm10_21",
+    "ok": true,
+    "codes": [
+      "MU.US",
+      "APLD.US",
+      "IONQ.US",
+      "TSLA.US"
+    ],
+    "style": "atm10_21",
+    "elapsed": 20.00977897644043,
+    "final_value": 1533451.71,
+    "total_return": 0.533452,
+    "max_drawdown": -0.107427,
+    "sharpe": 1.4012,
+    "win_rate": 0.8182,
+    "profit_factor": null,
+    "trade_count": 22,
+    "end_per_1000": 1533.452,
+    "years_to_1000x_at_cagr": 31.18432806081415,
+    "survived": true
+  },
+  "top10": [
+    {
+      "name": "bag_v20winners__atm10_21",
+      "ok": true,
+      "codes": [
+        "MU.US",
+        "APLD.US",
+        "IONQ.US",
+        "TSLA.US"
+      ],
+      "style": "atm10_21",
+      "elapsed": 20.00977897644043,
+      "final_value": 1533451.71,
+      "total_return": 0.533452,
+      "max_drawdown": -0.107427,
+      "sharpe": 1.4012,
+      "win_rate": 0.8182,
+      "profit_factor": null,
+      "trade_count": 22,
+      "end_per_1000": 1533.452,
+      "years_to_1000x_at_cagr": 31.18432806081415,
+      "survived": true
+    },
+    {
+      "name": "bag_v20winners__otm8_14",
+      "ok": true,
+      "codes": [
+        "MU.US",
+        "APLD.US",
+        "IONQ.US",
+        "TSLA.US"
+      ],
+      "style": "otm8_14",
+      "elapsed": 19.441751956939697,
+      "final_value": 1469462.11,
+      "total_return": 0.469462,
+      "max_drawdown": -0.062833,
+      "sharpe": 1.5739,
+      "win_rate": 0.8182,
+      "profit_factor": null,
+      "trade_count": 22,
+      "end_per_1000": 1469.462,
+      "years_to_1000x_at_cagr": 34.6378129547371,
+      "survived": true
+    },
+    {
+      "name": "bag_v20winners__atm5_30",
+      "ok": true,
+      "codes": [
+        "MU.US",
+        "APLD.US",
+        "IONQ.US",
+        "TSLA.US"
+      ],
+      "style": "atm5_30",
+      "elapsed": 19.897064924240112,
+      "final_value": 1400776.74,
+      "total_return": 0.400777,
+      "max_drawdown": -0.108116,
+      "sharpe": 1.379,
+      "win_rate": 0.8333,
+      "profit_factor": null,
+      "trade_count": 24,
+      "end_per_1000": 1400.777,
+      "years_to_1000x_at_cagr": 39.55755597736531,
+      "survived": true
+    },
+    {
+      "name": "solo_avgo__atm10_21",
+      "ok": true,
+      "codes": [
+        "AVGO.US"
+      ],
+      "style": "atm10_21",
+      "elapsed": 44.208226919174194,
+      "final_value": 1247197.77,
+      "total_return": 0.247198,
+      "max_drawdown": -0.152117,
+      "sharpe": 0.6308,
+      "win_rate": 0.4,
+      "profit_factor": null,
+      "trade_count": 10,
+      "end_per_1000": 1247.198,
+      "years_to_1000x_at_cagr": 60.35310899862784,
+      "survived": true
+    },
+    {
+      "name": "solo_ionq__atm5_30",
+      "ok": true,
+      "codes": [
+        "IONQ.US"
+      ],
+      "style": "atm5_30",
+      "elapsed": 107.95935988426208,
+      "final_value": 1236947.78,
+      "total_return": 0.236948,
+      "max_drawdown": -0.124123,
+      "sharpe": 0.9862,
+      "win_rate": 0.6,
+      "profit_factor": null,
+      "trade_count": 10,
+      "end_per_1000": 1236.9479999999999,
+      "years_to_1000x_at_cagr": 62.695284762433104,
+      "survived": true
+    },
+    {
+      "name": "solo_ionq__atm10_21",
+      "ok": true,
+      "codes": [
+        "IONQ.US"
+      ],
+      "style": "atm10_21",
+      "elapsed": 106.18067908287048,
+      "final_value": 1208793.43,
+      "total_return": 0.208793,
+      "max_drawdown": -0.14692,
+      "sharpe": 0.8579,
+      "win_rate": 0.6,
+      "profit_factor": null,
+      "trade_count": 10,
+      "end_per_1000": 1208.7930000000001,
+      "years_to_1000x_at_cagr": 70.30800069028514,
+      "survived": true
+    },
+    {
+      "name": "solo_hood__atm10_21",
+      "ok": true,
+      "codes": [
+        "HOOD.US"
+      ],
+      "style": "atm10_21",
+      "elapsed": 28.040107011795044,
+      "final_value": 1192273.69,
+      "total_return": 0.192274,
+      "max_drawdown": -0.103844,
+      "sharpe": 0.6381,
+      "win_rate": 1.0,
+      "profit_factor": null,
+      "trade_count": 10,
+      "end_per_1000": 1192.2740000000001,
+      "years_to_1000x_at_cagr": 75.80908188431323,
+      "survived": true
+    },
+    {
+      "name": "solo_gme__atm10_21",
+      "ok": true,
+      "codes": [
+        "GME.US"
+      ],
+      "style": "atm10_21",
+      "elapsed": 54.99837374687195,
+      "final_value": 1170200.24,
+      "total_return": 0.1702,
+      "max_drawdown": -0.139848,
+      "sharpe": 0.6136,
+      "win_rate": 0.8,
+      "profit_factor": null,
+      "trade_count": 10,
+      "end_per_1000": 1170.1999999999998,
+      "years_to_1000x_at_cagr": 84.8226200671593,
+      "survived": true
+    },
+    {
+      "name": "solo_rklb__atm5_30",
+      "ok": true,
+      "codes": [
+        "RKLB.US"
+      ],
+      "style": "atm5_30",
+      "elapsed": 57.95480298995972,
+      "final_value": 1142167.01,
+      "total_return": 0.142167,
+      "max_drawdown": -0.069883,
+      "sharpe": 0.9229,
+      "win_rate": 0.3636,
+      "profit_factor": null,
+      "trade_count": 22,
+      "end_per_1000": 1142.167,
+      "years_to_1000x_at_cagr": 100.295154992111,
+      "survived": true
+    },
+    {
+      "name": "solo_mu__atm10_21",
+      "ok": true,
+      "codes": [
+        "MU.US"
+      ],
+      "style": "atm10_21",
+      "elapsed": 21.109896898269653,
+      "final_value": 1139786.76,
+      "total_return": 0.139787,
+      "max_drawdown": -0.067754,
+      "sharpe": 0.6,
+      "win_rate": 0.8,
+      "profit_factor": null,
+      "trade_count": 10,
+      "end_per_1000": 1139.787,
+      "years_to_1000x_at_cagr": 101.8941053722346,
+      "survived": true
+    }
+  ],
+  "best_underlyings_avg_ret": [
+    {
+      "code": "IONQ.US",
+      "avg_ret": 0.194287,
+      "best_ret": 0.236948,
+      "n": 3
+    },
+    {
+      "code": "AVGO.US",
+      "avg_ret": 0.1870925,
+      "best_ret": 0.247198,
+      "n": 2
+    },
+    {
+      "code": "HOOD.US",
+      "avg_ret": 0.14512150000000001,
+      "best_ret": 0.192274,
+      "n": 2
+    },
+    {
+      "code": "GME.US",
+      "avg_ret": 0.109269,
+      "best_ret": 0.1702,
+      "n": 3
+    },
+    {
+      "code": "COIN.US",
+      "avg_ret": 0.0958875,
+      "best_ret": 0.12139,
+      "n": 2
+    },
+    {
+      "code": "MU.US",
+      "avg_ret": 0.0918335,
+      "best_ret": 0.139787,
+      "n": 2
+    },
+    {
+      "code": "TSLA.US",
+      "avg_ret": 0.0913195,
+      "best_ret": 0.123278,
+      "n": 2
+    },
+    {
+      "code": "RKLB.US",
+      "avg_ret": 0.0780635,
+      "best_ret": 0.142167,
+      "n": 2
+    },
+    {
+      "code": "ARM.US",
+      "avg_ret": 0.0594305,
+      "best_ret": 0.065194,
+      "n": 2
+    },
+    {
+      "code": "APLD.US",
+      "avg_ret": 0.05025166666666667,
+      "best_ret": 0.076028,
+      "n": 3
+    },
+    {
+      "code": "AMZN.US",
+      "avg_ret": 0.0394805,
+      "best_ret": 0.041962,
+      "n": 2
+    },
+    {
+      "code": "META.US",
+      "avg_ret": 0.031605,
+      "best_ret": 0.037529,
+      "n": 2
+    },
+    {
+      "code": "MSTR.US",
+      "avg_ret": 0.022563333333333335,
+      "best_ret": 0.040363,
+      "n": 3
+    },
+    {
+      "code": "SMCI.US",
+      "avg_ret": 0.017369,
+      "best_ret": 0.089188,
+      "n": 3
+    },
+    {
+      "code": "SPY.US",
+      "avg_ret": -0.010476000000000001,
+      "best_ret": -0.007028,
+      "n": 2
+    }
+  ],
+  "goal_1000_to_1m": {
+    "required_multiple": 1000,
+    "best_end_per_1000": 1533.452,
+    "best_years_to_1000x": 31.18432806081415,
+    "honest": "If years_to_1000x is huge or None, this window/style cannot hit the goal without unreal leverage / lucky OTM lottery paths."
+  },
+  "live_recommendation_rule": "Prefer high avg_ret underlying with DD > -45%, trades>=8, and bag diversification from top3 underlyings."
+}

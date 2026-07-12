@@ -1,0 +1,38 @@
+{
+  "name": "v22_opts_live",
+  "description": "v22 options signal engine wrapping v21 equity MACDHA/VWAP signals. Long ATM calls with compounding size, halt/flatten drawdown controls.",
+  "files": {
+    "signal_engine.py": {
+      "path": "/Users/syriljacob/Desktop/TradingAlgoWork/models/poc_va_gex/v22_artifact/signal_engine.py",
+      "sha256": "b9c142ea18aa8f6f27e245984799193ea780109abb5a34e63f5241d30da230d1"
+    },
+    "hunt_config.json": {
+      "path": "/Users/syriljacob/Desktop/TradingAlgoWork/models/poc_va_gex/v22_artifact/hunt_config.json",
+      "sha256": "12a42866b73611991a2efcdad59f19637023746e0faa33b8e37537db1dc00068"
+    },
+    "backtest_config.json": {
+      "path": "/Users/syriljacob/Desktop/TradingAlgoWork/models/poc_va_gex/v22_artifact/backtest_config.json",
+      "sha256": "00c0b48bb8e211841afe733bfd5f731ddcc5ed7efd1cac28274b1c3b009e8aea"
+    },
+    "v21_equity_engine": {
+      "path": "/Users/syriljacob/Desktop/TradingAlgoWork/models/poc_va_macdha/v21_mstr_tsla/signal_engine.py",
+      "sha256": "f0804085c68b73c646db27ca569008312ac17032e3d07c0e1633b4342affc59e"
+    }
+  },
+  "parameters": {
+    "risk_pct": 0.1,
+    "dte_days": 21,
+    "otm_pct": 0.0,
+    "halt_dd": 0.3,
+    "flatten_dd": 0.45,
+    "initial_cash": 1000000,
+    "contract_multiplier": 100
+  },
+  "symbols": [
+    "IONQ.US",
+    "AVGO.US",
+    "HOOD.US",
+    "MU.US"
+  ],
+  "saved_at": "2026-07-11T23:55:00Z"
+}

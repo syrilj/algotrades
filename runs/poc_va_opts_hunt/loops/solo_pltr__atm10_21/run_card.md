@@ -1,6 +1,6 @@
 # Backtest Run Card
 
-Generated: 2026-07-11T22:56:37.223934Z
+Generated: 2026-07-11T23:02:23.285630Z
 Run directory: `/Users/syriljacob/Desktop/TradingAlgoWork/runs/poc_va_opts_hunt/loops/solo_pltr__atm10_21`
 
 ## Backtest Summary

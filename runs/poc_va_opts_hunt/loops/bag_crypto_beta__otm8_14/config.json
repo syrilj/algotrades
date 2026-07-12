@@ -1,0 +1,28 @@
+{
+  "source": "yfinance",
+  "codes": [
+    "COIN.US",
+    "MSTR.US",
+    "MARA.US"
+  ],
+  "initial_cash": 1000000.0,
+  "commission": 0.001,
+  "engine": "options",
+  "start_date": "2024-08-01",
+  "end_date": "2026-07-11",
+  "interval": "1D",
+  "options_config": {
+    "risk_free_rate": 0.05,
+    "contract_multiplier": 100,
+    "exercise_style": "american"
+  },
+  "strategy": {
+    "model_version": "bag_crypto_beta__otm8_14",
+    "style": "otm8_14",
+    "codes": [
+      "COIN.US",
+      "MSTR.US",
+      "MARA.US"
+    ]
+  }
+}

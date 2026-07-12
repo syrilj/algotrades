@@ -1,0 +1,91 @@
+{
+  "artifacts": [
+    {
+      "path": "artifacts/equity.csv",
+      "sha256": "3328d1889246a3f5fa41024d82d1cd4c34c57c66bae552598f1b3485cf7a01a0",
+      "size_bytes": 19824
+    },
+    {
+      "path": "artifacts/greeks.csv",
+      "sha256": "40ad9831d10da0bf12e9e9d9fec708625afe3c8788c0fa2097d8bb61e9329184",
+      "size_bytes": 14495
+    },
+    {
+      "path": "artifacts/metrics.csv",
+      "sha256": "da3b15c58ddc6f17636e4dc2ad9c7a02a20229238103dbfb6e829247020414c5",
+      "size_bytes": 189
+    },
+    {
+      "path": "artifacts/ohlcv_COIN.US.csv",
+      "sha256": "bc01d81895cde42e1461bb4eb6ebe629568471eb93118731705a6af8bcf638a8",
+      "size_bytes": 42626
+    },
+    {
+      "path": "artifacts/ohlcv_GME.US.csv",
+      "sha256": "2178235eeeeeba08396dca5abf40d2f94c96ad7a269e91ffefd5d385725d038f",
+      "size_bytes": 44318
+    },
+    {
+      "path": "artifacts/ohlcv_MARA.US.csv",
+      "sha256": "7ba863f48c8dacc4c615e35ffdf65c513a9a8dd3caab398041b3f629b612febd",
+      "size_bytes": 44649
+    },
+    {
+      "path": "artifacts/ohlcv_MSTR.US.csv",
+      "sha256": "b16587c10de290b4a823907665c75e20d360418a964015ecef882a1822a9abba",
+      "size_bytes": 42884
+    },
+    {
+      "path": "artifacts/trades.csv",
+      "sha256": "488770f17d33716bcf90fb628b36af37e35c9dc6fc6fb743a19e993e38c89217",
+      "size_bytes": 967
+    },
+    {
+      "path": "code/signal_engine.py",
+      "sha256": "b9c142ea18aa8f6f27e245984799193ea780109abb5a34e63f5241d30da230d1",
+      "size_bytes": 8718
+    },
+    {
+      "path": "config.json",
+      "sha256": "7131223427c34503bb8dc477f8f53dfb3acc6d61abd44f898908efc1664b6ea7",
+      "size_bytes": 566
+    }
+  ],
+  "backtest": {
+    "codes": [
+      "GME.US",
+      "MSTR.US",
+      "MARA.US",
+      "COIN.US"
+    ],
+    "end_date": "2026-07-11",
+    "engine": "options",
+    "initial_cash": 1000000.0,
+    "interval": "1D",
+    "source": "yfinance",
+    "start_date": "2024-08-01"
+  },
+  "data_sources": [
+    "yfinance"
+  ],
+  "generated_at": "2026-07-11T23:16:24.603387Z",
+  "metrics": {
+    "annual_return": 0.053426,
+    "calmar": 0.8778,
+    "final_value": 1105588.37,
+    "max_drawdown": -0.060866,
+    "profit_loss_ratio": 4.8466,
+    "sharpe": 0.589,
+    "sortino": 0.1728,
+    "total_return": 0.105588,
+    "trade_count": 12,
+    "win_rate": 0.6667
+  },
+  "reproducibility": {
+    "config_hash": "7131223427c34503bb8dc477f8f53dfb3acc6d61abd44f898908efc1664b6ea7",
+    "strategy_hash": "b9c142ea18aa8f6f27e245984799193ea780109abb5a34e63f5241d30da230d1"
+  },
+  "run_dir": "/Users/syriljacob/Desktop/TradingAlgoWork/runs/poc_va_opts_hunt/loops_agg/agg_bag_meme_crypto__week_otm25",
+  "schema_version": "0.1",
+  "warnings": []
+}

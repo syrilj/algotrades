@@ -1,0 +1,97 @@
+{
+  "artifacts": [
+    {
+      "path": "artifacts/equity.csv",
+      "sha256": "9d0e894ec85be60b05032c5cf4917ff9d11183995956031f62c582aa1e94c7fb",
+      "size_bytes": 19840
+    },
+    {
+      "path": "artifacts/greeks.csv",
+      "sha256": "5ee0b498a6ead51cb7a43a2e69fc7bfb0138ab551ea3bc5d1a34dcb2d8de35fc",
+      "size_bytes": 14561
+    },
+    {
+      "path": "artifacts/metrics.csv",
+      "sha256": "57d0f55ff0cd0d1d089fbba7976441b55be93bcda696141f1adff4dd79105e38",
+      "size_bytes": 190
+    },
+    {
+      "path": "artifacts/ohlcv_AMD.US.csv",
+      "sha256": "c8f57b7430577a5a31b9b74fc749060c4448fd944e62efc512da0c44968209e2",
+      "size_bytes": 43952
+    },
+    {
+      "path": "artifacts/ohlcv_ARM.US.csv",
+      "sha256": "b85ff0e9e845b2fffeabef5217f8e021b9570e8fafc5f99667dac5285dd4431d",
+      "size_bytes": 42425
+    },
+    {
+      "path": "artifacts/ohlcv_AVGO.US.csv",
+      "sha256": "ab654881a51a135049588887f29902d31608c26e9483e3bf85eea8991ac8bc96",
+      "size_bytes": 43432
+    },
+    {
+      "path": "artifacts/ohlcv_MU.US.csv",
+      "sha256": "cdbe82eb2d045075cf9c3bb25d37ef4133652bb4251a4fa6fa41f80ad5149c3e",
+      "size_bytes": 43045
+    },
+    {
+      "path": "artifacts/ohlcv_NVDA.US.csv",
+      "sha256": "943b981b7c2ad03a289cfae42131c4dc6b4bb45385f79e03f0e758edf675ad1a",
+      "size_bytes": 44738
+    },
+    {
+      "path": "artifacts/trades.csv",
+      "sha256": "1d3cf50b4491b79c08603c593ecf0b773f0bed4a880cb46d297c6054e39a2e67",
+      "size_bytes": 1385
+    },
+    {
+      "path": "code/signal_engine.py",
+      "sha256": "b9c142ea18aa8f6f27e245984799193ea780109abb5a34e63f5241d30da230d1",
+      "size_bytes": 8718
+    },
+    {
+      "path": "config.json",
+      "sha256": "eb91a2ac6ef5df6a1e7e82c0c9877b974aa3a1266aaee9c33afb60ebff5bed76",
+      "size_bytes": 575
+    }
+  ],
+  "backtest": {
+    "codes": [
+      "MU.US",
+      "NVDA.US",
+      "AMD.US",
+      "AVGO.US",
+      "ARM.US"
+    ],
+    "end_date": "2026-07-11",
+    "engine": "options",
+    "initial_cash": 1000000.0,
+    "interval": "1D",
+    "source": "yfinance",
+    "start_date": "2024-08-01"
+  },
+  "data_sources": [
+    "yfinance"
+  ],
+  "generated_at": "2026-07-11T23:07:11.169692Z",
+  "metrics": {
+    "annual_return": 0.050619,
+    "calmar": 1.6518,
+    "final_value": 1099914.21,
+    "max_drawdown": -0.030644,
+    "profit_loss_ratio": 47.8986,
+    "sharpe": 0.924,
+    "sortino": 0.4708,
+    "total_return": 0.099914,
+    "trade_count": 18,
+    "win_rate": 0.7778
+  },
+  "reproducibility": {
+    "config_hash": "eb91a2ac6ef5df6a1e7e82c0c9877b974aa3a1266aaee9c33afb60ebff5bed76",
+    "strategy_hash": "b9c142ea18aa8f6f27e245984799193ea780109abb5a34e63f5241d30da230d1"
+  },
+  "run_dir": "/Users/syriljacob/Desktop/TradingAlgoWork/runs/poc_va_opts_hunt/loops/bag_semi__atm5_30",
+  "schema_version": "0.1",
+  "warnings": []
+}

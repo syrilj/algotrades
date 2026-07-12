@@ -50,7 +50,7 @@
   "data_sources": [
     "yfinance"
   ],
-  "generated_at": "2026-07-11T22:56:37.225564Z",
+  "generated_at": "2026-07-11T23:02:21.949494Z",
   "metrics": {
     "annual_return": -0.024262,
     "calmar": -0.5128,

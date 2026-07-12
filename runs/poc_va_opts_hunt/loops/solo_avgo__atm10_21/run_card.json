@@ -1,0 +1,73 @@
+{
+  "artifacts": [
+    {
+      "path": "artifacts/equity.csv",
+      "sha256": "3ef424da9a620e018e87b46253bad70c7e81e16b5b258d07ad0bc9987b2e5a4a",
+      "size_bytes": 19890
+    },
+    {
+      "path": "artifacts/greeks.csv",
+      "sha256": "1ac9c4584912297c4231edb48f75dc8733609d13334ca465dc8538d2de28b039",
+      "size_bytes": 14740
+    },
+    {
+      "path": "artifacts/metrics.csv",
+      "sha256": "bf84af5dc2c3d34859999e20bfbc4e47f1eabfc3e4c879f902bd880d8c272143",
+      "size_bytes": 186
+    },
+    {
+      "path": "artifacts/ohlcv_AVGO.US.csv",
+      "sha256": "ab654881a51a135049588887f29902d31608c26e9483e3bf85eea8991ac8bc96",
+      "size_bytes": 43432
+    },
+    {
+      "path": "artifacts/trades.csv",
+      "sha256": "33de91c41dd462a0e02891fce9a2895030772837927328ae9e001e7eb3971fc7",
+      "size_bytes": 820
+    },
+    {
+      "path": "code/signal_engine.py",
+      "sha256": "b9c142ea18aa8f6f27e245984799193ea780109abb5a34e63f5241d30da230d1",
+      "size_bytes": 8718
+    },
+    {
+      "path": "config.json",
+      "sha256": "96c1a7cd207caed2107747c9e44aefc5a681cfbfc4bff775e8bc66a4ff41003f",
+      "size_bytes": 458
+    }
+  ],
+  "backtest": {
+    "codes": [
+      "AVGO.US"
+    ],
+    "end_date": "2026-07-11",
+    "engine": "options",
+    "initial_cash": 1000000.0,
+    "interval": "1D",
+    "source": "yfinance",
+    "start_date": "2024-08-01"
+  },
+  "data_sources": [
+    "yfinance"
+  ],
+  "generated_at": "2026-07-11T23:05:40.788221Z",
+  "metrics": {
+    "annual_return": 0.121358,
+    "calmar": 0.7978,
+    "final_value": 1247197.77,
+    "max_drawdown": -0.152117,
+    "profit_loss_ratio": 7.4741,
+    "sharpe": 0.6308,
+    "sortino": 0.376,
+    "total_return": 0.247198,
+    "trade_count": 10,
+    "win_rate": 0.4
+  },
+  "reproducibility": {
+    "config_hash": "96c1a7cd207caed2107747c9e44aefc5a681cfbfc4bff775e8bc66a4ff41003f",
+    "strategy_hash": "b9c142ea18aa8f6f27e245984799193ea780109abb5a34e63f5241d30da230d1"
+  },
+  "run_dir": "/Users/syriljacob/Desktop/TradingAlgoWork/runs/poc_va_opts_hunt/loops/solo_avgo__atm10_21",
+  "schema_version": "0.1",
+  "warnings": []
+}

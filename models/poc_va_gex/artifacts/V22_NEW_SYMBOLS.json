@@ -1,0 +1,46 @@
+{
+  "new_symbols_2024_2026": {
+    "codes": [
+      "TSLA.US",
+      "SPY.US",
+      "APLD.US",
+      "ARM.US"
+    ],
+    "start": "2024-08-01",
+    "end": "2026-07-11",
+    "metrics": {
+      "final_value": 1223310.32,
+      "total_return": 0.22331,
+      "annual_return": 0.11017,
+      "max_drawdown": -0.098187,
+      "sharpe": 0.7596,
+      "calmar": 1.122,
+      "sortino": 0.3492,
+      "trade_count": 14,
+      "win_rate": 0.5714,
+      "profit_loss_ratio": 7.5865
+    }
+  },
+  "new_symbols_2022_2024": {
+    "codes": [
+      "TSLA.US",
+      "SPY.US",
+      "APLD.US",
+      "ARM.US"
+    ],
+    "start": "2022-01-01",
+    "end": "2024-07-31",
+    "metrics": {
+      "final_value": 904503.81,
+      "total_return": -0.095496,
+      "annual_return": -0.038338,
+      "max_drawdown": -0.096517,
+      "sharpe": -1.5637,
+      "calmar": -0.3972,
+      "sortino": -0.3522,
+      "trade_count": 14,
+      "win_rate": 0.1429,
+      "profit_loss_ratio": 0.1244
+    }
+  }
+}

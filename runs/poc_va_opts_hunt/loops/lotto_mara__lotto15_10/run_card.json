@@ -1,0 +1,73 @@
+{
+  "artifacts": [
+    {
+      "path": "artifacts/equity.csv",
+      "sha256": "2b6c310cba3cfef20bba28ae8350670b7c18038551be2443601d2c2eaf2982e6",
+      "size_bytes": 18872
+    },
+    {
+      "path": "artifacts/greeks.csv",
+      "sha256": "d1bfa20a06123f9a9959df0bf01309d26e57e9261de4d3c26047743b68fda20e",
+      "size_bytes": 14942
+    },
+    {
+      "path": "artifacts/metrics.csv",
+      "sha256": "10ee74607b8c89af0253fe2ea568ceff7c9d4a6390bf519a1ffb8e8c32edf94b",
+      "size_bytes": 194
+    },
+    {
+      "path": "artifacts/ohlcv_MARA.US.csv",
+      "sha256": "7ba863f48c8dacc4c615e35ffdf65c513a9a8dd3caab398041b3f629b612febd",
+      "size_bytes": 44649
+    },
+    {
+      "path": "artifacts/trades.csv",
+      "sha256": "8ac62f7017d68ed364280648c48551ae647527a40ab8f924a8eac43380cc683b",
+      "size_bytes": 961
+    },
+    {
+      "path": "code/signal_engine.py",
+      "sha256": "b9c142ea18aa8f6f27e245984799193ea780109abb5a34e63f5241d30da230d1",
+      "size_bytes": 8718
+    },
+    {
+      "path": "config.json",
+      "sha256": "4f7dd263b0dcbd28cd0905d044440e0edbe740a983c50d7bf6edd0fe15bf0abe",
+      "size_bytes": 463
+    }
+  ],
+  "backtest": {
+    "codes": [
+      "MARA.US"
+    ],
+    "end_date": "2026-07-11",
+    "engine": "options",
+    "initial_cash": 1000000.0,
+    "interval": "1D",
+    "source": "yfinance",
+    "start_date": "2024-08-01"
+  },
+  "data_sources": [
+    "yfinance"
+  ],
+  "generated_at": "2026-07-11T23:08:18.937896Z",
+  "metrics": {
+    "annual_return": -0.050706,
+    "calmar": -0.3748,
+    "final_value": 904514.31,
+    "max_drawdown": -0.135283,
+    "profit_loss_ratio": 0.2771,
+    "sharpe": -0.8139,
+    "sortino": -0.2398,
+    "total_return": -0.095486,
+    "trade_count": 12,
+    "win_rate": 0.1667
+  },
+  "reproducibility": {
+    "config_hash": "4f7dd263b0dcbd28cd0905d044440e0edbe740a983c50d7bf6edd0fe15bf0abe",
+    "strategy_hash": "b9c142ea18aa8f6f27e245984799193ea780109abb5a34e63f5241d30da230d1"
+  },
+  "run_dir": "/Users/syriljacob/Desktop/TradingAlgoWork/runs/poc_va_opts_hunt/loops/lotto_mara__lotto15_10",
+  "schema_version": "0.1",
+  "warnings": []
+}

@@ -1,0 +1,42 @@
+{
+  "version": "v23_devin_overlay",
+  "run": "runs/poc_va_v23_devin_overlay",
+  "window": {
+    "start": "2024-08-01",
+    "end": "2026-07-11",
+    "interval": "1H"
+  },
+  "portfolio": {
+    "annual_return": 0.5440504031058497,
+    "avg_holding_days": 13.2,
+    "benchmark_return": 2.930867,
+    "calmar": 6.0044,
+    "excess_return": -1.630972,
+    "final_value": 2299895.5223366483,
+    "information_ratio": -0.8443,
+    "max_consecutive_loss": 3,
+    "max_drawdown": -0.09060901763421025,
+    "profit_factor": 3.5438,
+    "profit_loss_ratio": 1.89,
+    "sharpe": 2.212014757839403,
+    "sortino": 1.929,
+    "total_return": 1.2998955223366484,
+    "trade_count": 92,
+    "win_rate": 0.6521739130434783
+  },
+  "pass_bar": true,
+  "gates": {
+    "profit_factor_min": true,
+    "max_drawdown_max_abs": true,
+    "sharpe_min": true,
+    "min_trades": true
+  },
+  "vs_v20b_winner": {
+    "ret_delta": 0.1647340592742976,
+    "dd_delta": 0.009879252165846481,
+    "sharpe_delta": -0.0224676113060315,
+    "pf_delta": 0.5038
+  },
+  "status": "pass",
+  "recipe": "v20b + volume-z/sector/QQQ RS conviction overlay"
+}

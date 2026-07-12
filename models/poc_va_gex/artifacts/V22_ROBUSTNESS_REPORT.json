@@ -1,0 +1,301 @@
+{
+  "model": "v22_opts_live",
+  "in_sample": {
+    "period": "2024-08-01 to 2026-07-11",
+    "metrics": {
+      "final_value": "1598114.68",
+      "total_return": "0.598115",
+      "annual_return": "0.275189",
+      "max_drawdown": "-0.111753",
+      "sharpe": "1.281",
+      "calmar": "2.4625",
+      "sortino": "0.7766",
+      "trade_count": "22",
+      "win_rate": "0.8182",
+      "profit_loss_ratio": "1.7593"
+    }
+  },
+  "out_of_sample": {
+    "v22_oos_2022_2024": {
+      "window": {
+        "start_date": "2022-01-01",
+        "end_date": "2024-07-31"
+      },
+      "metrics": {
+        "final_value": 966834.22,
+        "total_return": -0.033166,
+        "annual_return": -0.013051,
+        "max_drawdown": -0.079732,
+        "sharpe": -0.3153,
+        "calmar": -0.1637,
+        "sortino": -0.1197,
+        "trade_count": 14,
+        "win_rate": 0.1429,
+        "profit_loss_ratio": 3.6388
+      }
+    },
+    "v22_oos_2023_2024": {
+      "window": {
+        "start_date": "2023-01-01",
+        "end_date": "2024-07-31"
+      },
+      "metrics": {
+        "final_value": 999205.57,
+        "total_return": -0.000794,
+        "annual_return": -0.000506,
+        "max_drawdown": -0.095422,
+        "sharpe": 0.0408,
+        "calmar": -0.0053,
+        "sortino": 0.0224,
+        "trade_count": 14,
+        "win_rate": 0.4286,
+        "profit_loss_ratio": 1.3208
+      }
+    },
+    "v22_oos_2025_2026": {
+      "window": {
+        "start_date": "2025-01-01",
+        "end_date": "2026-07-11"
+      },
+      "metrics": {
+        "final_value": 955066.47,
+        "total_return": -0.044934,
+        "annual_return": -0.030028,
+        "max_drawdown": -0.062508,
+        "sharpe": -0.5713,
+        "calmar": -0.4804,
+        "sortino": -0.1176,
+        "trade_count": 8,
+        "win_rate": 0.0,
+        "profit_loss_ratio": 0.0
+      }
+    },
+    "v22_oos_2024_2025": {
+      "window": {
+        "start_date": "2024-08-01",
+        "end_date": "2025-07-31"
+      },
+      "metrics": {
+        "final_value": 1593235.08,
+        "total_return": 0.593235,
+        "annual_return": 0.599183,
+        "max_drawdown": -0.112425,
+        "sharpe": 1.8208,
+        "calmar": 5.3296,
+        "sortino": 1.5273,
+        "trade_count": 22,
+        "win_rate": 0.8182,
+        "profit_loss_ratio": 1.8341
+      }
+    },
+    "v22_oos_2021_2023": {
+      "window": {
+        "start_date": "2021-01-01",
+        "end_date": "2023-12-31"
+      },
+      "metrics": {
+        "final_value": 965567.08,
+        "total_return": -0.034433,
+        "annual_return": -0.011658,
+        "max_drawdown": -0.128686,
+        "sharpe": -0.1313,
+        "calmar": -0.0906,
+        "sortino": -0.0376,
+        "trade_count": 10,
+        "win_rate": 0.2,
+        "profit_loss_ratio": 2.3777
+      }
+    }
+  },
+  "summary": {
+    "oos_windows_tested": 5,
+    "oos_positive_return": 1,
+    "oos_negative_return": 4,
+    "oos_average_total_return": 0.09598159999999999,
+    "conclusion": "v22_opts_live is not robust: it only shows strong returns in the 2024-2025 window. It loses money on earlier periods, later periods, and different symbols, indicating severe overfitting to a specific bullish regime.",
+    "all_oos_and_walk_forward_windows": 14,
+    "positive_windows": 3,
+    "negative_windows": 11,
+    "average_return_all_windows": 0.06967814285714284,
+    "overfitting_prevention_techniques_applied": [
+      "Out-of-sample testing on unseen earlier periods",
+      "Walk-forward analysis across rolling windows",
+      "New symbol universe test",
+      "Model artifacting and reproducibility manifest"
+    ]
+  },
+  "recommendations": [
+    "Avoid compounding $10k-to-1M leverage without walk-forward validation.",
+    "Add dynamic position sizing based on realized volatility (regime filter).",
+    "Test on broader symbol universe and longer history before live use.",
+    "Use walk-forward optimization with expanding/recalibrating windows.",
+    "Apply max-drawdown and risk-of-ruin constraints more strictly."
+  ],
+  "new_symbol_tests": {
+    "new_symbols_2024_2026": {
+      "codes": [
+        "TSLA.US",
+        "SPY.US",
+        "APLD.US",
+        "ARM.US"
+      ],
+      "start": "2024-08-01",
+      "end": "2026-07-11",
+      "metrics": {
+        "final_value": 1223310.32,
+        "total_return": 0.22331,
+        "annual_return": 0.11017,
+        "max_drawdown": -0.098187,
+        "sharpe": 0.7596,
+        "calmar": 1.122,
+        "sortino": 0.3492,
+        "trade_count": 14,
+        "win_rate": 0.5714,
+        "profit_loss_ratio": 7.5865
+      }
+    },
+    "new_symbols_2022_2024": {
+      "codes": [
+        "TSLA.US",
+        "SPY.US",
+        "APLD.US",
+        "ARM.US"
+      ],
+      "start": "2022-01-01",
+      "end": "2024-07-31",
+      "metrics": {
+        "final_value": 904503.81,
+        "total_return": -0.095496,
+        "annual_return": -0.038338,
+        "max_drawdown": -0.096517,
+        "sharpe": -1.5637,
+        "calmar": -0.3972,
+        "sortino": -0.3522,
+        "trade_count": 14,
+        "win_rate": 0.1429,
+        "profit_loss_ratio": 0.1244
+      }
+    }
+  },
+  "walk_forward": {
+    "wf_2021_2022": {
+      "name": "wf_2021_2022",
+      "start": "2021-01-01",
+      "end": "2022-12-31",
+      "metrics": {
+        "final_value": 958177.49,
+        "total_return": -0.041823,
+        "annual_return": -0.021176,
+        "max_drawdown": -0.135629,
+        "sharpe": -0.2016,
+        "calmar": -0.1561,
+        "sortino": -0.0696,
+        "trade_count": 10,
+        "win_rate": 0.2,
+        "profit_loss_ratio": 2.186
+      }
+    },
+    "wf_2022_2023": {
+      "name": "wf_2022_2023",
+      "start": "2022-01-01",
+      "end": "2023-12-31",
+      "metrics": {
+        "final_value": 967198.9,
+        "total_return": -0.032801,
+        "annual_return": -0.016635,
+        "max_drawdown": -0.079813,
+        "sharpe": -0.3511,
+        "calmar": -0.2084,
+        "sortino": -0.1513,
+        "trade_count": 14,
+        "win_rate": 0.1429,
+        "profit_loss_ratio": 3.6686
+      }
+    },
+    "wf_2023_2024": {
+      "name": "wf_2023_2024",
+      "start": "2023-01-01",
+      "end": "2024-07-31",
+      "metrics": {
+        "final_value": 999205.57,
+        "total_return": -0.000794,
+        "annual_return": -0.000506,
+        "max_drawdown": -0.095422,
+        "sharpe": 0.0408,
+        "calmar": -0.0053,
+        "sortino": 0.0224,
+        "trade_count": 14,
+        "win_rate": 0.4286,
+        "profit_loss_ratio": 1.3208
+      }
+    },
+    "wf_2024_2025": {
+      "name": "wf_2024_2025",
+      "start": "2024-08-01",
+      "end": "2025-07-31",
+      "metrics": {
+        "final_value": 1593235.08,
+        "total_return": 0.593235,
+        "annual_return": 0.599183,
+        "max_drawdown": -0.112425,
+        "sharpe": 1.8208,
+        "calmar": 5.3296,
+        "sortino": 1.5273,
+        "trade_count": 22,
+        "win_rate": 0.8182,
+        "profit_loss_ratio": 1.8341
+      }
+    },
+    "wf_2025_2026": {
+      "name": "wf_2025_2026",
+      "start": "2025-01-01",
+      "end": "2026-07-11",
+      "metrics": {
+        "final_value": 955066.47,
+        "total_return": -0.044934,
+        "annual_return": -0.030028,
+        "max_drawdown": -0.062508,
+        "sharpe": -0.5713,
+        "calmar": -0.4804,
+        "sortino": -0.1176,
+        "trade_count": 8,
+        "win_rate": 0.0,
+        "profit_loss_ratio": 0.0
+      }
+    },
+    "wf_2022_2024": {
+      "name": "wf_2022_2024",
+      "start": "2022-01-01",
+      "end": "2024-07-31",
+      "metrics": {
+        "final_value": 966834.22,
+        "total_return": -0.033166,
+        "annual_return": -0.013051,
+        "max_drawdown": -0.079732,
+        "sharpe": -0.3153,
+        "calmar": -0.1637,
+        "sortino": -0.1197,
+        "trade_count": 14,
+        "win_rate": 0.1429,
+        "profit_loss_ratio": 3.6388
+      }
+    },
+    "wf_2020_2021": {
+      "name": "wf_2020_2021",
+      "start": "2020-01-01",
+      "end": "2021-12-31",
+      "metrics": {
+        "final_value": 928054.78,
+        "total_return": -0.071945,
+        "annual_return": -0.036573,
+        "max_drawdown": -0.074805,
+        "sharpe": -1.041,
+        "calmar": -0.4889,
+        "sortino": -0.3204,
+        "trade_count": 12,
+        "win_rate": 0.5,
+        "profit_loss_ratio": 0.1106
+      }
+    }
+  }
+}

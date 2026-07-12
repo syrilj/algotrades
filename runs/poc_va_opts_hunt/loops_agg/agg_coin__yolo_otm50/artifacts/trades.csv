@@ -1,0 +1,5 @@
+timestamp,code,option_type,strike,expiry,side,price,qty,pnl,entry_date
+2024-10-23,COIN.US,call,223.0,2024-10-30,buy,1.2389,398,0.0,2024-10-23
+2024-10-30,COIN.US,call,223.0,2024-10-30,expire,0.0,398,-49307.5927,2024-10-23
+2025-01-30,COIN.US,call,337.0,2025-02-06,buy,1.6648,198,0.0,2025-01-30
+2025-02-05,COIN.US,call,337.0,2025-02-06,close,0.0,198,-32962.9011,2025-01-30

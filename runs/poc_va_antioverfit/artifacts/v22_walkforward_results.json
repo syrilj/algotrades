@@ -1,0 +1,121 @@
+{
+  "wf_2021_2022": {
+    "name": "wf_2021_2022",
+    "start": "2021-01-01",
+    "end": "2022-12-31",
+    "metrics": {
+      "final_value": 958177.49,
+      "total_return": -0.041823,
+      "annual_return": -0.021176,
+      "max_drawdown": -0.135629,
+      "sharpe": -0.2016,
+      "calmar": -0.1561,
+      "sortino": -0.0696,
+      "trade_count": 10,
+      "win_rate": 0.2,
+      "profit_loss_ratio": 2.186
+    }
+  },
+  "wf_2022_2023": {
+    "name": "wf_2022_2023",
+    "start": "2022-01-01",
+    "end": "2023-12-31",
+    "metrics": {
+      "final_value": 967198.9,
+      "total_return": -0.032801,
+      "annual_return": -0.016635,
+      "max_drawdown": -0.079813,
+      "sharpe": -0.3511,
+      "calmar": -0.2084,
+      "sortino": -0.1513,
+      "trade_count": 14,
+      "win_rate": 0.1429,
+      "profit_loss_ratio": 3.6686
+    }
+  },
+  "wf_2023_2024": {
+    "name": "wf_2023_2024",
+    "start": "2023-01-01",
+    "end": "2024-07-31",
+    "metrics": {
+      "final_value": 999205.57,
+      "total_return": -0.000794,
+      "annual_return": -0.000506,
+      "max_drawdown": -0.095422,
+      "sharpe": 0.0408,
+      "calmar": -0.0053,
+      "sortino": 0.0224,
+      "trade_count": 14,
+      "win_rate": 0.4286,
+      "profit_loss_ratio": 1.3208
+    }
+  },
+  "wf_2024_2025": {
+    "name": "wf_2024_2025",
+    "start": "2024-08-01",
+    "end": "2025-07-31",
+    "metrics": {
+      "final_value": 1593235.08,
+      "total_return": 0.593235,
+      "annual_return": 0.599183,
+      "max_drawdown": -0.112425,
+      "sharpe": 1.8208,
+      "calmar": 5.3296,
+      "sortino": 1.5273,
+      "trade_count": 22,
+      "win_rate": 0.8182,
+      "profit_loss_ratio": 1.8341
+    }
+  },
+  "wf_2025_2026": {
+    "name": "wf_2025_2026",
+    "start": "2025-01-01",
+    "end": "2026-07-11",
+    "metrics": {
+      "final_value": 955066.47,
+      "total_return": -0.044934,
+      "annual_return": -0.030028,
+      "max_drawdown": -0.062508,
+      "sharpe": -0.5713,
+      "calmar": -0.4804,
+      "sortino": -0.1176,
+      "trade_count": 8,
+      "win_rate": 0.0,
+      "profit_loss_ratio": 0.0
+    }
+  },
+  "wf_2022_2024": {
+    "name": "wf_2022_2024",
+    "start": "2022-01-01",
+    "end": "2024-07-31",
+    "metrics": {
+      "final_value": 966834.22,
+      "total_return": -0.033166,
+      "annual_return": -0.013051,
+      "max_drawdown": -0.079732,
+      "sharpe": -0.3153,
+      "calmar": -0.1637,
+      "sortino": -0.1197,
+      "trade_count": 14,
+      "win_rate": 0.1429,
+      "profit_loss_ratio": 3.6388
+    }
+  },
+  "wf_2020_2021": {
+    "name": "wf_2020_2021",
+    "start": "2020-01-01",
+    "end": "2021-12-31",
+    "metrics": {
+      "final_value": 928054.78,
+      "total_return": -0.071945,
+      "annual_return": -0.036573,
+      "max_drawdown": -0.074805,
+      "sharpe": -1.041,
+      "calmar": -0.4889,
+      "sortino": -0.3204,
+      "trade_count": 12,
+      "win_rate": 0.5,
+      "profit_loss_ratio": 0.1106
+    }
+  }
+}

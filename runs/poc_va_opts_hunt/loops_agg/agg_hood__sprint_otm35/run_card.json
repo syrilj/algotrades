@@ -1,0 +1,73 @@
+{
+  "artifacts": [
+    {
+      "path": "artifacts/equity.csv",
+      "sha256": "7fcf2fffb3c63584434b4f5015deedb4b93c17ae5fac64fa52b3b56c7bb412fa",
+      "size_bytes": 19218
+    },
+    {
+      "path": "artifacts/greeks.csv",
+      "sha256": "f0428addab600ff918a826a07ebba2550cf341889dfeed235d453f682c7065c2",
+      "size_bytes": 14377
+    },
+    {
+      "path": "artifacts/metrics.csv",
+      "sha256": "5f940e3788f90b881675271910b05cf170486a83f0bb4cf1c3fde2c8bbd3ae5d",
+      "size_bytes": 188
+    },
+    {
+      "path": "artifacts/ohlcv_HOOD.US.csv",
+      "sha256": "36aa3f4fce88fcc38c5ed2403c553144e81c8520ee71080cbb40ea8f26dc8be3",
+      "size_bytes": 43876
+    },
+    {
+      "path": "artifacts/trades.csv",
+      "sha256": "8f0f5d843389e03bc365fb3e9a5146a82656ca032e6dcfa1cc8d335d81452325",
+      "size_bytes": 673
+    },
+    {
+      "path": "code/signal_engine.py",
+      "sha256": "b9c142ea18aa8f6f27e245984799193ea780109abb5a34e63f5241d30da230d1",
+      "size_bytes": 8718
+    },
+    {
+      "path": "config.json",
+      "sha256": "979783eaaa9d99e8a3ed3dd275793fedbdd4fbd28b37ce19c4ff2a63d1ed1211",
+      "size_bytes": 465
+    }
+  ],
+  "backtest": {
+    "codes": [
+      "HOOD.US"
+    ],
+    "end_date": "2026-07-11",
+    "engine": "options",
+    "initial_cash": 1000000.0,
+    "interval": "1D",
+    "source": "yfinance",
+    "start_date": "2024-08-01"
+  },
+  "data_sources": [
+    "yfinance"
+  ],
+  "generated_at": "2026-07-11T23:15:02.223264Z",
+  "metrics": {
+    "annual_return": 0.112992,
+    "calmar": 0.4128,
+    "final_value": 1229315.21,
+    "max_drawdown": -0.273747,
+    "profit_loss_ratio": 11.7033,
+    "sharpe": 0.4471,
+    "sortino": 0.0996,
+    "total_return": 0.229315,
+    "trade_count": 8,
+    "win_rate": 0.75
+  },
+  "reproducibility": {
+    "config_hash": "979783eaaa9d99e8a3ed3dd275793fedbdd4fbd28b37ce19c4ff2a63d1ed1211",
+    "strategy_hash": "b9c142ea18aa8f6f27e245984799193ea780109abb5a34e63f5241d30da230d1"
+  },
+  "run_dir": "/Users/syriljacob/Desktop/TradingAlgoWork/runs/poc_va_opts_hunt/loops_agg/agg_hood__sprint_otm35",
+  "schema_version": "0.1",
+  "warnings": []
+}

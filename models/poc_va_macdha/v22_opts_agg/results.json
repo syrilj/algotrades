@@ -1,0 +1,19 @@
+{
+  "model": "v22_opts_agg",
+  "note": "High-risk big-move sleeve from aggressive hunt",
+  "codes": [
+    "AVGO.US"
+  ],
+  "style": "yolo_otm50",
+  "portfolio": {
+    "final_value": 2157257.25,
+    "total_return": 1.157257,
+    "max_drawdown": -0.100875,
+    "sharpe": 0.8453,
+    "win_rate": 0.25,
+    "trade_count": 8
+  },
+  "end_per_1000": 2157.26,
+  "best_14d_spike_pct": 145.1,
+  "alt_near_best": "agg_ionq__week_atm20 (~+110%, cleaner than YOLO on many names)"
+}

@@ -1,6 +1,6 @@
 # Backtest Run Card
 
-Generated: 2026-07-11T22:56:47.913186Z
+Generated: 2026-07-11T23:02:44.971429Z
 Run directory: `/Users/syriljacob/Desktop/TradingAlgoWork/runs/poc_va_opts_hunt/loops/solo_sofi__atm5_30`
 
 ## Backtest Summary
