@@ -22,6 +22,7 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
+import math
 import sys
 import time
 from datetime import datetime, timezone
@@ -51,6 +52,21 @@ from risk_manager import (  # noqa: E402
     decision_to_dict,
     plan_entry,
 )
+
+def _sanitize_nan(obj: Any) -> Any:
+    """Replace NaN/±Infinity with None so downstream JSON.parse is safe."""
+    if isinstance(obj, float) and not math.isfinite(obj):
+        return None
+    if isinstance(obj, dict):
+        return {k: _sanitize_nan(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_sanitize_nan(v) for v in obj]
+    return obj
+
+
+def _safe_json(obj: Any, **kwargs: Any) -> str:
+    return json.dumps(_sanitize_nan(obj), default=str, **kwargs)
+
 
 _ENGINE_CACHE: dict[str, Any] = {}
 
@@ -1639,7 +1655,7 @@ def main(argv: list[str] | None = None) -> int:
         d["account"] = args.account
         d["model_conf_used"] = conf
         if args.json:
-            print(json.dumps(d, indent=2))
+            print(_safe_json(d, indent=2))
         else:
             print(f"=== RISK  {sym}  ${args.account:,.0f}  conf={conf:.2f} ===")
             print(f"MODE {dec.mode}  VEHICLE {dec.vehicle}  ACTION {dec.action}")
@@ -1664,7 +1680,7 @@ def main(argv: list[str] | None = None) -> int:
             rows = rank_models(engines_only=args.engines_only)
             title = "OVERALL MODEL RANK  (portfolio hist)"
         if args.json:
-            print(json.dumps(rows, indent=2))
+            print(_safe_json(rows, indent=2))
         else:
             _print_rank(rows, title)
         return 0
@@ -1682,7 +1698,7 @@ def main(argv: list[str] | None = None) -> int:
             fast_only=bool(getattr(args, "fast", False)),
         )
         if args.json:
-            print(json.dumps(payload, indent=2, default=str))
+            print(_safe_json(payload, indent=2))
         else:
             _print_human(payload)
         return 0 if payload.get("ok") else 1
@@ -1733,7 +1749,7 @@ def main(argv: list[str] | None = None) -> int:
             args.account, args.risk_pct, args.horizon, args.model, top_n=max(1, args.top)
         )
         if args.json:
-            print(json.dumps(payload, indent=2, default=str))
+            print(_safe_json(payload, indent=2))
         else:
             _print_rotate(payload, args.horizon)
         return 0
@@ -1756,14 +1772,14 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Scanning {len(symbols)} names…", flush=True)
         rows = scan_picks(symbols, args.account, args.risk_pct, args.horizon, model=args.model)
         if args.json:
-            print(json.dumps({"horizon": args.horizon, "model": args.model, "picks": rows}, indent=2))
+            print(_safe_json({"horizon": args.horizon, "model": args.model, "picks": rows}, indent=2))
         else:
             _print_picks(rows, args.horizon)
         return 0
 
     payload = analyze(args.command, args.account, args.risk_pct, period=args.period, model=args.model)
     if args.json:
-        print(json.dumps(payload, indent=2, default=str))
+        print(_safe_json(payload, indent=2))
     else:
         _print_analyze(payload)
     return 0

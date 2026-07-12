@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import math
 import os
 import shutil
 import statistics
@@ -63,8 +64,19 @@ def _f(x: Any, default: float = 0.0) -> float:
         return default
 
 
+def _sanitize_nan(obj: Any) -> Any:
+    """Replace NaN/±Infinity with None so downstream JSON.parse is safe."""
+    if isinstance(obj, float) and not math.isfinite(obj):
+        return None
+    if isinstance(obj, dict):
+        return {k: _sanitize_nan(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_sanitize_nan(v) for v in obj]
+    return obj
+
+
 def _print_json(obj: Any) -> int:
-    print(json.dumps(obj, default=str))
+    print(json.dumps(_sanitize_nan(obj), default=str))
     return 0
 
 
@@ -407,7 +419,7 @@ def enrich_live(rows: list[dict[str, Any]], symbol: str) -> None:
 def _atomic_write(path: Path, obj: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     tmp = path.with_suffix(".tmp")
-    tmp.write_text(json.dumps(obj, indent=2, default=str))
+    tmp.write_text(json.dumps(_sanitize_nan(obj), indent=2, default=str))
     os.replace(tmp, path)
 
 

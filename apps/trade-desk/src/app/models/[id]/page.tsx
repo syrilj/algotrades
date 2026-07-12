@@ -89,7 +89,7 @@ export default function ModelDetailPage() {
     setError(null);
     try {
       const [raw, catalog] = await Promise.all([
-        fetchJson<ModelDetail>(`/api/models/${encodeURIComponent(id)}`),
+        fetchJson<ModelDetail>(`/api/models?id=${encodeURIComponent(id)}`),
         fetchJson<ModelsCatalog>("/api/models").catch(() => null),
       ]);
       setDetail({
