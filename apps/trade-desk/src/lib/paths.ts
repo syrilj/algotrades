@@ -60,3 +60,7 @@ export function symbolRankerScript(): string {
 export function paperLedgerScript(): string {
   return path.join(repoRoot(), "tools", "paper_ledger.py");
 }
+
+export function supplyChainScript(): string {
+  return path.join(repoRoot(), "tools", "supply_chain.py");
+}

@@ -14,6 +14,7 @@ import {
   riskAssessmentScript,
   riskManagerScript,
   sectorWatchlistScript,
+  supplyChainScript,
   symbolRankerScript,
   tradeDeskScript,
   vpaScanScript,
@@ -381,6 +382,13 @@ export async function loadModelDetail(id: string): Promise<{
   }
 
   return { id, has_engine, model_md, results, hypothesis };
+}
+
+export async function runSupplyChain(
+  args: string[],
+  timeoutMs = 120_000,
+): Promise<unknown> {
+  return runPythonScript(supplyChainScript(), args, "supply_chain", timeoutMs);
 }
 
 export type { ModelRankRow };

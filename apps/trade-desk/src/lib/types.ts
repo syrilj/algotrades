@@ -149,6 +149,57 @@ export interface ApiEnvelope<T> {
   asof?: string;
 }
 
+export interface SupplyChainPlay {
+  action?: string;
+  why?: string;
+  do_next?: string;
+  confidence?: number | null;
+  price?: number | null;
+  stop?: number | null;
+  entry?: number | null;
+  setup_ok?: boolean;
+  model?: string;
+}
+
+export interface SupplyChainAnchor {
+  symbol: string;
+  name?: string;
+  price?: number | null;
+  market_cap?: number | null;
+  sector?: string;
+  industry?: string;
+  play?: SupplyChainPlay;
+}
+
+export interface SupplyChainPartner {
+  symbol: string;
+  name?: string;
+  product?: string;
+  confidence?: string;
+  source?: string;
+  price?: number | null;
+  ytd_return?: number | null;
+  correlation_1y?: number | null;
+  market_cap?: number | null;
+  is_small_cap?: boolean;
+  sector?: string;
+  industry?: string;
+  revenue?: number | null;
+  revenue_yoy?: number | null;
+  net_income_yoy?: number | null;
+  free_cash_flow_yoy?: number | null;
+  play?: SupplyChainPlay;
+  score?: number;
+}
+
+export interface SupplyChainResponse {
+  ok: boolean;
+  symbol: string;
+  asof: string;
+  anchor: SupplyChainAnchor;
+  suppliers: SupplyChainPartner[];
+}
+
 /** v25 hybrid live plan (tools/live_plan.py --json) */
 export type RiskMode =
   | "STAND_ASIDE"

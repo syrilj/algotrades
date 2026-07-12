@@ -41,3 +41,9 @@ export function modelHref(id: string): string {
 export function positionsHref(): string {
   return "/positions";
 }
+
+export function supplyChainHref(symbol?: string): string {
+  const s = symbol?.trim().toUpperCase();
+  if (!s) return "/supply-chain";
+  return `/supply-chain?symbol=${encodeURIComponent(s)}`;
+}
