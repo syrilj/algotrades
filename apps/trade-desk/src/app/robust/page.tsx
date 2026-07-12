@@ -1,6 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
+import { PageHeader } from "@/components/shell/PageHeader";
 
 const VARIANTS = [
   { id: "v22_robust", label: "v22 robust (balanced)" },
@@ -45,11 +47,16 @@ export default function RobustBacktestPage() {
   const m = result?.metrics;
 
   return (
-    <main className="min-h-screen px-4 py-6 sm:px-6" style={{ background: "var(--td-ink-950)", color: "var(--td-ink-100)" }}>
-      <h1 className="text-[20px] font-medium mb-1">v22 Robust Backtest</h1>
-      <p className="text-[13px] mb-5" style={{ color: "var(--td-ink-400)" }}>
-        Run the overfitting-resistant options variants against any date range.
-      </p>
+    <main className="td-page">
+      <PageHeader
+        title="v22 Robust backtest"
+        description="Research only — offline options variants. Live structure lives on Options desk; risk mode on Live."
+        actions={
+          <Link href="/options" className="td-btn td-btn-primary no-underline">
+            Options desk
+          </Link>
+        }
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
         <div className="p-4 rounded-sm" style={{ background: "var(--td-ink-900)", border: "1px solid var(--td-ink-700)" }}>
@@ -108,9 +115,16 @@ export default function RobustBacktestPage() {
       </div>
 
       <div className="p-4 rounded-sm text-[13px]" style={{ background: "var(--td-ink-900)", border: "1px solid var(--td-ink-700)" }}>
-        <h3 className="font-medium mb-2">Recommended for live</h3>
+        <h3 className="font-medium mb-2">How to use this</h3>
         <p style={{ color: "var(--td-ink-300)" }}>
-          Start with <strong>v22 robust conservative</strong>. It produced positive returns in all tested windows with a worst drawdown under 2%. The original v22 is overfit to 2024-2025 and not safe for live use.
+          Start with <strong>v22 robust conservative</strong> for research windows. Positive returns across tested ranges with worst drawdown under 2%. Original v22 is overfit to 2024-2025 — not a live ticket by itself.
+        </p>
+        <p className="mt-2" style={{ color: "var(--td-ink-400)" }}>
+          For a live structure + do-next steps, open{" "}
+          <Link href="/options" style={{ color: "var(--td-brand)" }}>
+            Options
+          </Link>{" "}
+          (picker + risk mode). This page does not send orders.
         </p>
       </div>
     </main>

@@ -197,7 +197,7 @@ function buildStages(
   }));
 }
 
-function nodeColors(status: StageStatus): {
+export function nodeColors(status: StageStatus): {
   border: string;
   bg: string;
   fg: string;
@@ -212,13 +212,13 @@ function nodeColors(status: StageStatus): {
     case "pass":
       return {
         border: "var(--td-gate-pass)",
-        bg: "#2F6B4F18",
+        bg: "color-mix(in oklch, var(--td-gate-pass) 12%, transparent)",
         fg: "var(--td-gate-pass)",
       };
     case "fail":
       return {
         border: "var(--td-gate-fail)",
-        bg: "#A3484818",
+        bg: "color-mix(in oklch, var(--td-gate-fail) 12%, transparent)",
         fg: "var(--td-gate-fail)",
       };
     case "neutral":

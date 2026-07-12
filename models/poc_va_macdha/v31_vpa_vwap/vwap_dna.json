@@ -1,0 +1,25 @@
+{
+  "_comment": "Per-symbol VWAP policy from FEATURE_INSIGHTS / ROUTING DNA. hard=require peg, soft=size mult only, off=ignore peg for size.",
+  "defaults": {
+    "policy": "soft",
+    "peg_size_mult": 0.5,
+    "chase_atr": 2.0
+  },
+  "by_symbol": {
+    "APLD": { "policy": "hard", "peg_size_mult": 0.5, "note": "DNA +7pp above_vwap" },
+    "SPY": { "policy": "hard", "peg_size_mult": 0.5, "note": "VWAP-trend specialist" },
+    "IONQ": { "policy": "hard", "peg_size_mult": 0.45, "note": "above helps; uptrend off" },
+    "ARM": { "policy": "soft", "peg_size_mult": 0.5, "note": "above mild lift" },
+    "AVGO": { "policy": "soft", "peg_size_mult": 0.55 },
+    "NVDA": { "policy": "soft", "peg_size_mult": 0.5 },
+    "AMD": { "policy": "soft", "peg_size_mult": 0.5 },
+    "META": { "policy": "soft", "peg_size_mult": 0.5 },
+    "AAPL": { "policy": "soft", "peg_size_mult": 0.5 },
+    "AMZN": { "policy": "soft", "peg_size_mult": 0.5 },
+    "GOOGL": { "policy": "soft", "peg_size_mult": 0.5 },
+    "HOOD": { "policy": "soft", "peg_size_mult": 0.55 },
+    "TSLA": { "policy": "off", "peg_size_mult": 1.0, "note": "hard VWAP hurts DNA" },
+    "MU": { "policy": "off", "peg_size_mult": 1.0, "note": "above_vwap negative lift" },
+    "MSTR": { "policy": "soft", "peg_size_mult": 0.6, "note": "high beta; soft only" }
+  }
+}

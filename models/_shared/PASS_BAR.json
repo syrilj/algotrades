@@ -8,6 +8,52 @@
     "min_trades": 40,
     "expectancy_after_costs_min": 0.0
   },
+  "claim_levels": {
+    "THIN": {
+      "max_trades_exclusive": 12,
+      "meaning": "Log only; no rank weight beyond reliability haircut"
+    },
+    "RESEARCH": {
+      "min_trades": 12,
+      "max_trades_exclusive": 40,
+      "meaning": "Interesting for loops; cannot auto-ship to WINNER/desk default"
+    },
+    "CLAIM": {
+      "min_trades": 40,
+      "require_pass_bar": true,
+      "data_tracks_allowed": ["equity_ohlcv"],
+      "meaning": "Eligible for WINNER after multi-lock OOS"
+    },
+    "BLOCKED_DATA": {
+      "tracks": ["gex_live_only"],
+      "meaning": "No honest historical claim (e.g. GEX without OI history)"
+    }
+  },
+  "data_tracks": {
+    "equity_ohlcv": {
+      "pricing": "exchange_ohlcv",
+      "may_auto_promote": true
+    },
+    "options_synthetic": {
+      "pricing": "synthetic_bs",
+      "may_auto_promote": false,
+      "max_claim_level": "RESEARCH",
+      "realism": [
+        "cash locked while position open",
+        "risk_pct of available cash only",
+        "label every report pricing=synthetic_bs"
+      ]
+    },
+    "gex_live_only": {
+      "pricing": "live_snapshot_only",
+      "may_auto_promote": false
+    }
+  },
+  "utility_reward": {
+    "description": "Search objective for evolve_pipeline — not end-to-end RL",
+    "formula": "reliability(n) * (ret + 0.35*min(sharpe,3) + 0.15*calmar + 0.05*wr - 0.55*max(0,|dd|-0.15) - hard_kill_if_|dd|>=0.25)",
+    "reliability": "min(1, n/min_trades)"
+  },
   "vanity_not_sufficient": ["win_rate"],
   "preferred_windows": {
     "minimum_calendar_years": 3,
@@ -17,6 +63,6 @@
   "ml_rules": {
     "primary_side": "rules_or_high_recall_primary",
     "secondary": "meta_label_filter_and_size",
-    "forbid": ["random_kfold", "predict_next_close_as_primary", "tune_threshold_on_test"]
+    "forbid": ["random_kfold", "predict_next_close_as_primary", "tune_threshold_on_test", "end_to_end_rl_primary"]
   }
 }

@@ -1,0 +1,8 @@
+{
+  "version": "v25_regime_grow",
+  "parent": "v23_devin_overlay",
+  "description": "Equity hedge sleeve for hybrid book; live risk in tools/risk_manager.py",
+  "symbols": ["TSLA.US", "MU.US", "SPY.US", "IONQ.US", "APLD.US", "XLP.US", "QQQ.US"],
+  "interval": "1H",
+  "note": "Include XLP.US and QQQ.US in data_map for macro/regime gates"
+}

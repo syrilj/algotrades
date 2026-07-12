@@ -1,0 +1,51 @@
+{
+  "version": "v37_feedback_meta",
+  "run": "runs/poc_va_dynamic_rank/runs/v37_feedback_meta/v37_h2h__daily__c1000000",
+  "window": {
+    "start": "2024-08-01",
+    "end": "2026-07-11",
+    "interval": "1H"
+  },
+  "portfolio": {
+    "annual_return": 0.7801195740112201,
+    "avg_holding_days": 11.5,
+    "benchmark_return": 2.930867,
+    "calmar": 5.794,
+    "excess_return": -0.909736,
+    "final_value": 3021131.0519475895,
+    "information_ratio": -0.4765,
+    "max_consecutive_loss": 5,
+    "max_drawdown": -0.13464246495348567,
+    "profit_factor": 3.4096,
+    "profit_loss_ratio": 1.609,
+    "sharpe": 2.517261038776251,
+    "sortino": 2.3041,
+    "total_return": 2.0211310519475894,
+    "trade_count": 131,
+    "win_rate": 0.6793893129770993
+  },
+  "pass_bar": true,
+  "gates": {
+    "profit_factor_min": true,
+    "max_drawdown_max_abs": true,
+    "sharpe_min": true,
+    "min_trades": true
+  },
+  "vs_v23_winner": {
+    "ret_delta": 0.721235529610941,
+    "dd_delta": -0.04403344731927542,
+    "sharpe_delta": 0.305246280936848,
+    "pf_delta": -0.1342,
+    "n_delta": 39
+  },
+  "h2h_rank": 1,
+  "h2h": {
+    "v37_feedback_meta": {"ret": 2.021, "sharpe": 2.517, "dd": -0.135, "n": 131, "wr": 0.679},
+    "v20b_macro_light": {"ret": 1.135, "sharpe": 2.234, "dd": -0.100, "n": 101, "wr": 0.644},
+    "v23_devin_overlay": {"ret": 1.300, "sharpe": 2.212, "dd": -0.091, "n": 92, "wr": 0.652},
+    "v15_meta_xgb": {"ret": 0.492, "sharpe": 1.145, "dd": -0.210, "n": 52, "wr": 0.442}
+  },
+  "status": "pass",
+  "recipe": "v23 DNA + continuous soft meta size + evolve soft feature/structure mults (no hard gates)",
+  "caveat": "Worse max DD than v23 (-13.5% vs -9.1%) but better Sharpe, return, WR, and trade count. Full-sample meta booster inherited from v23 — still want purged WF stitch before multi-year claim."
+}

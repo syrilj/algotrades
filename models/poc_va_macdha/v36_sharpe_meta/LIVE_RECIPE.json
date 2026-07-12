@@ -1,0 +1,91 @@
+{
+  "version": "v36_sharpe_meta",
+  "updated_at": "2026-07-12T06:05:00Z",
+  "objective": "Grow $1000 with best live Sharpe, then return. Options allowed when 1 contract fits.",
+  "account_cash": 1000,
+  "window_tested": "2024-08-01..2026-07-11",
+  "universe_1k": ["IONQ.US", "HOOD.US", "APLD.US", "SOFI.US", "PLTR.US"],
+  "ranking_objective": "softmax reward = max(0, sharpe) + 0.15*max(0, ret)",
+  "sleeves": {
+    "primary_equity": {
+      "engine": "v15_meta_xgb",
+      "why": "Highest Sharpe on $1k bag (1.95) with +102% return; reward weight 0.42",
+      "mode": "daily",
+      "role": "core growth / best risk-adjusted equity path"
+    },
+    "satellite_equity": {
+      "engine": "v23_devin_overlay",
+      "why": "2nd reward weight; higher raw return (+108%) slightly lower Sharpe (1.59)",
+      "mode": "daily",
+      "role": "optional risk-on overlay when v15 agrees"
+    },
+    "options_leverage": {
+      "engine": "v31_selective_nodes_opts",
+      "alt_engine": "v32_soft_react_opts",
+      "why": "Best options Sharpe on $1k bag among opts (v31 sh=1.45, DD -2.7%, +53%); v32 softer DNA for research continuity",
+      "mode": "options",
+      "role": "1-contract debit calls when premium fits risk budget",
+      "rules": {
+        "max_contracts": 1,
+        "risk_pct": 0.20,
+        "dte_days": 14,
+        "prefer": "debit call or tight bull call spread",
+        "avoid": ["MU ATM weeklies", "naked short premium", "2+ concurrent options"]
+      }
+    }
+  },
+  "reward_weights_screen": {
+    "v15_meta_xgb": 0.422,
+    "v23_devin_overlay": 0.156,
+    "v20b_macro_light": 0.09,
+    "v31_selective_nodes_opts": 0.083,
+    "v26_opts_evolve": 0.07,
+    "v32_soft_react_opts": 0.044,
+    "v28_feedback_opts": 0.044,
+    "v29_coldstart_opts": 0.034,
+    "v22_opts_live": 0.033,
+    "v30_feedback_pro": 0.023
+  },
+  "features_selected": {
+    "method": "mean IC with next-day return × half-window stability; drop corr>0.92",
+    "top": [
+      {"feature": "atr_14", "mean_ic": -0.0884, "stability": 1.0, "story": "vol level; higher ATR often coexists with short-horizon mean-reversion / chop"},
+      {"feature": "range", "mean_ic": 0.046, "stability": 0.7, "story": "intraday range / close; expansion regimes"},
+      {"feature": "atr_pct", "mean_ic": 0.0443, "stability": 0.7, "story": "normalized vol for sizing"},
+      {"feature": "room_pct", "mean_ic": 0.0382, "stability": 0.9, "story": "distance to prior high — structure room (node DNA)"},
+      {"feature": "macd_hist", "mean_ic": -0.0363, "stability": 0.9, "story": "momentum exhaustion / reversion"},
+      {"feature": "ret_5d", "mean_ic": -0.0374, "stability": 0.7, "story": "short-horizon return reversal pressure"}
+    ],
+    "also_keep": ["roc_10", "vwap_dist", "hvol_20", "body", "dist_sma200", "ret_1d"]
+  },
+  "meta_mlp": {
+    "architecture": "MLP(32,16) sklearn, walk-forward 4 folds, StandardScaler fit train-only",
+    "oos_sharpe_long_filter": 0.76,
+    "buy_hold_sharpe_same_bars": 0.78,
+    "mean_fold_accuracy": 0.515,
+    "verdict": "MLP alone does NOT beat buy-hold on this bag — use as soft size hint only, never hard gate",
+    "live_use": {
+      "if_proba_ge_0.65": "size_mult ×1.10–1.15 (soft boost)",
+      "if_proba_0.45_to_0.65": "size_mult ×1.0",
+      "if_proba_lt_0.45": "size_mult ×0.55 (soft cut, not block)",
+      "forbid": "skip trade solely because MLP says no"
+    }
+  },
+  "feedback_loop": {
+    "reward": "increase weight of models with positive Sharpe on $1k bag",
+    "punish": "weight→0 if sharpe≤0 or n=0",
+    "feature_feedback": "keep high |IC|×stability; drop redundant pairs",
+    "never_promote_from": ["v29 hard filters", "v30 hard stacks", "win-rate-only snipers with n<15"]
+  },
+  "how_to_rerun": ".venv/bin/python tools/feature_evolve_1k.py --cash 1000 --quick",
+  "artifacts": {
+    "report": "runs/poc_va_feature_evolve_1k/EVOLVE_REPORT.md",
+    "state": "runs/poc_va_feature_evolve_1k/META_ENSEMBLE.json"
+  },
+  "honest_limits": [
+    "Options PnL uses model premium estimate + BS engine — not fill-realistic options tape",
+    "n trades on options sleeve is small (12–16) — Sharpe unstable",
+    "Equity +102% on high-beta names is path-dependent; paper first",
+    "MLP OOS filter did not clear buy-hold — features inform size, not prediction theater"
+  ]
+}

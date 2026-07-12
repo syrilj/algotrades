@@ -1,0 +1,552 @@
+//@version=6
+// ═══════════════════════════════════════════════════════════════════════════
+// v29 coldstart opts — OPTIONS DEFAULT (OOS champion)
+// Timing: v21 DNA  →  Structure: ATM ~21 DTE CALL when size ≥ 0.35
+// Bag: IONQ · AVGO · HOOD · MU
+//
+// HOW TO USE
+// 1. Add this STRATEGY (not indicator) to the underlying chart
+// 2. Chart TF:  IONQ → 4H   |   AVGO / HOOD / MU → 2H
+// 3. Settings → Symbol Profile = that ticker
+// 4. Open Strategy Tester (bottom panel) for backtest stats
+//
+// NOTE: TV backtests the UNDERLYING as a timing proxy.
+// Real book is long calls (~21 DTE ATM). Equity PnL ≠ options PnL.
+// ═══════════════════════════════════════════════════════════════════════════
+
+strategy(
+     title              = "v29 coldstart opts ★",
+     shorttitle         = "v29 CALL",
+     overlay            = true,
+     initial_capital    = 100000,
+     default_qty_type   = strategy.percent_of_equity,
+     default_qty_value  = 10,
+     commission_type    = strategy.commission.percent,
+     commission_value   = 0.05,
+     slippage           = 1,
+     pyramiding         = 0,
+     process_orders_on_close = true,
+     calc_on_every_tick = false,
+     max_bars_back      = 5000,
+     max_labels_count   = 200,
+     max_lines_count    = 100,
+     max_boxes_count    = 50)
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  SETTINGS — keep groups short; presets do the heavy lifting
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── 1. Profile ─────────────────────────────────────────────────────────────
+profile = input.string("IONQ", "① Symbol profile", options=["IONQ", "AVGO", "HOOD", "MU", "TSLA", "Custom"], group="1 · Profile", tooltip="Pick the ticker you have open. Sets gates + HTF automatically.")
+
+// ── 2. Display ─────────────────────────────────────────────────────────────
+grpVis = "2 · Display"
+showVA = input.bool(true, "Value area fill", group=grpVis)
+showLevels = input.bool(true, "POC + VWAP lines", group=grpVis)
+showStops = input.bool(true, "Stop / trail while in trade", group=grpVis)
+showSignals = input.bool(true, "BUY / EXIT markers", group=grpVis)
+showLabels = input.bool(true, "Trade labels", group=grpVis)
+showDash = input.bool(true, "Dashboard", group=grpVis)
+showGates = input.bool(true, "Gate traffic lights", group=grpVis)
+cleanBg = input.bool(true, "Soft position background", group=grpVis)
+
+// ── 3. Options / risk ──────────────────────────────────────────────────────
+grpOpts = "3 · Options book"
+dteDays = input.int(21, "Target DTE (days)", minval=5, maxval=60, group=grpOpts)
+otmPct = input.float(0.0, "OTM % (0 = ATM)", step=0.005, group=grpOpts)
+minSizeFrac = input.float(0.35, "Min size (skip weak)", minval=0.0, maxval=1.0, step=0.05, group=grpOpts)
+riskPct = input.float(10.0, "Risk % equity / trade", minval=1, maxval=50, group=grpOpts, tooltip="TV proxy: % of equity allocated on each entry")
+kellyFrac = input.float(0.5, "Kelly fraction", group=grpOpts)
+exitOnDte = input.bool(true, "Force exit at ~DTE bars", group=grpOpts)
+
+// ── 4. Surgical macro ──────────────────────────────────────────────────────
+grpMac = "4 · Surgical macro"
+useSurgical = input.bool(true, "Enable FOMC ∧ VIX gate", group=grpMac)
+fomcDay = input.bool(false, "FOMC day NOW (manual)", group=grpMac)
+vixTicker = input.symbol("TVC:VIX", "VIX symbol", group=grpMac)
+vixElevated = input.float(20.0, "VIX elevated if above", group=grpMac)
+
+// ── 5. Engine knobs (usually leave alone) ──────────────────────────────────
+grpEng = "5 · Engine (advanced)"
+vaPct = input.float(70.0, "VA %", minval=10, maxval=95, group=grpEng) / 100.0
+rows = input.int(25, "VP rows", group=grpEng)
+lookback = input.int(20, "VP lookback", group=grpEng)
+fastL = input.int(12, "MACD fast", group=grpEng)
+slowL = input.int(26, "MACD slow", group=grpEng)
+htfCustom = input.timeframe("D", "HTF if Custom", group=grpEng)
+prd = input.int(50, "Swing period", group=grpEng)
+baseAPT = input.float(20, "VWAP APT", group=grpEng)
+volLen = input.int(20, "Vol SMA", group=grpEng)
+volLook = input.int(5, "Vol look", group=grpEng)
+bbLen = input.int(20, "SQZ length", group=grpEng)
+bbMult = input.float(2.0, "BB mult", group=grpEng)
+kcMult = input.float(1.5, "KC mult", group=grpEng)
+minConf = input.float(0.55, "Min confidence", step=0.05, group=grpEng)
+softConf = input.bool(true, "Soft confidence", group=grpEng)
+stopAtr = input.float(1.5, "Hard stop ATR", group=grpEng)
+trailAtr = input.float(2.5, "Trail ATR", group=grpEng)
+armTrailAtr = input.float(1.0, "Arm trail ATR", group=grpEng)
+
+// Custom-only gate toggles
+grpC = "6 · Custom gates only"
+c_reqHtf = input.bool(true, "Need HTF green", group=grpC)
+c_reqAboveVwap = input.bool(true, "Need above VWAP", group=grpC)
+c_reqVolExpand = input.bool(false, "Need vol expand", group=grpC)
+c_blockRed = input.bool(true, "Block red-flag", group=grpC)
+c_blockDump = input.bool(false, "Block dump", group=grpC)
+c_reqMom = input.bool(true, "Need mom > 0", group=grpC)
+c_exitVwap = input.bool(true, "Exit below VWAP", group=grpC)
+c_exitSqz = input.bool(false, "Exit on mom < 0", group=grpC)
+
+// ── Resolve specialist DNA ─────────────────────────────────────────────────
+string htfTF = htfCustom
+bool reqHtfGreen = c_reqHtf
+bool reqAboveVwap = c_reqAboveVwap
+bool reqVolExpand = c_reqVolExpand
+bool blockRedFlag = c_blockRed
+bool blockDump = c_blockDump
+bool reqMomPos = c_reqMom
+bool exitBelowVwap = c_exitVwap
+bool exitOnSqzNeg = c_exitSqz
+string chartHint = "set TF manually"
+
+if profile == "IONQ"
+    htfTF := "D"
+    reqHtfGreen := true
+    reqAboveVwap := true
+    reqVolExpand := false
+    blockRedFlag := true
+    blockDump := false
+    reqMomPos := true
+    exitBelowVwap := true
+    exitOnSqzNeg := false
+    chartHint := "use 4H chart"
+else if profile == "MU"
+    htfTF := "240"
+    reqHtfGreen := true
+    reqAboveVwap := false
+    reqVolExpand := false
+    blockRedFlag := true
+    blockDump := true
+    reqMomPos := false
+    exitBelowVwap := false
+    exitOnSqzNeg := false
+    chartHint := "use 2H chart"
+else if profile == "AVGO" or profile == "HOOD" or profile == "TSLA"
+    htfTF := "240"
+    reqHtfGreen := true
+    reqAboveVwap := false
+    reqVolExpand := true
+    blockRedFlag := true
+    blockDump := true
+    reqMomPos := true
+    exitBelowVwap := false
+    exitOnSqzNeg := true
+    chartHint := "use 2H chart"
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  CORE CALCULATIONS
+// ═══════════════════════════════════════════════════════════════════════════
+
+f_ema(src, len) =>
+    ta.ema(src, len)
+
+f_st_macd_ha() =>
+    hl = high - low
+    macd = (f_ema(close, fastL) - f_ema(close, slowL)) / f_ema(hl, slowL) * 100.0
+    o = nz(macd[1], macd)
+    h = math.max(macd, o)
+    l = math.min(macd, o)
+    c = macd
+    var float haO = na
+    haC = (o + h + l + c) / 4.0
+    haO := na(haO[1]) ? (o + c) / 2.0 : (haO[1] + haC[1]) / 2.0
+    [haC > haO, haC < haO]
+
+[htfGreen, htfRed] = request.security(syminfo.tickerid, htfTF, f_st_macd_ha(), barmerge.gaps_off, barmerge.lookahead_off)
+[localGreen, localRed] = f_st_macd_ha()
+
+// Volume profile → POC / VAH / VAL
+hi = ta.highest(high, lookback)
+lo = ta.lowest(low, lookback)
+step = (hi - lo) / rows
+float poc = lo + (hi - lo) * 0.5
+float vah = hi
+float val = lo
+if step > 0
+    array<float> bins = array.new_float(rows, 0.0)
+    for i = 1 to lookback
+        for k = 0 to rows - 1
+            binLo = lo + k * step
+            if high[i] >= binLo and low[i] < binLo + step
+                br = high[i] - low[i]
+                w = br == 0 ? 1.0 : step / br
+                array.set(bins, k, array.get(bins, k) + volume[i] * w)
+    pocIdx = array.indexof(bins, array.max(bins))
+    target = array.sum(bins) * vaPct
+    acc = array.get(bins, pocIdx)
+    above = pocIdx
+    below = pocIdx
+    while acc < target
+        if below == 0 and above == rows - 1
+            break
+        vaN = above < rows - 1 ? array.get(bins, above + 1) : 0.0
+        vbN = below > 0 ? array.get(bins, below - 1) : 0.0
+        if vaN == 0 and vbN == 0
+            break
+        if vaN >= vbN
+            above += 1
+            acc += vaN
+        else
+            below -= 1
+            acc += vbN
+    poc := lo + (pocIdx + 0.5) * step
+    vah := lo + (above + 1.0) * step
+    val := lo + below * step
+
+// Swing VWAP
+var float ph = na
+var float pl = na
+var int phL = bar_index
+var int plL = bar_index
+var float p = na
+var float vol = na
+var float vap = na
+var int dir = 1
+ph := ta.highestbars(high, prd) == 0 ? high : ph
+pl := ta.lowestbars(low, prd) == 0 ? low : pl
+phL := ta.highestbars(high, prd) == 0 ? bar_index : phL
+plL := ta.lowestbars(low, prd) == 0 ? bar_index : plL
+newDir = phL > plL ? 1 : -1
+alphaFromAPT(apt) =>
+    1.0 - math.exp(-math.log(2) / math.max(1.0, apt))
+if newDir != dir
+    x = newDir > 0 ? plL : phL
+    y = newDir > 0 ? pl : ph
+    barsback = math.max(bar_index - x, 0)
+    p := y * volume[barsback]
+    vol := volume[barsback]
+    for i = barsback to 0
+        a = alphaFromAPT(baseAPT)
+        p := (1 - a) * p + a * hlc3[i] * volume[i]
+        vol := (1 - a) * vol + a * volume[i]
+    vap := vol > 0 ? p / vol : na
+    dir := newDir
+else
+    a = alphaFromAPT(baseAPT)
+    p := (1 - a) * nz(p, hlc3 * volume) + a * hlc3 * volume
+    vol := (1 - a) * nz(vol, volume) + a * volume
+    vap := vol > 0 ? p / vol : na
+    dir := newDir
+
+vwapUse = vap[1]
+uptrend = dir[1] > 0
+aboveVwap = not na(vwapUse) and close >= vwapUse
+
+// Squeeze mom
+basis = ta.sma(close, bbLen)
+std = ta.stdev(close, bbLen)
+upperBB = basis + bbMult * std
+lowerBB = basis - bbMult * std
+ma = ta.sma(close, bbLen)
+rangema = ta.sma(ta.tr(true), bbLen)
+upperKC = ma + rangema * kcMult
+lowerKC = ma - rangema * kcMult
+sqzOn = lowerBB > lowerKC and upperBB < upperKC
+sqzOff = lowerBB < lowerKC and upperBB > upperKC
+mid = (math.avg(ta.highest(high, bbLen), ta.lowest(low, bbLen)) + ta.sma(close, bbLen)) / 2.0
+valSqz = ta.linreg(close - mid, bbLen, 0)
+momPos = valSqz > 0
+momNeg = valSqz < 0
+sqzRelease = sqzOn[1] and sqzOff
+
+// Volume-price
+priceUp = close > close[volLook]
+priceDn = close < close[volLook]
+vsma = ta.sma(volume, volLen)
+volUp = volume > vsma
+volRising = volume > volume[volLook]
+volFalling = volume < volume[volLook]
+confirmUp = priceUp and (volUp or volRising)
+redFlag = priceUp and volFalling and not volUp
+healthyPull = priceDn and volFalling
+dump = priceDn and volRising and volUp
+volExpand = volUp
+
+// Gates
+pocOk = not na(poc) and close >= poc
+inVa = not na(val) and not na(vah) and close >= val and close <= vah
+
+longHard = pocOk and inVa
+longHard := reqHtfGreen ? longHard and htfGreen : longHard
+longHard := reqAboveVwap ? longHard and aboveVwap : longHard
+longHard := reqVolExpand ? longHard and volExpand : longHard
+longHard := blockRedFlag ? longHard and not redFlag : longHard
+longHard := blockDump ? longHard and not dump : longHard
+longHard := reqMomPos ? longHard and momPos : longHard
+
+partSum =
+     (pocOk ? 1.0 : 0.0) +
+     (inVa ? 1.0 : 0.0) +
+     (htfGreen ? 1.0 : 0.0) +
+     (uptrend ? 1.0 : 0.0) +
+     (aboveVwap ? 1.0 : 0.0) +
+     ((confirmUp or healthyPull) ? 1.0 : 0.0) +
+     (not redFlag ? 1.0 : 0.0) +
+     (momPos ? 1.0 : 0.0) +
+     ((sqzOff or sqzRelease) ? 1.0 : 0.0)
+conf = partSum / 9.0
+
+longEntryBase = softConf ? (pocOk and inVa and conf >= minConf and longHard) : longHard
+longEntryBase := softConf and blockRedFlag ? longEntryBase and not redFlag : longEntryBase
+longEntryBase := softConf and blockDump ? longEntryBase and not dump : longEntryBase
+longEntryBase := softConf and reqHtfGreen ? longEntryBase and htfGreen : longEntryBase
+
+// Size
+atr = ta.atr(14)
+atrPct = atr / math.max(close, 1e-9)
+medAtrPct = ta.percentile_linear_interpolation(atrPct, 100, 50)
+baseK = conf < 0.55 ? 0.0 : conf < 0.65 ? 0.35 : conf < 0.78 ? 0.65 : 1.0
+baseK := baseK * math.min(math.max(kellyFrac / 0.5, 0.5), 1.0)
+volScale = math.min(math.max(nz(medAtrPct, atrPct) / math.max(atrPct, 1e-9), 0.4), 1.25)
+sizeFrac = baseK <= 0 ? 0.0 : math.min(math.max(baseK * volScale, 0.25), 1.0)
+
+// Macro
+vixClose = request.security(vixTicker, "D", close, barmerge.gaps_off, barmerge.lookahead_off)
+vixIsElev = not na(vixClose) and vixClose > vixElevated
+surgicalBlock = useSurgical and fomcDay and vixIsElev
+optsQuality = sizeFrac >= minSizeFrac
+longEntry = longEntryBase and sizeFrac > 0 and optsQuality and not surgicalBlock
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  POSITION + EXITS + STRATEGY ORDERS (backtest)
+// ═══════════════════════════════════════════════════════════════════════════
+
+var float entryPx = na
+var float peakPx = na
+var float entryAtr = na
+var float entrySize = na
+var int entryBar = na
+var string lastExit = ""
+
+wasFlat = strategy.position_size[1] <= 0
+inPos = strategy.position_size > 0
+
+// Bars in a DTE window from chart TF (RTH ≈ 6.5h)
+sec = timeframe.in_seconds()
+barsPerDay = sec <= 0 ? 1 : math.max(1, int(math.round(6.5 * 3600.0 / sec)))
+maxHoldBars = dteDays * barsPerDay
+
+// Stops while long
+float hardStopPx = na
+float trailStopPx = na
+bool armed = false
+bool hardHit = false
+bool trailHit = false
+bool softHit = false
+bool dteHit = false
+string exitWhy = ""
+
+// Prefer live strategy avg price once filled
+liveEntry = inPos ? strategy.position_avg_price : entryPx
+
+if inPos or not na(entryPx)
+    usePx = nz(liveEntry, entryPx)
+    useAtr = nz(entryAtr, atr > 0 ? atr : close * 0.01)
+    peakPx := math.max(nz(peakPx, high), high)
+    hardStopPx := usePx - stopAtr * useAtr
+    armed := peakPx >= usePx + armTrailAtr * useAtr
+    trailStopPx := armed ? peakPx - trailAtr * useAtr : na
+    hardHit := close <= hardStopPx
+    trailHit := armed and not na(trailStopPx) and close <= trailStopPx
+    softHit := false
+    if not armed
+        if reqHtfGreen and not htfGreen
+            softHit := true
+        if exitBelowVwap and not na(vwapUse) and close < vwapUse
+            softHit := true
+        if exitOnSqzNeg and momNeg
+            softHit := true
+        if localRed and not htfGreen
+            softHit := true
+        if blockRedFlag and redFlag
+            softHit := true
+    else
+        if blockRedFlag and redFlag
+            softHit := true
+        else if exitOnSqzNeg and momNeg and close < usePx
+            softHit := true
+    dteHit := exitOnDte and not na(entryBar) and (bar_index - entryBar) >= maxHoldBars
+    if hardHit
+        exitWhy := "STOP"
+    else if trailHit
+        exitWhy := "TRAIL"
+    else if dteHit
+        exitWhy := "DTE"
+    else if softHit
+        exitWhy := "SOFT"
+
+// Size as % of equity (TV underlying proxy for premium budget)
+qtyPct = math.max(riskPct * math.max(sizeFrac, minSizeFrac), 1.0)
+shares = math.max(strategy.equity * qtyPct / 100.0 / close, 1.0)
+
+// ENTRY
+openSignal = false
+if longEntry and wasFlat and strategy.position_size <= 0
+    strategy.entry("CALL", strategy.long, qty=shares, comment="ATM " + str.tostring(dteDays) + "D")
+    entryPx := close
+    peakPx := high
+    entryAtr := atr > 0 ? atr : close * 0.01
+    entrySize := sizeFrac
+    entryBar := bar_index
+    lastExit := ""
+    openSignal := true
+
+// EXIT
+closeSignal = false
+if (inPos or not na(entryPx)) and (hardHit or trailHit or softHit or dteHit)
+    strategy.close("CALL", comment=exitWhy)
+    lastExit := exitWhy
+    closeSignal := strategy.position_size[1] > 0 or inPos
+    entryPx := na
+    peakPx := na
+    entryAtr := na
+    entrySize := na
+    entryBar := na
+
+// Clean visual open/close if strategy fill lags one bar
+openSignal := openSignal or (strategy.position_size > 0 and strategy.position_size[1] <= 0)
+closeSignal := closeSignal or (strategy.position_size <= 0 and strategy.position_size[1] > 0)
+
+strike = math.round(close * (1.0 + otmPct))
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  VISUALS — clean, scannable
+// ═══════════════════════════════════════════════════════════════════════════
+
+// Colors
+cBuy = color.new(#00c853, 0)
+cExit = color.new(#ff1744, 0)
+cPoc = color.new(#ff6d00, 0)
+cVa = color.new(#26c6da, 85)
+cVaLine = color.new(#26c6da, 55)
+cVwapUp = color.new(#76ff03, 0)
+cVwapDn = color.new(#ff5252, 30)
+cInPos = color.new(#00bfa5, 92)
+cSetup = color.new(#00e676, 88)
+cBlock = color.new(#ff9100, 90)
+
+// Value area band
+pVah = plot(showLevels ? vah : na, "VAH", color=cVaLine, linewidth=1)
+pVal = plot(showLevels ? val : na, "VAL", color=cVaLine, linewidth=1)
+fill(pVah, pVal, color=showVA ? cVa : na, title="Value area")
+
+// POC + VWAP
+plot(showLevels ? poc : na, "POC", color=cPoc, linewidth=2, style=plot.style_linebr)
+plot(showLevels ? vap : na, "Swing VWAP", color=dir > 0 ? cVwapUp : cVwapDn, linewidth=2)
+
+// Background states (only one at a time, soft)
+bgcolor(cleanBg and surgicalBlock ? cBlock : na, title="Blocked")
+bgcolor(cleanBg and not surgicalBlock and inPos ? cInPos : na, title="In trade")
+bgcolor(cleanBg and not surgicalBlock and not inPos and longEntryBase and optsQuality ? cSetup : na, title="Setup ready")
+
+// Stop / trail guides in trade
+plot(showStops and inPos ? hardStopPx : na, "Hard stop", color=color.new(#ff1744, 20), linewidth=2, style=plot.style_linebr)
+plot(showStops and inPos and armed ? trailStopPx : na, "Trail", color=color.new(#ffd600, 10), linewidth=2, style=plot.style_linebr)
+
+// Big clear markers
+plotshape(showSignals and openSignal, title="BUY CALL", style=shape.labelup, location=location.belowbar, color=cBuy, text="BUY CALL", textcolor=color.white, size=size.normal)
+plotshape(showSignals and closeSignal, title="EXIT", style=shape.labeldown, location=location.abovebar, color=cExit, text="EXIT", textcolor=color.white, size=size.normal)
+
+// Compact trade tags
+if showLabels and openSignal
+    label.new(bar_index, low, "ATM ~" + str.tostring(strike) + "  ·  " + str.tostring(dteDays) + "DTE\nsize " + str.tostring(nz(entrySize, sizeFrac), "#.##") + "  conf " + str.tostring(conf, "#.##"), style=label.style_label_up, color=color.new(#1b5e20, 0), textcolor=color.white, size=size.small)
+if showLabels and closeSignal
+    label.new(bar_index, high, lastExit == "" ? "EXIT" : lastExit, style=label.style_label_down, color=color.new(#b71c1c, 0), textcolor=color.white, size=size.small)
+
+// ── Gate traffic lights (right edge) ───────────────────────────────────────
+// Small checklist so you instantly see what's blocking
+var table g = table.new(position.middle_right, 2, 8, bgcolor=color.new(#0b0f14, 10), border_width=0, frame_color=color.new(#263238, 0), frame_width=1)
+gateDot(ok) =>
+    ok ? "●" : "○"
+gateCol(ok) =>
+    ok ? color.new(#00e676, 0) : color.new(#546e7a, 0)
+
+if showGates and barstate.islast
+    table.cell(g, 0, 0, "GATES", text_color=color.white, text_size=size.small, text_halign=text.align_left)
+    table.cell(g, 1, 0, profile, text_color=color.aqua, text_size=size.small)
+    table.cell(g, 0, 1, gateDot(pocOk) + "  POC", text_color=gateCol(pocOk), text_size=size.normal)
+    table.cell(g, 1, 1, gateDot(inVa) + "  in VA", text_color=gateCol(inVa), text_size=size.normal)
+    table.cell(g, 0, 2, gateDot(htfGreen) + "  HTF", text_color=gateCol(htfGreen), text_size=size.normal)
+    table.cell(g, 1, 2, gateDot(not reqAboveVwap or aboveVwap) + "  VWAP", text_color=gateCol(not reqAboveVwap or aboveVwap), text_size=size.normal)
+    table.cell(g, 0, 3, gateDot(not reqMomPos or momPos) + "  MOM", text_color=gateCol(not reqMomPos or momPos), text_size=size.normal)
+    table.cell(g, 1, 3, gateDot(not blockRedFlag or not redFlag) + "  RED", text_color=gateCol(not blockRedFlag or not redFlag), text_size=size.normal)
+    table.cell(g, 0, 4, gateDot(not blockDump or not dump) + "  DUMP", text_color=gateCol(not blockDump or not dump), text_size=size.normal)
+    table.cell(g, 1, 4, gateDot(not reqVolExpand or volExpand) + "  VOL", text_color=gateCol(not reqVolExpand or volExpand), text_size=size.normal)
+    table.cell(g, 0, 5, gateDot(optsQuality) + "  SIZE", text_color=gateCol(optsQuality), text_size=size.normal)
+    table.cell(g, 1, 5, gateDot(not surgicalBlock) + "  MACRO", text_color=gateCol(not surgicalBlock), text_size=size.normal)
+    ready = longEntry
+    table.cell(g, 0, 6, ready ? "READY TO BUY" : "WAITING", text_color=ready ? cBuy : color.gray, text_size=size.normal, text_halign=text.align_left)
+    table.cell(g, 1, 6, "conf " + str.tostring(conf, "#.##"), text_color=color.white, text_size=size.small)
+    table.cell(g, 0, 7, chartHint, text_color=color.new(#90a4ae, 0), text_size=size.tiny)
+    table.cell(g, 1, 7, inPos ? "IN TRADE" : "FLAT", text_color=inPos ? color.aqua : color.gray, text_size=size.small)
+
+// ── Main dashboard (top right) ─────────────────────────────────────────────
+var table d = table.new(position.top_right, 2, 11, bgcolor=color.new(#0b0f14, 5), border_width=0, frame_color=color.new(#37474f, 0), frame_width=1)
+
+if showDash and barstate.islast
+    // Header
+    table.cell(d, 0, 0, "v29 CALL", text_color=color.white, text_size=size.normal, bgcolor=color.new(#00695c, 0))
+    table.cell(d, 1, 0, profile, text_color=color.white, text_size=size.normal, bgcolor=color.new(#00695c, 0))
+
+    // Status row
+    stTxt = surgicalBlock ? "BLOCKED" : inPos ? "LONG CALL" : longEntry ? "FIRE" : longEntryBase ? "WEAK SIZE" : "NO SETUP"
+    stCol = surgicalBlock ? color.orange : inPos ? color.aqua : longEntry ? cBuy : color.gray
+    table.cell(d, 0, 1, "STATUS", text_color=color.gray, text_size=size.small)
+    table.cell(d, 1, 1, stTxt, text_color=stCol, text_size=size.normal)
+
+    // Structure
+    table.cell(d, 0, 2, "STRUCTURE", text_color=color.gray, text_size=size.small)
+    table.cell(d, 1, 2, "ATM ~" + str.tostring(strike) + " · " + str.tostring(dteDays) + "D", text_color=color.white, text_size=size.small)
+
+    // Numbers
+    table.cell(d, 0, 3, "CONFIDENCE", text_color=color.gray, text_size=size.small)
+    table.cell(d, 1, 3, str.tostring(conf, "#.##") + (conf >= minConf ? "  ✓" : "  low"), text_color=conf >= minConf ? cBuy : color.orange, text_size=size.normal)
+
+    table.cell(d, 0, 4, "SIZE FRAC", text_color=color.gray, text_size=size.small)
+    table.cell(d, 1, 4, str.tostring(sizeFrac, "#.##") + "  (need ≥" + str.tostring(minSizeFrac, "#.##") + ")", text_color=optsQuality ? cBuy : color.orange, text_size=size.small)
+
+    table.cell(d, 0, 5, "VIX", text_color=color.gray, text_size=size.small)
+    table.cell(d, 1, 5, na(vixClose) ? "n/a" : str.tostring(vixClose, "#.#") + (vixIsElev ? "  elevated" : "  calm"), text_color=vixIsElev ? color.orange : cBuy, text_size=size.small)
+
+    // Backtest snapshot from strategy
+    nTrades = strategy.closedtrades
+    winN = strategy.wintrades
+    wr = nTrades > 0 ? 100.0 * winN / nTrades : 0.0
+    netP = strategy.netprofit
+    netCol = netP >= 0 ? cBuy : cExit
+    table.cell(d, 0, 6, "─────────", text_color=color.new(#37474f, 0), text_size=size.tiny)
+    table.cell(d, 1, 6, "BACKTEST", text_color=color.new(#90a4ae, 0), text_size=size.tiny)
+
+    table.cell(d, 0, 7, "NET P&L", text_color=color.gray, text_size=size.small)
+    table.cell(d, 1, 7, str.tostring(netP, "#.##") + "  (" + str.tostring(strategy.netprofit_percent, "#.##") + "%)", text_color=netCol, text_size=size.normal)
+
+    table.cell(d, 0, 8, "TRADES", text_color=color.gray, text_size=size.small)
+    table.cell(d, 1, 8, str.tostring(nTrades) + "   WR " + str.tostring(wr, "#.#") + "%", text_color=color.white, text_size=size.small)
+
+    table.cell(d, 0, 9, "OPEN P&L", text_color=color.gray, text_size=size.small)
+    op = strategy.openprofit
+    table.cell(d, 1, 9, inPos ? str.tostring(op, "#.##") : "—", text_color=op >= 0 ? cBuy : cExit, text_size=size.small)
+
+    table.cell(d, 0, 10, "NOTE", text_color=color.gray, text_size=size.tiny)
+    table.cell(d, 1, 10, "equity proxy · not options PnL", text_color=color.new(#78909c, 0), text_size=size.tiny)
+
+// Data window helpers
+plot(conf, "conf", display=display.data_window)
+plot(sizeFrac, "size", display=display.data_window)
+plot(valSqz, "sqz mom", display=display.data_window)
+
+// Alerts
+alertcondition(openSignal, "v29 BUY CALL", "v29: BUY ATM ~21DTE CALL {{ticker}} @ {{close}}")
+alertcondition(closeSignal, "v29 EXIT", "v29: EXIT {{ticker}} @ {{close}}")
+alertcondition(longEntryBase and optsQuality and not inPos, "v29 SETUP", "v29 setup ready on {{ticker}}")

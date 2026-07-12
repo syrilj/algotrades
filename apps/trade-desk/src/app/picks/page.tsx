@@ -7,6 +7,7 @@ import {
   type PicksPanelValue,
 } from "@/components/picks/PicksPanel";
 import type { ApiEnvelope, ModelsCatalog } from "@/lib/types";
+import { PageHeader } from "@/components/shell/PageHeader";
 
 function asRecord(v: unknown): Record<string, unknown> | null {
   return v && typeof v === "object" ? (v as Record<string, unknown>) : null;
@@ -166,15 +167,11 @@ export default function PicksPage() {
   }, [panel]);
 
   return (
-    <div className="flex min-h-full flex-col bg-[var(--td-ink-900,#12181F)] text-[var(--td-ink-200,#CBD5E1)]">
-      <header className="border-b border-[var(--td-ink-600,#334155)] px-4 py-3">
-        <h1 className="text-[20px] font-semibold text-[var(--td-ink-100,#E2E8F0)]">
-          Picks
-        </h1>
-        <p className="text-[12px] text-[var(--td-ink-400,#64748B)]">
-          Horizon + sector scan · grouped by action
-        </p>
-      </header>
+    <div className="td-page">
+      <PageHeader
+        title="Picks"
+        description="Horizon + sector scan, grouped by action. Click a name to open Analyze with auto model selection."
+      />
 
       <PicksPanel
         value={panel}
@@ -186,16 +183,18 @@ export default function PicksPage() {
         }}
       />
 
-      <PicksList
-        rows={rows}
-        loading={loading}
-        error={error}
-        emptyHint={
-          scanned
-            ? "Scan returned no live setups for this filter."
-            : "Choose horizon and sectors, then Scan."
-        }
-      />
+      <div className="td-panel">
+        <PicksList
+          rows={rows}
+          loading={loading}
+          error={error}
+          emptyHint={
+            scanned
+              ? "Scan returned no live setups for this filter."
+              : "Choose horizon and sectors, then Scan."
+          }
+        />
+      </div>
     </div>
   );
 }

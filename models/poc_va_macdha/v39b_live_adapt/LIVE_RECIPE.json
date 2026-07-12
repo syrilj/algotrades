@@ -1,0 +1,34 @@
+{
+  "model": "v39b_live_adapt",
+  "philosophy": "react_to_nodes_and_volume_not_predict_price",
+  "timeframes": {
+    "signal": "engine routing (2h/4h specialists)",
+    "vpa_sensors": "bar TF of frame — look=3, vol_sma=14, stop_look=5",
+    "htf_bias": "macd_htf per routing"
+  },
+  "entry_checklist": [
+    "Primary long gates pass (POC/VA + specialist routing)",
+    "Meta proba above soft skip (~0.50)",
+    "Prefer demand_node (near VAL/POC) with vpa_score + mom >= 0",
+    "Avoid chase at VAH with hot macd + big ret_5d",
+    "Soft cut if high_beta and QQQ RS weak"
+  ],
+  "size_map": {
+    "vpa_score_high": "1.12–1.20",
+    "vpa_neutral": "1.0",
+    "vpa_weak": "0.55–0.82",
+    "demand_node_boost": "×1.12",
+    "ema_bull": "×1.06",
+    "ema_bear_mild": "×0.90",
+    "streak": "0.45–1.45 adaptive"
+  },
+  "exit_fast": [
+    "unarmed + climax_recent + weak VPA",
+    "unarmed + vpa_mom <= -0.85 and vpa_score <= -0.35",
+    "armed + mom <= -1.10 and score <= -0.60 and underwater",
+    "mid-trade size *0.85 when mom <= -0.70 and score < 0"
+  ],
+  "after_trade": "eng.record_trade(pnl, symbol=...) so next plan inherits streak",
+  "desk_cmd": ".venv/bin/python tools/trade_desk.py SYMBOL --model v39b_live_adapt",
+  "options_live_note": "GEX/call-put walls stay desk confluence (poc_va_gex); scale size, do not flip side"
+}

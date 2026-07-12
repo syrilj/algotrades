@@ -1,0 +1,21 @@
+{
+  "risk_pct": 0.10,
+  "dte_days": 21,
+  "otm_pct": 0.0,
+  "halt_dd": 0.30,
+  "flatten_dd": 0.45,
+  "initial_cash": 1000000,
+  "contract_multiplier": 100,
+  "max_contracts": 500,
+  "use_narrative": true,
+  "narrative_mode": "surgical",
+  "loss_cooloff_days": 0,
+  "streak_losses_for_cut": 99,
+  "streak_size_mult": 1.0,
+  "min_size_frac": 0.35,
+  "max_size_frac": 1.0,
+  "use_conf_tier": false,
+  "optimized_for": "cold_start_oos",
+  "promoted_ablation": "v29_surgical_only",
+  "note": "Cooloff+streak lost mean OOS score; surgical + min_signal 0.35 + correct DTE premium won"
+}

@@ -1,6 +1,6 @@
 # Backtest Run Card
 
-Generated: 2026-07-12T00:34:45.769755Z
+Generated: 2026-07-12T01:31:24.723688Z
 Run directory: `/Users/syriljacob/Desktop/TradingAlgoWork/runs/trade_desk_robust/v22_robust_conservative_2024-08-01_2026-07-11`
 
 ## Backtest Summary

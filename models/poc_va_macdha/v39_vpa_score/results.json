@@ -1,0 +1,35 @@
+{
+  "portfolio": {
+    "total_return": 2.2380645224380147,
+    "max_drawdown": -0.10261053136891467,
+    "sharpe": 2.525672646732213,
+    "trade_count": 142,
+    "win_rate": 0.676056338028169,
+    "final_value": 3238064.522438015,
+    "profit_factor": 3.568,
+    "avg_holding_days": 11.2
+  },
+  "compare_v38": {
+    "ret": 3.102993326853544,
+    "dd": -0.1250659386962458,
+    "sharpe": 2.6542346667535486,
+    "n": 140,
+    "wr": 0.6642857142857143
+  },
+  "window": {
+    "start": "2024-08-01",
+    "end": "2026-07-11",
+    "interval": "1H",
+    "codes": ["TSLA.US", "MU.US", "SPY.US", "IONQ.US", "APLD.US", "XLP.US", "QQQ.US"],
+    "cash": 1000000
+  },
+  "pass_vs_v38": false,
+  "verdict": "FAIL_PROMOTE — better DD/WR, worse Sharpe/return vs WINNER bag. Continuous VPA still useful as research sleeve; do not replace v38.",
+  "screen_mixed_note": "On multi-sector screen bag (NVDA/AVGO/TSLA/JPM/XOM/UNH/HOOD/SPY/QQQ) v39 beat v38 (+13.3% vs +2.4%, better DD). Edge may be universe-dependent.",
+  "next_ablations": [
+    "A: remove stand-aside floor (vpa_score <= -1.60)",
+    "B: remove EMA bear cut (keep score + demand node only)",
+    "C: halve negative VPA weights (lighter no_demand/climax)",
+    "D: score as soft exit only, keep v38 entry size"
+  ]
+}

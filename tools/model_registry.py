@@ -7,8 +7,27 @@ from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 MODELS_ROOT = ROOT / "models" / "poc_va_macdha"
-# Keep aligned with WINNER.json: v15 beats v14 on Sharpe/PF/DD (risk-adj), not raw return.
-DEFAULT_MODEL = "v15_meta_xgb"
+RANKER_ROOT = ROOT / "runs" / "symbol_ranker"
+RANKER_MAX_AGE_DAYS = 7
+# Fallback if WINNER.json missing; live default prefers WINNER via equity_default_model().
+DEFAULT_MODEL = "v39b_live_adapt"
+# Options stack default = OOS champion (see OPTIONS_WINNER.json / runs/poc_va_oos_rank/).
+OPTIONS_DEFAULT_MODEL = "v32_soft_react_opts"
+OPTIONS_WINNER_PATH = MODELS_ROOT / "OPTIONS_WINNER.json"
+EQUITY_WINNER_PATH = MODELS_ROOT / "WINNER.json"
+
+
+def equity_default_model() -> str:
+    """Current equity WINNER for desk/auto; falls back to DEFAULT_MODEL."""
+    try:
+        if EQUITY_WINNER_PATH.exists():
+            d = json.loads(EQUITY_WINNER_PATH.read_text())
+            w = d.get("winner")
+            if w and (MODELS_ROOT / w / "signal_engine.py").exists():
+                return str(w)
+    except Exception:
+        pass
+    return DEFAULT_MODEL
 
 # Process-local card cache — scan/watch call rank_models_for_symbol per symbol.
 _CARD_CACHE: dict[str, Any] = {"mtime_key": None, "cards": None}
@@ -52,6 +71,39 @@ def engine_path(model: str) -> Path:
     if not p.exists():
         raise FileNotFoundError(f"No engine for model {model}: {p}")
     return p
+
+
+def engine_kind(model: str) -> str:
+    """Classify engine for desk routing: equity | options | other.
+
+    Equity engines expose desk helpers (_resample_ohlcv + profile). Options
+    wrappers load an equity child via equity_engine / _equity_engine_path.
+    """
+    path = MODELS_ROOT / model / "signal_engine.py"
+    if not path.exists():
+        return "other"
+    try:
+        text = path.read_text(encoding="utf-8", errors="ignore")
+    except OSError:
+        return "other"
+    has_desk = "def _resample_ohlcv" in text and (
+        "def _prior_session_profile" in text or "_prior_session_profile" in text
+    )
+    if has_desk:
+        return "equity"
+    if "equity_engine" in text or "_equity_engine_path" in text or "opts" in model:
+        return "options"
+    return "other"
+
+
+def is_desk_engine(model: str) -> bool:
+    """True when Analyze/Live can compute state without unwrapping."""
+    return engine_kind(model) == "equity"
+
+
+def list_desk_engines() -> list[str]:
+    """Equity engines safe for --model auto on the trade desk."""
+    return [m for m in list_engine_models() if is_desk_engine(m)]
 
 
 def _extract_portfolio(d: Any) -> dict | None:
@@ -264,32 +316,161 @@ def rank_models_for_symbol(symbol: str, engines_only: bool = False) -> list[dict
     return ranked
 
 
-def recommend_model(symbol: str | None = None) -> dict[str, Any]:
-    """Pick best runnable model overall, or best for a symbol."""
+def load_symbol_ranker(symbol: str) -> dict[str, Any] | None:
+    """Read runs/symbol_ranker/<SYM>/RANKER.json; None on missing/corrupt."""
+    sym = str(symbol).strip().upper().replace(".US", "")
+    path = RANKER_ROOT / sym / "RANKER.json"
+    if not path.exists():
+        return None
+    try:
+        data = json.loads(path.read_text())
+    except Exception:
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def ranker_best_model(symbol: str, *, desk_only: bool = True) -> dict[str, Any] | None:
+    """Fresh (≤7d) RANKER.json top desk-eligible row, or None."""
+    from datetime import datetime, timezone
+
+    art = load_symbol_ranker(symbol)
+    if not art:
+        return None
+    asof = art.get("asof")
+    if not asof:
+        return None
+    try:
+        dt = datetime.fromisoformat(str(asof).replace("Z", "+00:00"))
+        age_days = (datetime.now(timezone.utc) - dt.astimezone(timezone.utc)).total_seconds() / 86400.0
+    except Exception:
+        return None
+    if age_days > RANKER_MAX_AGE_DAYS:
+        return None
+    for row in art.get("rows") or []:
+        if not isinstance(row, dict):
+            continue
+        if row.get("status") != "ok":
+            continue
+        if float(row.get("score") or 0) <= 0:
+            continue
+        if row.get("claim_level") not in ("RESEARCH", "CLAIM"):
+            continue
+        if desk_only and not row.get("desk_runnable"):
+            continue
+        return {
+            "model": row["model"],
+            "score": float(row.get("score") or 0),
+            "win_rate": row.get("win_rate"),
+            "sharpe": row.get("sharpe"),
+            "code": art.get("code") or f"{str(symbol).upper().replace('.US', '')}.US",
+            "asof": str(asof),
+            "claim_level": row.get("claim_level"),
+        }
+    return None
+
+
+def recommend_model(
+    symbol: str | None = None,
+    *,
+    desk_only: bool = True,
+) -> dict[str, Any]:
+    """Pick best runnable model overall, or best for a symbol.
+
+    desk_only=True (default): only equity engines with desk helpers so Analyze
+    / auto never lands on options wrappers that lack _resample_ohlcv.
+    """
+    desk = set(list_desk_engines()) if desk_only else None
+
+    def _ok(row: dict[str, Any]) -> bool:
+        if not row.get("has_engine"):
+            return False
+        if desk is not None and row["model"] not in desk:
+            return False
+        return True
+
+    # Per-symbol ranker first (return-forward OOS backtest), then promoted
+    # WINNER, then historical score, then overall portfolio rank.
     if symbol:
+        hit = ranker_best_model(symbol, desk_only=desk_only)
+        if hit:
+            return {
+                "model": hit["model"],
+                "reason": (
+                    f"symbol ranker #1 on {hit['code']} "
+                    f"(backtested {hit['asof'][:10]}, score {hit['score']:.2f})"
+                ),
+                "score": hit["score"],
+                "win_rate": hit.get("win_rate"),
+                "sharpe": hit.get("sharpe"),
+                "kind": engine_kind(hit["model"]),
+                "source": "symbol_ranker",
+            }
         for row in rank_models_for_symbol(symbol, engines_only=True):
-            if row["has_engine"]:
+            if _ok(row):
                 return {
                     "model": row["model"],
                     "reason": f"best historical score on {row['code']}",
                     "score": row["score"],
                     "win_rate": row["win_rate"],
                     "sharpe": row["sharpe"],
+                    "kind": engine_kind(row["model"]),
                 }
-    overall = rank_models(engines_only=True)
-    if overall:
-        top = overall[0]
+
+    # Promoted WINNER as desk default when no per-symbol data exists yet.
+    winner = equity_default_model()
+    if (desk is None or winner in desk) and (MODELS_ROOT / winner / "signal_engine.py").exists():
+        reason = "WINNER.json equity champion"
+        if symbol:
+            reason = f"WINNER.json equity champion (desk default for {symbol.upper()})"
         return {
-            "model": top["model"],
-            "reason": "best portfolio score among engines",
-            "score": top["score"],
-            "win_rate": top["win_rate"],
-            "sharpe": top["sharpe"],
+            "model": winner,
+            "reason": reason,
+            "score": None,
+            "win_rate": None,
+            "sharpe": None,
+            "kind": engine_kind(winner),
+            "source": "winner",
         }
+
+    overall = rank_models(engines_only=True)
+    for top in overall:
+        if _ok(top):
+            return {
+                "model": top["model"],
+                "reason": "best portfolio score among engines",
+                "score": top["score"],
+                "win_rate": top["win_rate"],
+                "sharpe": top["sharpe"],
+                "kind": engine_kind(top["model"]),
+            }
+    fallback = equity_default_model()
+    if desk is not None and fallback not in desk:
+        fallback = next(iter(desk), DEFAULT_MODEL) if desk else DEFAULT_MODEL
     return {
-        "model": DEFAULT_MODEL,
+        "model": fallback,
         "reason": "fallback default",
         "score": None,
         "win_rate": None,
         "sharpe": None,
+        "kind": engine_kind(fallback),
     }
+
+
+def options_default_model() -> str:
+    """OOS-elected options default; falls back to OPTIONS_DEFAULT_MODEL constant."""
+    try:
+        if OPTIONS_WINNER_PATH.exists():
+            d = json.loads(OPTIONS_WINNER_PATH.read_text())
+            w = d.get("winner") or d.get("champion_oos", {}).get("model_dir")
+            if w and (MODELS_ROOT / w / "signal_engine.py").exists():
+                return str(w)
+    except Exception:
+        pass
+    return OPTIONS_DEFAULT_MODEL
+
+
+def options_winner_card() -> dict:
+    """Full OPTIONS_WINNER.json for API / desk."""
+    if OPTIONS_WINNER_PATH.exists():
+        return json.loads(OPTIONS_WINNER_PATH.read_text())
+    return {"winner": OPTIONS_DEFAULT_MODEL, "note": "OPTIONS_WINNER.json missing"}

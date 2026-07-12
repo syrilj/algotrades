@@ -1,6 +1,21 @@
 # LSE improvement loops — session state (2026-07-11)
 
-## User ask
+## User ask (UPDATED 21:15 MDT)
+PIVOT: user wants an OPTIONS model to compound $1k → $1M in the shortest time, taking into account
+their newer uncommitted work (v22_opts_live, OPTIONS_WINNER.json=v29_coldstart_opts, v32 ablations,
+opts hunt + OOS rank harness). Honest framing: maximize geometric growth subject to the repo's own
+pure-OOS 5-fold survival rule (score = ret + 0.15*wr + 0.10*min(sharpe,2)/2 - 0.40*|dd|).
+Baselines: v29_surgical_only mean OOS score 0.028; v22 0.018; v32 soft_struct full-window +108% Sharpe 1.49.
+DONE (2026-07-11 ~22:15): workflow wf_78720942-a9d delivered v33_risk_sweep (agent) before hitting
+session limit; ALL remaining experiments run INLINE via runs/poc_va_v33_loops/inline_driver.py
+(13 variants × 6 windows) + blend_sleeves.py. SHIPPED: models/poc_va_macdha/v34_bag6_opts/ promoted
+in OPTIONS_WINNER.json (mean OOS 0.1018 vs v29 0.0282; full +66% DD -7.8% Sharpe 1.59 WR 85%).
+Findings recorded in findings.jsonl (bag-expand pass; v32-standalone fail; sizing-escalation fail;
+dual-sleeve working). Open next: OOS-challenge v36_sharpe_meta's v31 options sleeve (elected by
+full-window Sharpe in a parallel session, never fold-challenged); earnings_guard + mark-to-model
+premium still untested. Stock-side v20-v27 experiment set designed but never run (EXPERIMENTS.json).
+
+## Original ask (superseded but context)
 Find current best model → research londonstrategicedge.com/machine-learning techniques → run multiple
 feedback loops trying approaches → deliver model with best win rate + Sharpe for live trading.
 Use prior failure notes (findings.jsonl, FAILURE_PROTOCOL, RESEARCH_NEXT).

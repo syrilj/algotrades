@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { AlertTriangle, ListFilter } from "lucide-react";
 import { ActionChip, actionRailColor } from "@/components/ui/ActionChip";
+import { analyzeHref } from "@/lib/routes";
 
 export type PickRow = {
   symbol: string;
@@ -89,19 +90,20 @@ export function PicksList({
 
   const select = (sym: string) => {
     if (onSelectSymbol) onSelectSymbol(sym);
-    else router.push(`/analyze?symbol=${encodeURIComponent(sym)}`);
+    else router.push(analyzeHref({ symbol: sym }));
   };
 
   if (error) {
     return (
-      <div className="flex items-start gap-2 border border-[#A34848]/40 bg-[#A34848]/10 px-4 py-3 text-[13px] text-[var(--td-ink-100,#E2E8F0)]">
+      <div className="td-alert td-alert--error flex items-start gap-2" role="alert">
         <AlertTriangle
-          className="mt-0.5 size-4 shrink-0 text-[#A34848]"
+          className="mt-0.5 size-4 shrink-0"
           strokeWidth={1.75}
+          style={{ color: "var(--td-action-avoid)" }}
         />
         <div>
           <div className="font-medium">Picks failed</div>
-          <div className="text-[var(--td-ink-300,#94A3B8)]">{error}</div>
+          <div style={{ color: "var(--td-ink-300)" }}>{error}</div>
         </div>
       </div>
     );

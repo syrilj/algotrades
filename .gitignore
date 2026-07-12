@@ -32,3 +32,10 @@ books/
 # Graphify knowledge graph (local / regenerated)
 graphify-out/
 .gstack/
+
+# Generated data artifacts
+*.csv
+**/.poolside/
+
+# Manim output
+media/

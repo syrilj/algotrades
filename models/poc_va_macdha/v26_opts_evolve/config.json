@@ -1,0 +1,32 @@
+{
+  "source": "yfinance",
+  "codes": [
+    "IONQ.US",
+    "AVGO.US",
+    "HOOD.US",
+    "MU.US"
+  ],
+  "start_date": "2024-08-01",
+  "end_date": "2026-07-11",
+  "initial_cash": 1000000,
+  "commission": 0.001,
+  "engine": "options",
+  "interval": "1D",
+  "options_config": {
+    "risk_free_rate": 0.05,
+    "contract_multiplier": 100,
+    "exercise_style": "american"
+  },
+  "strategy": {
+    "model_version": "v26_opts_evolve",
+    "parent": "v22_opts_live",
+    "style": "atm_risk10_dte14",
+    "codes": [
+      "IONQ.US",
+      "AVGO.US",
+      "HOOD.US",
+      "MU.US"
+    ],
+    "note": "v22 DNA; DTE 14 beats 21 on 2024-08..2026-07"
+  }
+}

@@ -212,9 +212,26 @@ Sector chips = square radius (not pill clusters). Empty group: one quiet line �
 
 ---
 
+## Evolve (`/evolve`) — model research factory
+
+**Goal:** Surface `tools/evolve_pipeline` boards (utility, claim levels, multi-lock, finalize) without leaving the desk.
+
+```
+┌─ Nav: … Leaderboard  Evolve  Models ───────────────────────────────────────┐
+│ Finalize action · Frozen WINNER · OPTIONS_WINNER (research only)           │
+│ Track · cash · run selector · [Reload] [Run quick rank]                    │
+├─ Rank table (util / ret / sharpe / DD / n / OOS lock) ─┬─ Selected model ─┤
+│ CLAIM / RESEARCH / THIN chips · promote flags           │ Open / Analyze   │
+└─────────────────────────────────────────────────────────┴──────────────────┘
+```
+
+API: `GET/POST /api/evolve` · reads `runs/evolve_*/STATE.json`.
+
+---
+
 ## Cross-screen rules
 
 1. One composition per view — avoid nested card stacks.
 2. Tabular nums for all prices/% / scores.
-3. Nav verbs: analyze, watch, picks, leaderboard, models.
+3. Nav verbs: analyze, watch, picks, leaderboard, evolve, models.
 4. Dense desktop OK; mobile stacks without hiding action/why.

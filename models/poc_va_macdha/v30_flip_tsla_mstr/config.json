@@ -1,0 +1,20 @@
+{
+  "source": "yfinance",
+  "codes": ["TSLA.US", "MSTR.US"],
+  "start_date": "2024-08-01",
+  "end_date": "2026-07-11",
+  "initial_cash": 1000000,
+  "commission": 0.001,
+  "engine": "options",
+  "interval": "1D",
+  "options_config": {
+    "risk_free_rate": 0.05,
+    "contract_multiplier": 100,
+    "exercise_style": "american"
+  },
+  "strategy": {
+    "model_version": "v30_flip_tsla_mstr",
+    "style": "short_term_call_put_flip",
+    "note": "TSLA/MSTR long calls on pullbacks, long puts on downs; 1-5d hold; aggressive size"
+  }
+}

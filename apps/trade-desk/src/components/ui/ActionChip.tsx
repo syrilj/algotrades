@@ -8,44 +8,89 @@ type ActionStyle = {
   dashed: boolean;
 };
 
+function softOf(token: string): string {
+  return `color-mix(in oklch, ${token} 22%, transparent)`;
+}
+
 export function actionStyle(action: string | undefined | null): ActionStyle {
   const a = (action ?? "").toUpperCase();
 
   if (a.includes("BUY NOW")) {
-    return { color: "var(--td-action-buy-now)", soft: "#2F6B4F22", dashed: false };
+    return {
+      color: "var(--td-action-buy-now)",
+      soft: softOf("var(--td-action-buy-now)"),
+      dashed: false,
+    };
   }
   if (a.includes("BUY BREAKOUT")) {
     return {
       color: "var(--td-action-buy-breakout)",
-      soft: "#1F7A6B22",
+      soft: softOf("var(--td-action-buy-breakout)"),
       dashed: false,
     };
   }
   if (a.includes("BREAKOUT WATCH")) {
     return {
       color: "var(--td-action-breakout-watch)",
-      soft: "#B0892E22",
+      soft: softOf("var(--td-action-breakout-watch)"),
       dashed: false,
     };
   }
   if (a.includes("PULLBACK")) {
     return {
       color: "var(--td-action-pullback)",
-      soft: "#3D6E9C22",
+      soft: softOf("var(--td-action-pullback)"),
       dashed: false,
     };
   }
   if (a.includes("AVOID")) {
-    return { color: "var(--td-action-avoid)", soft: "#A3484822", dashed: false };
+    return {
+      color: "var(--td-action-avoid)",
+      soft: softOf("var(--td-action-avoid)"),
+      dashed: false,
+    };
   }
   if (a.includes("WAIT")) {
     return {
       color: "var(--td-action-wait)",
-      soft: "#6B778522",
+      soft: softOf("var(--td-action-wait)"),
       dashed: a.includes("ALMOST"),
     };
   }
-  return { color: "var(--td-ink-400)", soft: "#64748B22", dashed: false };
+  // Risk assessment modes from tools/risk_assessment.py
+  if (a.includes("RISK_OK")) {
+    return {
+      color: "var(--td-action-buy-now)",
+      soft: softOf("var(--td-action-buy-now)"),
+      dashed: false,
+    };
+  }
+  if (a.includes("SIZE_DOWN")) {
+    return {
+      color: "var(--td-action-breakout-watch)",
+      soft: softOf("var(--td-action-breakout-watch)"),
+      dashed: false,
+    };
+  }
+  if (a.includes("HALT_NEW") || a.includes("EQUITY_HEDGE")) {
+    return {
+      color: "var(--td-action-wait)",
+      soft: softOf("var(--td-action-wait)"),
+      dashed: false,
+    };
+  }
+  if (a.includes("FLATTEN") || a.includes("AVOID")) {
+    return {
+      color: "var(--td-action-avoid)",
+      soft: softOf("var(--td-action-avoid)"),
+      dashed: false,
+    };
+  }
+  return {
+    color: "var(--td-ink-400)",
+    soft: softOf("var(--td-ink-400)"),
+    dashed: false,
+  };
 }
 
 /** Left-rail accent color for dense tables (Watch / Picks). */
@@ -61,21 +106,20 @@ type ActionChipProps = {
 
 export function ActionChip({ action, size = "md", className = "" }: ActionChipProps) {
   const style = actionStyle(action);
-  const pad =
+  const sizeClass =
     size === "lg"
-      ? "px-3 py-1.5 text-[13px]"
+      ? "td-action-chip--lg"
       : size === "sm"
-        ? "px-1.5 py-0.5 text-[11px]"
-        : "px-2 py-1 text-[12px]";
+        ? "td-action-chip--sm"
+        : "td-action-chip--md";
 
   return (
     <span
-      className={`inline-flex items-center font-semibold tracking-wide ${pad} ${className}`}
+      className={`td-action-chip ${sizeClass} ${className}`.trim()}
       style={{
         color: style.color,
         background: style.soft,
         border: `1px ${style.dashed ? "dashed" : "solid"} ${style.color}`,
-        borderRadius: "var(--td-radius-sm)",
       }}
     >
       {action}

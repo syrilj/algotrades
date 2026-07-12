@@ -20,9 +20,6 @@ type PicksPanelProps = {
   onRun: () => void;
 };
 
-const field =
-  "h-8 rounded-[4px] border border-[var(--td-ink-600,#334155)] bg-[var(--td-ink-900,#12181F)] px-2 text-[13px] text-[var(--td-ink-100,#E2E8F0)] outline-none focus:ring-1 focus:ring-[var(--td-brand,#2F6F7A)]";
-
 export function PicksPanel({
   value,
   models,
@@ -41,12 +38,10 @@ export function PicksPanel({
   };
 
   return (
-    <div className="flex flex-col gap-3 border-b border-[var(--td-ink-600,#334155)] bg-[var(--td-ink-800,#1A222C)] p-3">
-      <div className="flex flex-wrap items-end gap-3">
+    <div className="td-toolbar">
+      <div className="td-toolbar__row">
         <div className="flex flex-col gap-1">
-          <span className="text-[12px] font-medium text-[var(--td-ink-300,#94A3B8)]">
-            Horizon
-          </span>
+          <span className="td-label">Horizon</span>
           <div
             className="inline-flex rounded-[4px] border border-[var(--td-ink-600,#334155)] p-0.5"
             role="group"
@@ -72,17 +67,16 @@ export function PicksPanel({
           </div>
         </div>
 
-        <label className="flex min-w-[160px] flex-col gap-1">
-          <span className="text-[12px] font-medium text-[var(--td-ink-300,#94A3B8)]">
-            Model
-          </span>
+        <label className="td-field td-field--model">
+          <span className="td-label">Model</span>
           <select
-            className={`${field} w-full`}
+            className="td-input w-full"
             value={value.model}
             onChange={(e) => onChange({ ...value, model: e.target.value })}
             aria-label="Model"
+            style={{ fontFamily: "var(--td-font-mono)" }}
           >
-            <option value="auto">auto</option>
+            <option value="auto">auto · pick best</option>
             {models.map((m) => (
               <option key={m} value={m}>
                 {m}
@@ -91,16 +85,15 @@ export function PicksPanel({
           </select>
         </label>
 
-        <label className="flex min-w-[180px] flex-1 flex-col gap-1">
-          <span className="text-[12px] font-medium text-[var(--td-ink-300,#94A3B8)]">
-            Symbols override
-          </span>
+        <label className="td-field td-field--grow">
+          <span className="td-label">Symbols override</span>
           <input
-            className={`${field} w-full font-[family-name:var(--td-font-mono,ui-monospace,Menlo,monospace)]`}
+            className="td-input w-full"
             value={value.symbols}
             onChange={(e) => onChange({ ...value, symbols: e.target.value })}
             placeholder="optional: NVDA, MU"
             aria-label="Symbols override"
+            style={{ fontFamily: "var(--td-font-mono)" }}
           />
         </label>
 
@@ -108,7 +101,7 @@ export function PicksPanel({
           type="button"
           onClick={onRun}
           disabled={loading}
-          className="inline-flex h-8 items-center gap-1.5 rounded-[4px] bg-[var(--td-brand,#2F6F7A)] px-3 text-[13px] font-medium text-[var(--td-ink-50,#F1F5F9)] hover:bg-[var(--td-brand-muted,#1E4A52)] disabled:opacity-40"
+          className="td-btn td-btn-primary"
         >
           {loading ? (
             <Loader2 className="size-3.5 animate-spin" strokeWidth={1.75} />
@@ -120,9 +113,7 @@ export function PicksPanel({
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <span className="text-[12px] font-medium text-[var(--td-ink-300,#94A3B8)]">
-          Sectors
-        </span>
+        <span className="td-label">Sectors</span>
         <div className="flex flex-wrap gap-1.5">
           {SECTORS.map((sector) => {
             const active = value.sectors.includes(sector);

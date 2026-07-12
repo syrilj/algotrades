@@ -1,0 +1,45 @@
+{
+  "version": "v38_research_stack",
+  "run": "runs/poc_va_dynamic_rank/runs/v38_research_stack/v38_h2h__daily__c1000000",
+  "window": {
+    "start": "2024-08-01",
+    "end": "2026-07-11",
+    "interval": "1H"
+  },
+  "portfolio": {
+    "annual_return": 1.0882577464465637,
+    "avg_holding_days": 12.2,
+    "benchmark_return": 2.930867,
+    "calmar": 8.7015,
+    "excess_return": 0.172126,
+    "final_value": 4102993.3268535435,
+    "information_ratio": -0.0504,
+    "max_consecutive_loss": 6,
+    "max_drawdown": -0.1250659386962458,
+    "profit_factor": 3.5954,
+    "profit_loss_ratio": 1.817,
+    "sharpe": 2.6542346667535486,
+    "sortino": 2.6094,
+    "total_return": 3.102993326853544,
+    "trade_count": 140,
+    "win_rate": 0.6642857142857143
+  },
+  "pass_bar": true,
+  "gates": {
+    "profit_factor_min": true,
+    "max_drawdown_max_abs": true,
+    "sharpe_min": true,
+    "min_trades": true
+  },
+  "h2h_rank": 1,
+  "h2h": {
+    "v38_research_stack": {"ret": 3.103, "sharpe": 2.654, "dd": -0.125, "n": 140, "wr": 0.664},
+    "v37_feedback_meta": {"ret": 2.021, "sharpe": 2.517, "dd": -0.135, "n": 131, "wr": 0.679},
+    "v36_genome_train": {"ret": 1.743, "sharpe": 2.315, "dd": -0.114, "n": 92, "wr": 0.652},
+    "v23_devin_overlay": {"ret": 1.300, "sharpe": 2.212, "dd": -0.091, "n": 92, "wr": 0.652},
+    "v20b_macro_light": {"ret": 1.135, "sharpe": 2.234, "dd": -0.100, "n": 101, "wr": 0.644}
+  },
+  "status": "pass",
+  "recipe": "v37 continuous meta + v36 genome streak/risk + v17b soft VPA + high-beta QQQ soft cut",
+  "caveat": "Full-sample meta booster still inherited. Better return/Sharpe/DD than v37; first positive excess_return vs benchmark on this window. Paper before multi-year claim."
+}

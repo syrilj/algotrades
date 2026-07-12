@@ -14,9 +14,12 @@ type WatchControlsProps = {
   models: string[];
   running: boolean;
   loading?: boolean;
+  scanning?: boolean;
   onChange: (next: WatchControlsValue) => void;
   onStart: () => void;
   onStop: () => void;
+  /** Run full-market open scanner → fills watchlist with ranked plays */
+  onMarketScan?: () => void;
 };
 
 const INTERVALS = ["1m", "5m", "15m", "30m", "1h", "4h", "1d"] as const;
@@ -26,39 +29,35 @@ export function WatchControls({
   models,
   running,
   loading = false,
+  scanning = false,
   onChange,
   onStart,
   onStop,
+  onMarketScan,
 }: WatchControlsProps) {
-  const field =
-    "h-8 rounded-[4px] border border-[var(--td-ink-600,#334155)] bg-[var(--td-ink-900,#12181F)] px-2 text-[13px] text-[var(--td-ink-100,#E2E8F0)] outline-none focus:ring-1 focus:ring-[var(--td-brand,#2F6F7A)]";
-
   return (
-    <div className="flex flex-col gap-3 border-b border-[var(--td-ink-600,#334155)] bg-[var(--td-ink-800,#1A222C)] p-3">
-      <div className="flex flex-wrap items-end gap-3">
-        <label className="flex min-w-[220px] flex-1 flex-col gap-1">
-          <span className="text-[12px] font-medium text-[var(--td-ink-300,#94A3B8)]">
-            Watchlist
-          </span>
+    <div className="td-toolbar">
+      <div className="td-toolbar__row">
+        <label className="td-field td-field--grow">
+          <span className="td-label">Watchlist</span>
           <input
-            className={`${field} w-full font-[family-name:var(--td-font-mono,ui-monospace,Menlo,monospace)]`}
+            className="td-input w-full"
             value={value.symbols}
             onChange={(e) => onChange({ ...value, symbols: e.target.value })}
-            placeholder="NVDA, MU, ANET"
-            disabled={running}
+            placeholder="NVDA, MU, APLD — or Market scan"
+            disabled={running || scanning}
             aria-label="Symbols (comma-separated)"
+            style={{ fontFamily: "var(--td-font-mono)" }}
           />
         </label>
 
-        <label className="flex w-[88px] flex-col gap-1">
-          <span className="text-[12px] font-medium text-[var(--td-ink-300,#94A3B8)]">
-            Every (s)
-          </span>
+        <label className="td-field" style={{ width: "5.5rem" }}>
+          <span className="td-label">Every (s)</span>
           <input
             type="number"
             min={15}
             step={5}
-            className={`${field} w-full tabular-nums`}
+            className="td-input w-full tabular"
             value={value.every}
             onChange={(e) =>
               onChange({
@@ -68,15 +67,14 @@ export function WatchControls({
             }
             disabled={running}
             aria-label="Poll every N seconds (min 15)"
+            style={{ fontFamily: "var(--td-font-mono)" }}
           />
         </label>
 
-        <label className="flex w-[100px] flex-col gap-1">
-          <span className="text-[12px] font-medium text-[var(--td-ink-300,#94A3B8)]">
-            Interval
-          </span>
+        <label className="td-field" style={{ width: "6.5rem" }}>
+          <span className="td-label">Interval</span>
           <select
-            className={`${field} w-full`}
+            className="td-input w-full"
             value={value.interval}
             onChange={(e) => onChange({ ...value, interval: e.target.value })}
             disabled={running}
@@ -90,18 +88,17 @@ export function WatchControls({
           </select>
         </label>
 
-        <label className="flex min-w-[160px] flex-col gap-1">
-          <span className="text-[12px] font-medium text-[var(--td-ink-300,#94A3B8)]">
-            Model
-          </span>
+        <label className="td-field td-field--model">
+          <span className="td-label">Model</span>
           <select
-            className={`${field} w-full`}
+            className="td-input w-full"
             value={value.model}
             onChange={(e) => onChange({ ...value, model: e.target.value })}
             disabled={running}
             aria-label="Model"
+            style={{ fontFamily: "var(--td-font-mono)" }}
           >
-            <option value="auto">auto</option>
+            <option value="auto">auto · pick best</option>
             {models.map((m) => (
               <option key={m} value={m}>
                 {m}
@@ -110,27 +107,38 @@ export function WatchControls({
           </select>
         </label>
 
-        {running ? (
+        {onMarketScan ? (
           <button
             type="button"
-            onClick={onStop}
-            className="inline-flex h-8 items-center gap-1.5 rounded-[4px] border border-[var(--td-ink-600,#334155)] bg-[var(--td-ink-700,#243040)] px-3 text-[13px] font-medium text-[var(--td-ink-100,#E2E8F0)] hover:bg-[var(--td-ink-600,#334155)]"
+            onClick={onMarketScan}
+            className="td-btn td-btn-ghost"
+            disabled={running || scanning}
+            title="Scan hot sectors + liquid names → rank plays with WINNER model"
           >
-            <Square className="size-3.5" strokeWidth={1.75} />
+            {scanning ? (
+              <Loader2 className="size-3.5 animate-spin" strokeWidth={1.75} />
+            ) : null}
+            Market scan
+          </button>
+        ) : null}
+
+        {running ? (
+          <button type="button" onClick={onStop} className="td-btn td-btn-ghost">
+            {loading ? (
+              <Loader2 className="size-3.5 animate-spin" strokeWidth={1.75} />
+            ) : (
+              <Square className="size-3.5" strokeWidth={1.75} />
+            )}
             Stop
           </button>
         ) : (
           <button
             type="button"
             onClick={onStart}
-            disabled={loading || !value.symbols.trim()}
-            className="inline-flex h-8 items-center gap-1.5 rounded-[4px] bg-[var(--td-brand,#2F6F7A)] px-3 text-[13px] font-medium text-[var(--td-ink-50,#F1F5F9)] hover:bg-[var(--td-brand-muted,#1E4A52)] disabled:opacity-40"
+            className="td-btn td-btn-primary"
+            disabled={scanning}
           >
-            {loading ? (
-              <Loader2 className="size-3.5 animate-spin" strokeWidth={1.75} />
-            ) : (
-              <Play className="size-3.5" strokeWidth={1.75} />
-            )}
+            <Play className="size-3.5" strokeWidth={1.75} />
             Start
           </button>
         )}

@@ -108,17 +108,34 @@ class LiveSignalEngine:
         macd_hist = self._macd_hist(df)
         above_vwap_data = self._swing_vwap(df)
         
-        # Signal logic - conservative but catches big moves
+        above_vwap = bool(df['Close'].iloc[-1] > above_vwap_data['vwap'])
+        swing_up = bool(above_vwap_data['uptrend'])
+        macd_pos = bool(macd_hist.iloc[-1] > 0)
+        bullish_bar = bool(df['Close'].iloc[-1] > df['Open'].iloc[-1])
+        # Research-backed: vol expand is strongest meta (VOLUME_Z_META); VWAP/MACD are side aids
         go_long = (
             vol_z >= self.params['vol_z_threshold'] and
-            macd_hist.iloc[-1] > 0 and
-            df['Close'].iloc[-1] > df['Open'].iloc[-1]  # bullish intraday
+            macd_pos and
+            (above_vwap or swing_up) and
+            bullish_bar
         )
-        
-        # Confidence based on vol_z strength
-        confidence = min(1.0, max(0.0, vol_z / 4.0))
-        
-        # Position sizing multiplier for options leverage
+        # Softer candidate for equity hedge (desk may still size small)
+        soft_long = macd_pos and (above_vwap or swing_up) and vol_z >= 0.5
+
+        # Confidence: blend vol_z + structure (not vanity WR)
+        conf = 0.0
+        conf += min(0.45, max(0.0, vol_z / 4.0) * 0.45 / 0.5)  # vol_z primary
+        if macd_pos:
+            conf += 0.20
+        if above_vwap:
+            conf += 0.15
+        if swing_up:
+            conf += 0.10
+        if bullish_bar:
+            conf += 0.10
+        confidence = float(min(1.0, max(0.0, conf)))
+
+        # Position sizing multiplier for options leverage (live_plan maps via risk_manager)
         signal_strength = 0.0
         if go_long:
             if vol_z >= 2.5:
@@ -127,19 +144,22 @@ class LiveSignalEngine:
                 signal_strength = 5.0   # High conviction
             elif vol_z >= 1.5:
                 signal_strength = 3.0   # Standard
-        
+        elif soft_long:
+            signal_strength = 1.0
+
         return {
             'symbol': symbol,
             'go_long': go_long,
+            'soft_long': soft_long,
             'confidence': round(confidence, 2),
             'vol_z': round(vol_z, 2),
             'atr_pct': round(atr_pct, 4),
-            'above_vwap': bool(df['Close'].iloc[-1] > above_vwap_data['vwap']),
-            'swing_uptrend': above_vwap_data['uptrend'],
-            'macd_positive': bool(macd_hist.iloc[-1] > 0),
+            'above_vwap': above_vwap,
+            'swing_uptrend': swing_up,
+            'macd_positive': macd_pos,
             'price': round(float(df['Close'].iloc[-1]), 2),
             'signal_strength': signal_strength,
-            'timestamp': df.index[-1].isoformat()
+            'timestamp': df.index[-1].isoformat(),
         }
 
 

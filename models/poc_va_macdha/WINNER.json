@@ -1,48 +1,42 @@
 {
-  "winner": "v23_devin_overlay",
-  "selection_rule": "PASS_BAR + best portfolio Sharpe/PF/DD among engines on 2024-08..2026-07 window",
-  "updated_at": "2026-07-11T23:14:00Z",
-  "caveat": "v20b base + volume-z/sector/QQQ conviction overlay. Slightly lower Sharpe than v20b (-0.02) but higher total return (+16.5pp), lower max DD (-9.06% vs -10.0%), and higher profit factor (3.54 vs 3.04). The overlay is research-backed and small to avoid overfitting. Prefer for higher risk-adjusted return.",
+  "winner": "v39b_live_adapt",
+  "selection_rule": "PASS_BAR + beat prior WINNER on Sharpe and return on same 1H WINNER bag; live-adapt VPA stack",
+  "updated_at": "2026-07-12T21:50:00Z",
+  "caveat": "v39b: lighter Coulling score + fast lookbacks + vpa_mom/vol_regime + live streak API. +365% ret Sharpe 2.77 DD -13.2% n=144 beats v38 (+310%/2.65/-12.5%). Slightly higher DD. Meta booster still full-sample lineage. Prefer for live desk; backup low-DD: v23 / quality sleeve v39. Run holdout stress before capital raise.",
   "portfolio": {
-    "annual_return": 0.5440504031058497,
-    "avg_holding_days": 13.2,
-    "benchmark_return": 2.930867,
-    "calmar": 6.0044,
-    "excess_return": -1.630972,
-    "final_value": 2299895.5223366483,
-    "information_ratio": -0.8443,
-    "max_consecutive_loss": 3,
-    "max_drawdown": -0.09060901763421025,
-    "profit_factor": 3.5438,
-    "profit_loss_ratio": 1.89,
-    "sharpe": 2.212014757839403,
-    "sortino": 1.929,
-    "total_return": 1.2998955223366484,
-    "trade_count": 92,
-    "win_rate": 0.6521739130434783
+    "total_return": 3.6495093465195207,
+    "max_drawdown": -0.13155361001438798,
+    "sharpe": 2.7716247338744515,
+    "profit_factor": 3.6478,
+    "trade_count": 144,
+    "win_rate": 0.6805555555555556,
+    "final_value": 4649509.3465195205,
+    "avg_holding_days": 11.5
   },
-  "previous_winner": "v20b_macro_light",
+  "previous_winner": "v38_research_stack",
+  "also_supersedes": ["v39_vpa_score", "v37_feedback_meta"],
   "pass_bar": true,
   "compare": {
-    "v20b_macro_light": {
-      "total_return": 1.1351614630623508,
-      "max_drawdown": -0.10048826980005673,
-      "sharpe": 2.2344823691454345,
-      "profit_factor": 3.04,
-      "trade_count": 101
+    "v39b_live_adapt": {
+      "total_return": 3.65,
+      "max_drawdown": -0.132,
+      "sharpe": 2.772,
+      "trade_count": 144,
+      "win_rate": 0.681
     },
-    "v15_meta_xgb": {
-      "total_return": 1.305,
-      "max_drawdown": -0.1324,
-      "sharpe": 2.128,
-      "profit_factor": 2.6768,
-      "trade_count": 130
+    "v38_research_stack": {
+      "total_return": 3.103,
+      "max_drawdown": -0.125,
+      "sharpe": 2.654,
+      "trade_count": 140,
+      "win_rate": 0.664
     },
-    "v16_meta_risk": {
-      "total_return": 1.165,
-      "max_drawdown": -0.108,
-      "sharpe": 2.062,
-      "profit_factor": 2.442
+    "v39_vpa_score": {
+      "total_return": 2.238,
+      "max_drawdown": -0.103,
+      "sharpe": 2.526,
+      "trade_count": 142,
+      "win_rate": 0.676
     }
   }
 }

@@ -2,6 +2,45 @@
 
 Live assistant for **poc_va_macdha** models. Enter a ticker → entry/stop/size/hit-prob. Rank models overall or **per stock**. Switch engines with `--model`.
 
+## Evolution pipeline (all models)
+
+Automated backtest farm + feedback loop with honest claim levels (see `models/_shared/PASS_BAR.json`).
+
+```bash
+# Phase 0+1: rank equity engines (screen + deep + multi-lock)
+.venv/bin/python tools/evolve_pipeline.py rank --track equity --quick
+
+# Full equity rank (slower)
+.venv/bin/python tools/evolve_pipeline.py rank --track equity --cash 10000
+
+# Phase 2: multi-gen feedback + constrained mutations
+.venv/bin/python tools/evolve_pipeline.py loop --track equity --gens 3
+
+# Phase 3: options synthetic research board (never auto-promotes)
+.venv/bin/python tools/evolve_pipeline.py rank --track options --cash 1000 --quick
+
+# Phase 4: meta MLP recipe (secondary size/skip only)
+.venv/bin/python tools/evolve_pipeline.py meta
+
+# Everything: equity rank+loop, options research, meta
+.venv/bin/python tools/evolve_pipeline.py all --quick
+.venv/bin/python tools/evolve_pipeline.py all --gens 2 --cash 10000
+
+# Self-feedback train loop (like model training — persistent BRAIN.json)
+.venv/bin/python tools/evolve_pipeline.py train --epochs 20 --base v23_devin_overlay
+.venv/bin/python tools/evolve_pipeline.py train --track options --base v35_softstruct_bag8 --epochs 15 --cash 1000
+.venv/bin/python tools/evolve_pipeline.py train --continuous --max-epochs 100
+.venv/bin/python tools/evolve_pipeline.py brain
+
+# Auditor model (overfit / look-ahead / vanity / cheating)
+.venv/bin/python tools/evolve_pipeline.py audit
+.venv/bin/python tools/evolve_pipeline.py audit --models v23_devin_overlay,v15_meta_xgb
+```
+
+Outputs under `runs/evolve_*` + checkpoint `runs/evolve_brain/BRAIN.json`. Desk tab: **/evolve**.
+
+Package: `tools/evolve/` (`genome`, `train_loop`, `farm`, `mutations`, …).
+
 ## Findings / improve loop (shared)
 
 Follow `models/_shared/PLAYBOOK.md`. After every research or backtest claim:

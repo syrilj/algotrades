@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import type { ApiEnvelope, EngineModelInfo, ModelsCatalog } from "@/lib/types";
 import { ModelBadges } from "@/components/leaderboard/ModelBadges";
+import { PageHeader } from "@/components/shell/PageHeader";
+import { modelHref } from "@/lib/routes";
 
 async function fetchCatalog(): Promise<ModelsCatalog> {
   const res = await fetch("/api/models", { cache: "no-store" });
@@ -61,126 +63,90 @@ export default function ModelsCatalogPage() {
   }, [refresh]);
 
   return (
-    <main
-      className="min-h-screen px-4 py-6 sm:px-6"
-      style={{
-        background: "var(--td-ink-950, #0B1014)",
-        color: "var(--td-ink-100, #E2E8F0)",
-        fontFamily: "var(--td-font-body, IBM Plex Sans, ui-sans-serif, system-ui, sans-serif)",
-      }}
-    >
-      <header className="mb-5 flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-[20px] font-medium leading-tight">Models</h1>
-          <p
-            className="text-[13px] mt-1"
-            style={{ color: "var(--td-ink-400, #64748B)" }}
-          >
+    <div className="td-page">
+      <PageHeader
+        title="Models"
+        description={
+          <>
             All discovered versions (engines + non-engines). Refresh after adding a new{" "}
             <code className="text-[12px]">v*</code> folder.
-          </p>
-          {catalog ? (
-            <p
-              className="text-[12px] mt-1 tabular-nums"
-              style={{
-                color: "var(--td-ink-400, #64748B)",
-                fontFamily: "var(--td-font-mono, ui-monospace, Menlo, monospace)",
-              }}
-            >
+          </>
+        }
+        meta={
+          catalog ? (
+            <span className="tabular" style={{ fontFamily: "var(--td-font-mono)" }}>
               {models.length} models · default {catalog.default_model}
               {catalog.winner ? ` · winner ${catalog.winner}` : ""}
               {catalog.updated_at ? ` · updated ${catalog.updated_at}` : ""}
-            </p>
-          ) : null}
-        </div>
-        <div className="flex items-center gap-2">
-          <div
-            className="inline-flex rounded-sm overflow-hidden"
-            style={{ border: "1px solid var(--td-ink-600, #334155)" }}
-            role="group"
-            aria-label="View mode"
-          >
-            {(["grid", "list"] as const).map((v) => (
-              <button
-                key={v}
-                type="button"
-                onClick={() => setView(v)}
-                className="px-3 py-1.5 text-[13px] capitalize"
-                style={{
-                  background:
-                    view === v
-                      ? "var(--td-brand, #2F6F7A)"
-                      : "var(--td-ink-800, #1A222C)",
-                  color:
-                    view === v
-                      ? "var(--td-ink-100, #E2E8F0)"
-                      : "var(--td-ink-300, #94A3B8)",
-                }}
-                aria-pressed={view === v}
-              >
-                {v}
-              </button>
-            ))}
+            </span>
+          ) : null
+        }
+        actions={
+          <div className="flex items-center gap-2">
+            <div
+              className="inline-flex overflow-hidden rounded-[var(--td-radius-sm)]"
+              style={{ border: "1px solid var(--td-ink-600)" }}
+              role="group"
+              aria-label="View mode"
+            >
+              {(["grid", "list"] as const).map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => setView(v)}
+                  className="px-3 py-1.5 text-[13px] capitalize"
+                  style={{
+                    background: view === v ? "var(--td-brand)" : "var(--td-ink-800)",
+                    color: view === v ? "var(--td-ink-50)" : "var(--td-ink-300)",
+                  }}
+                  aria-pressed={view === v}
+                >
+                  {v}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => void refresh()}
+              disabled={loading}
+              className="td-btn td-btn-ghost"
+            >
+              {loading ? "Refreshing…" : "Refresh"}
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => void refresh()}
-            disabled={loading}
-            className="h-8 px-3 text-[13px] rounded-sm disabled:opacity-50"
-            style={{
-              background: "var(--td-ink-800, #1A222C)",
-              border: "1px solid var(--td-ink-600, #334155)",
-              color: "var(--td-ink-200, #CBD5E1)",
-            }}
-          >
-            {loading ? "Refreshing…" : "Refresh"}
-          </button>
-        </div>
-      </header>
+        }
+      />
 
       {error ? (
-        <p
-          className="mb-4 text-[13px]"
-          style={{ color: "var(--td-action-avoid, #A34848)" }}
-          role="alert"
-        >
+        <p className="td-alert td-alert--error" role="alert">
           {error}
         </p>
       ) : null}
 
       {loading && !models.length ? (
-        <p className="text-[13px]" style={{ color: "var(--td-ink-400, #64748B)" }}>
-          Discovering models from API…
-        </p>
+        <p className="td-muted">Discovering models from API…</p>
       ) : null}
 
       {!loading && !models.length && !error ? (
-        <p className="text-[13px]" style={{ color: "var(--td-ink-400, #64748B)" }}>
-          No models discovered yet.
-        </p>
+        <p className="td-muted">No models discovered yet.</p>
       ) : null}
 
       {view === "grid" ? (
-        <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 list-none p-0 m-0">
+        <ul className="m-0 grid list-none grid-cols-1 gap-3 p-0 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {models.map((m) => (
             <li key={m.id}>
               <Link
-                href={`/models/${encodeURIComponent(m.id)}`}
-                className="block p-4 rounded-sm h-full transition-colors"
+                href={modelHref(m.id)}
+                className="td-panel block h-full p-4 no-underline transition-colors hover:border-[var(--td-brand)]"
                 style={{
-                  background: "var(--td-ink-900, #12181F)",
-                  border: "1px solid var(--td-ink-700, #243040)",
                   boxShadow: m.is_winner
-                    ? "inset 2px 0 0 var(--td-brand, #2F6F7A)"
+                    ? "inset 2px 0 0 var(--td-brand)"
                     : undefined,
                 }}
               >
                 <p
-                  className="text-[14px] font-medium mb-2"
-                  style={{
-                    fontFamily:
-                      "var(--td-font-mono, ui-monospace, Menlo, monospace)",
-                  }}
+                  className="mb-2 text-[14px] font-medium"
+                  style={{ fontFamily: "var(--td-font-mono)" }}
                 >
                   {m.id}
                 </p>
@@ -194,31 +160,26 @@ export default function ModelsCatalogPage() {
           ))}
         </ul>
       ) : (
-        <ul
-          className="list-none p-0 m-0 rounded-sm overflow-hidden"
-          style={{ border: "1px solid var(--td-ink-700, #243040)" }}
-        >
+        <ul className="td-panel m-0 list-none overflow-hidden p-0">
           {models.map((m) => (
             <li
               key={m.id}
               style={{
-                borderBottom: "1px solid var(--td-ink-800, #1A222C)",
-                background: "var(--td-ink-900, #12181F)",
+                borderBottom: "1px solid var(--td-ink-800)",
                 boxShadow: m.is_winner
-                  ? "inset 2px 0 0 var(--td-brand, #2F6F7A)"
+                  ? "inset 2px 0 0 var(--td-brand)"
                   : undefined,
               }}
             >
               <Link
-                href={`/models/${encodeURIComponent(m.id)}`}
-                className="flex flex-wrap items-center justify-between gap-2 px-4 py-3"
+                href={modelHref(m.id)}
+                className="td-row-link flex flex-wrap items-center justify-between gap-2 px-4 py-3 no-underline"
               >
                 <span
                   className="text-[13px]"
                   style={{
-                    fontFamily:
-                      "var(--td-font-mono, ui-monospace, Menlo, monospace)",
-                    color: "var(--td-ink-100, #E2E8F0)",
+                    fontFamily: "var(--td-font-mono)",
+                    color: "var(--td-ink-100)",
                   }}
                 >
                   {m.id}
@@ -233,6 +194,6 @@ export default function ModelsCatalogPage() {
           ))}
         </ul>
       )}
-    </main>
+    </div>
   );
 }

@@ -48,14 +48,14 @@ function Badge({
       border: "1px solid var(--td-ink-700, #243040)",
     },
     fail: {
-      background: "#A3484822",
-      color: "var(--td-badge-status-fail, var(--td-action-avoid, #A34848))",
+      background: "color-mix(in oklch, var(--td-action-avoid) 14%, transparent)",
+      color: "var(--td-badge-status-fail)",
       border: "1px solid transparent",
     },
     frozen: {
       background: "transparent",
-      color: "var(--td-badge-status-frozen, var(--td-ink-400, #64748B))",
-      border: "1px solid var(--td-ink-600, #334155)",
+      color: "var(--td-badge-status-frozen)",
+      border: "1px solid var(--td-ink-600)",
     },
   };
 

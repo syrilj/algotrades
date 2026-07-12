@@ -10,9 +10,12 @@ Usage:
   python3 tools/trade_desk.py rotate
   python3 tools/trade_desk.py rotate --top 3
   python3 tools/trade_desk.py picks --horizon day --model v14_risk_kelly
+  python3 tools/trade_desk.py risk APLD --account 1000 --conf 0.85 --vol-z 1.8
   python3 tools/trade_desk.py watch NVDA --every 30
   python3 tools/trade_desk.py watch NVDA,MU,ANET --every 45
   python3 tools/trade_desk.py watch rotate --every 90
+  python3 tools/trade_desk.py openscan
+  python3 tools/trade_desk.py openscan --top 12 --account 10000
 """
 from __future__ import annotations
 
@@ -33,12 +36,20 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 from model_registry import (  # noqa: E402
     DEFAULT_MODEL,
+    engine_kind,
     engine_path,
+    equity_default_model,
     hist_win_rate,
     list_engine_models,
     rank_models,
     rank_models_for_symbol,
     recommend_model,
+)
+from risk_manager import (  # noqa: E402
+    PortfolioState,
+    SetupSnapshot,
+    decision_to_dict,
+    plan_entry,
 )
 
 _ENGINE_CACHE: dict[str, Any] = {}
@@ -361,7 +372,7 @@ _PRIOR_WR = {
 
 
 def _resolve_model(model_arg: str, symbol: str | None = None) -> tuple[str, dict[str, Any]]:
-    arg = (model_arg or DEFAULT_MODEL).strip()
+    arg = (model_arg or equity_default_model()).strip()
     if arg in ("auto", "best"):
         rec = recommend_model(symbol)
         return rec["model"], rec
@@ -383,6 +394,79 @@ def _load_engine(model: str):
     spec.loader.exec_module(mod)
     _ENGINE_CACHE[model] = mod
     return mod
+
+
+def _resample_ohlcv(df: pd.DataFrame, rule: str) -> pd.DataFrame:
+    """Desk-local OHLCV resample — used when an engine module lacks the helper."""
+    if not rule:
+        return df
+    cols = ["open", "high", "low", "close", "volume"]
+    frame = df[[c for c in cols if c in df.columns]].copy()
+    if "volume" not in frame.columns:
+        frame["volume"] = 0.0
+    return (
+        frame.resample(rule, label="right", closed="right")
+        .agg({"open": "first", "high": "max", "low": "min", "close": "last", "volume": "sum"})
+        .dropna(subset=["close"])
+    )
+
+
+def _prior_session_profile_fallback(
+    df: pd.DataFrame,
+    lookback: int,
+    rows: int,
+    value_area_pct: float,
+) -> dict[str, pd.Series]:
+    """Minimal POC/VAH/VAL when engine has no _prior_session_profile."""
+    idx = df.index
+    nan = pd.Series(np.nan, index=idx)
+    if df.empty or "close" not in df.columns:
+        return {"poc": nan, "vah": nan, "val": nan}
+    close = df["close"]
+    lb = max(int(lookback), 5)
+    poc = close.rolling(lb, min_periods=3).median()
+    band = close.rolling(lb, min_periods=3).std().fillna(0.0) * 0.5
+    _ = rows, value_area_pct
+    return {"poc": poc, "vah": poc + band, "val": poc - band}
+
+
+def _desk_mod_for_state(mod: Any, model_name: str) -> tuple[Any, str | None]:
+    """Resolve module with equity desk helpers.
+
+    Options wrappers (e.g. v35_softstruct_bag8) lack _resample_ohlcv; unwrap to
+    their equity child so Analyze/Live still work when that model is selected.
+    """
+    if hasattr(mod, "_resample_ohlcv") and hasattr(mod, "_prior_session_profile"):
+        return mod, None
+
+    path_fn = getattr(mod, "_equity_engine_path", None)
+    if callable(path_fn):
+        try:
+            eq_path = Path(path_fn())
+            if eq_path.exists():
+                key = f"_equity_from_{model_name}"
+                if key in _ENGINE_CACHE:
+                    return _ENGINE_CACHE[key], eq_path.parent.name
+                spec = importlib.util.spec_from_file_location(f"poc_va_eq_{model_name}", eq_path)
+                if spec is not None and spec.loader is not None:
+                    eq_mod = importlib.util.module_from_spec(spec)
+                    spec.loader.exec_module(eq_mod)
+                    _ENGINE_CACHE[key] = eq_mod
+                    return eq_mod, eq_path.parent.name
+        except Exception:  # noqa: BLE001
+            pass
+
+    try:
+        eng = mod.SignalEngine()
+        eq = getattr(eng, "equity_engine", None)
+        if eq is not None:
+            eq_mod = sys.modules.get(type(eq).__module__)
+            if eq_mod is not None and hasattr(eq_mod, "_resample_ohlcv"):
+                return eq_mod, getattr(eq_mod, "__name__", None)
+    except Exception:  # noqa: BLE001
+        pass
+
+    return mod, None
 
 
 def _fallback_kelly(conf: float, atr_pct: float, med_atr_pct: float, kelly_fraction: float = 0.5) -> float:
@@ -467,7 +551,8 @@ def _market_session() -> dict[str, Any]:
 
 
 def _compute_state(mod, code: str, df: pd.DataFrame, model_name: str, live: bool = False) -> dict[str, Any]:
-    eng = mod.SignalEngine()
+    desk_mod, underlying = _desk_mod_for_state(mod, model_name)
+    eng = desk_mod.SignalEngine()
     # routers expose _cfg(code); plain engines use defaults via __dict__/getattr
     if hasattr(eng, "_cfg"):
         cfg = eng._cfg(code)
@@ -488,7 +573,8 @@ def _compute_state(mod, code: str, df: pd.DataFrame, model_name: str, live: bool
 
     # Live watch: keep native bar size (5m/1m) so open tape actually moves
     signal_tf = "" if live else (cfg.get("signal_tf", "2h") or "")
-    frame = mod._resample_ohlcv(df, signal_tf) if signal_tf else df
+    resample_fn = getattr(desk_mod, "_resample_ohlcv", _resample_ohlcv)
+    frame = resample_fn(df, signal_tf) if signal_tf else df
     if frame.empty:
         frame = df
 
@@ -508,7 +594,11 @@ def _compute_state(mod, code: str, df: pd.DataFrame, model_name: str, live: bool
     kelly_fraction = float(cfg.get("kelly_fraction", 0.5))
     min_confidence = float(cfg.get("min_confidence", 0.55))
 
-    levels = mod._prior_session_profile(frame, profile_lookback, profile_rows, value_area_pct)
+    profile_fn = getattr(desk_mod, "_prior_session_profile", None)
+    if callable(profile_fn):
+        levels = profile_fn(frame, profile_lookback, profile_rows, value_area_pct)
+    else:
+        levels = _prior_session_profile_fallback(frame, profile_lookback, profile_rows, value_area_pct)
     close = frame["close"]
     high = frame["high"]
     low = frame["low"]
@@ -516,26 +606,31 @@ def _compute_state(mod, code: str, df: pd.DataFrame, model_name: str, live: bool
     poc_ok = (close >= poc) & poc.notna()
     in_va = (close >= val) & (close <= vah) & val.notna()
     # htf helper signatures differ slightly across versions
-    try:
-        htf = mod._htf_ha_green(frame, macd_htf, macd_fast, macd_slow, macd_signal)
-    except TypeError:
-        htf = mod._htf_ha_green(frame, macd_htf, {"macd_fast": macd_fast, "macd_slow": macd_slow, "macd_signal": macd_signal})
-    if hasattr(mod, "dynamic_swing_anchored_vwap"):
-        swing = mod.dynamic_swing_anchored_vwap(frame, swing_period)
+    if hasattr(desk_mod, "_htf_ha_green"):
+        try:
+            htf = desk_mod._htf_ha_green(frame, macd_htf, macd_fast, macd_slow, macd_signal)
+        except TypeError:
+            htf = desk_mod._htf_ha_green(
+                frame, macd_htf, {"macd_fast": macd_fast, "macd_slow": macd_slow, "macd_signal": macd_signal}
+            )
+    else:
+        htf = pd.Series(True, index=frame.index)
+    if hasattr(desk_mod, "dynamic_swing_anchored_vwap"):
+        swing = desk_mod.dynamic_swing_anchored_vwap(frame, swing_period)
     else:
         swing = pd.DataFrame({"vwap": close, "uptrend": True}, index=frame.index)
     vwap = swing["vwap"].shift(1)
     uptrend = swing["uptrend"].shift(1).fillna(False).astype(bool)
     above_vwap = (close >= vwap).fillna(False)
-    if hasattr(mod, "volume_price_state"):
-        vp = mod.volume_price_state(frame, vol_look, vol_sma)
+    if hasattr(desk_mod, "volume_price_state"):
+        vp = desk_mod.volume_price_state(frame, vol_look, vol_sma)
     else:
         vp = pd.DataFrame({
             "confirm_up": True, "healthy_pull": False, "red_flag_up": False,
             "dump": False, "vol_expand": True,
         }, index=frame.index)
-    if hasattr(mod, "squeeze_momentum"):
-        sqz = mod.squeeze_momentum(frame)
+    if hasattr(desk_mod, "squeeze_momentum"):
+        sqz = desk_mod.squeeze_momentum(frame)
     else:
         sqz = pd.DataFrame({
             "mom_pos": True, "mom_pos_inc": False, "mom_neg": False,
@@ -591,7 +686,7 @@ def _compute_state(mod, code: str, df: pd.DataFrame, model_name: str, live: bool
     a = float(atr.iloc[i]) if np.isfinite(atr.iloc[i]) else px * 0.01
     c = float(conf.iloc[i])
     hard = bool(long_hard.iloc[i])
-    kelly_fn = getattr(mod, "_kelly_size", _fallback_kelly)
+    kelly_fn = getattr(desk_mod, "_kelly_size", _fallback_kelly)
     sleeve = float(kelly_fn(c, float(atr_pct.iloc[i]), med_atr_pct, kelly_fraction))
     setup_ok = hard and c >= min_confidence and sleeve > 0
 
@@ -730,6 +825,8 @@ def _compute_state(mod, code: str, df: pd.DataFrame, model_name: str, live: bool
 
     return {
         "model": model_name,
+        "desk_engine": underlying or model_name,
+        "engine_kind": engine_kind(model_name),
         "symbol": _to_yf(code),
         "code": code,
         "asof": str(frame.index[i]),
@@ -789,6 +886,20 @@ def _position_math(state: dict, account: float, risk_pct: float) -> dict[str, An
     shares_by_risk = int(risk_budget // rps) if rps > 0 else 0
     # sleeve caps notional
     sleeve = float(state["sleeve_fraction"])
+    # Live adapt: paper/IB closed trades scale next size (persistent runs/live_adapt)
+    adapt_mult = 1.0
+    try:
+        import live_adapt as _la
+
+        adapt_mult = float(
+            _la.size_mult_for(
+                str(state.get("model") or state.get("desk_engine") or ""),
+                str(state.get("symbol") or ""),
+            )
+        )
+        sleeve = max(0.15, min(1.5, sleeve * adapt_mult))
+    except Exception:
+        adapt_mult = 1.0
     max_notional = account * sleeve if sleeve > 0 else 0.0
     px = float(state["price"])
     shares_by_sleeve = int(max_notional // px) if px > 0 else 0
@@ -814,6 +925,8 @@ def _position_math(state: dict, account: float, risk_pct: float) -> dict[str, An
         "reward_to_arm": round(reward, 4),
         "rr_to_arm": round(rr, 2),
         "forced_preview": forced,
+        "live_adapt_mult": round(adapt_mult, 4),
+        "sleeve_after_adapt": round(sleeve, 4),
     }
 
 
@@ -822,12 +935,12 @@ def analyze(
     account: float,
     risk_pct: float,
     period: str = "60d",
-    model: str = DEFAULT_MODEL,
+    model: str | None = None,
     interval: str = "1h",
     live: bool = False,
     ranks: bool = True,
 ) -> dict[str, Any]:
-    model_name, selection = _resolve_model(model, symbol)
+    model_name, selection = _resolve_model(model or equity_default_model(), symbol)
     mod = _load_engine(model_name)
     code = _to_code(symbol)
     if live:
@@ -1422,16 +1535,23 @@ def _print_picks(rows: list[dict], horizon: str) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description="POC/VA trade desk (multi-model)")
-    p.add_argument("command", nargs="?", help="Symbol, 'picks', 'rotate', 'rank', or 'watch'")
+    p.add_argument(
+        "command",
+        nargs="?",
+        help="Symbol, 'picks', 'rotate', 'rank', 'risk', 'watch', or 'openscan'",
+    )
     p.add_argument(
         "rest",
         nargs="*",
-        help="For watch: tickers, comma-list, or 'rotate'",
+        help="For watch: tickers, comma-list, or 'rotate'. For risk: symbol.",
     )
     p.add_argument("--account", type=float, default=100_000, help="Account equity (default 100000)")
     p.add_argument("--risk-pct", type=float, default=0.01, help="Max risk fraction per trade (default 1%%)")
     p.add_argument("--horizon", choices=["day", "week"], default="day", help="For picks/rotate: day or week")
-    p.add_argument("--top", type=int, default=5, help="For rotate/watch rotate: how many hot sectors")
+    p.add_argument("--top", type=int, default=5, help="For rotate/openscan: top N sectors or plays")
+    p.add_argument("--deep", type=int, default=24, help="For openscan: VPA candidates to deep-analyze")
+    p.add_argument("--fast", action="store_true", help="For openscan: VPA screen only")
+    p.add_argument("--full", action="store_true", help="For openscan: full DEFAULT_WATCH universe")
     p.add_argument("--symbols", type=str, default="", help="Comma watchlist for picks/watch")
     p.add_argument(
         "--sectors",
@@ -1442,8 +1562,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument(
         "--model",
         type=str,
-        default=DEFAULT_MODEL,
-        help=f"Model engine ({'/'.join(list_engine_models())}) or 'auto'",
+        default=equity_default_model(),
+        help=f"Model engine ({'/'.join(list_engine_models()[:8])}…) or 'auto' (default=WINNER)",
     )
     p.add_argument("--symbol", type=str, default="", help="For rank: rank models on this symbol")
     p.add_argument("--engines-only", action="store_true", help="For rank: only runnable engines")
@@ -1458,6 +1578,14 @@ def main(argv: list[str] | None = None) -> int:
     )
     p.add_argument("--no-clear", action="store_true", help="For watch: don't clear screen each tick")
     p.add_argument("--ticks", type=int, default=0, help="For watch: stop after N ticks (0=forever)")
+    # v25 risk plan knobs
+    p.add_argument("--conf", type=float, default=None, help="For risk: model confidence 0-1 (else from engine)")
+    p.add_argument("--vol-z", type=float, default=0.0, help="For risk: 20d volume z-score")
+    p.add_argument("--peak", type=float, default=0.0, help="For risk: equity high-water mark")
+    p.add_argument("--qqq-ok", action="store_true", help="For risk: QQQ trend ok")
+    p.add_argument("--defensive", action="store_true", help="For risk: XLP/SPY defensive on")
+    p.add_argument("--no-options", action="store_true", help="For risk: options unaffordable")
+    p.add_argument("--history", type=str, default="", help="For risk: recent closed PnL list e.g. 1,-1,0.2")
     args = p.parse_args(argv)
 
     if not args.command:
@@ -1470,13 +1598,64 @@ def main(argv: list[str] | None = None) -> int:
         print("  python3 tools/trade_desk.py rotate")
         print("  python3 tools/trade_desk.py rotate --top 5 --horizon day")
         print("  python3 tools/trade_desk.py picks --horizon week --model v14_risk_kelly")
+        print("  python3 tools/trade_desk.py risk APLD --account 1000 --conf 0.85 --vol-z 1.8 --qqq-ok")
         print("  python3 tools/trade_desk.py watch NVDA --every 30")
         print("  python3 tools/trade_desk.py watch NVDA,MU,ANET --every 45 --interval 5m")
         print("  python3 tools/trade_desk.py watch rotate --every 90 --top 3")
+        print("  python3 tools/trade_desk.py openscan              # full-market open plays")
+        print("  python3 tools/trade_desk.py openscan --top 12 --json")
         print("  python3 tools/trade_desk.py watch --symbols NVDA,IBIT,ANET --interval 1m --every 20")
         return 0
 
     cmd = args.command.strip().lower()
+    if cmd == "risk":
+        sym = (args.rest[0] if args.rest else args.symbol or "").strip().upper()
+        if not sym:
+            raise SystemExit("risk: pass a symbol, e.g. trade_desk.py risk APLD --account 1000")
+        conf = args.conf
+        if conf is None:
+            try:
+                payload = analyze(sym, args.account, args.risk_pct, period=args.period, model=args.model)
+                conf = float(payload.get("confidence") or payload.get("conf") or 0.65)
+            except Exception:  # noqa: BLE001
+                conf = 0.65
+        hist: list[float] = []
+        if args.history.strip():
+            hist = [float(x) for x in args.history.split(",") if x.strip()]
+        peak = args.peak if args.peak > 0 else args.account
+        setup = SetupSnapshot(
+            symbol=sym,
+            model_conf=float(conf),
+            vol_z=float(args.vol_z),
+            trend_ok=True,
+            macro_ok=not args.defensive,
+            qqq_ok=True if not hasattr(args, "qqq_ok") else (bool(args.qqq_ok) if args.qqq_ok else True),
+            options_affordable=not args.no_options,
+        )
+        state = PortfolioState(equity=float(args.account), peak=float(peak), trade_pnl_history=hist)
+        dec = plan_entry(setup, state)
+        d = decision_to_dict(dec)
+        d["symbol"] = sym
+        d["account"] = args.account
+        d["model_conf_used"] = conf
+        if args.json:
+            print(json.dumps(d, indent=2))
+        else:
+            print(f"=== RISK  {sym}  ${args.account:,.0f}  conf={conf:.2f} ===")
+            print(f"MODE {dec.mode}  VEHICLE {dec.vehicle}  ACTION {dec.action}")
+            print(f"RISK {dec.risk_pct:.1%} → max loss ${dec.max_loss_dollars:,.0f}  size×{dec.size_mult:.2f}")
+            for r in dec.reasons:
+                print(f"  • {r}")
+            print("EXIT RULES")
+            for k, v in dec.exit_rules.items():
+                print(f"  {k}: {v}")
+            if dec.mode == "OPTIONS_ATTACK":
+                print(f"\n→ options_picker.py --symbol {sym} --account {args.account:.0f} --risk-pct {dec.risk_pct:.2f}")
+            elif dec.mode == "EQUITY_HEDGE":
+                print(f"\n→ trade_desk.py {sym} --model v25_regime_grow --account {args.account:.0f}")
+            print("\nPlaybook: models/poc_va_macdha/v25_regime_grow/RISK_PLAYBOOK.md")
+        return 0
+
     if cmd == "rank":
         if args.symbol:
             rows = rank_models_for_symbol(args.symbol, engines_only=args.engines_only)
@@ -1489,6 +1668,24 @@ def main(argv: list[str] | None = None) -> int:
         else:
             _print_rank(rows, title)
         return 0
+
+    if cmd in ("openscan", "open-scan", "open_scan", "scanner"):
+        from open_scan import run_open_scan, _print_human
+
+        payload = run_open_scan(
+            account=float(args.account),
+            risk_pct=float(args.risk_pct),
+            model=str(args.model or "auto"),
+            universe="full" if getattr(args, "full", False) else "open",
+            top=max(1, int(args.top or 12)),
+            deep_n=max(8, int(getattr(args, "deep", 0) or 24)),
+            fast_only=bool(getattr(args, "fast", False)),
+        )
+        if args.json:
+            print(json.dumps(payload, indent=2, default=str))
+        else:
+            _print_human(payload)
+        return 0 if payload.get("ok") else 1
 
     if cmd == "watch":
         # Resolve symbol list

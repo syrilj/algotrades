@@ -1,0 +1,48 @@
+{
+  "version": "v26_opts_evolve",
+  "parent": "v22_opts_live",
+  "window": "2024-08-01..2026-07-11",
+  "codes": ["IONQ.US", "AVGO.US", "HOOD.US", "MU.US"],
+  "style": "atm_risk10_dte14",
+  "lesson": "v22 won via options+hunt bag+10% risk+high WR SIDE. Extra gates (vol/stop/concentrate) HURT. Beating v22 came from shorter DTE (14 vs 21), same DNA.",
+  "portfolio": {
+    "initial_cash": 1000000,
+    "final_value": 1645423.81,
+    "total_return": 0.645424,
+    "max_drawdown": -0.093354,
+    "sharpe": 1.3966,
+    "trade_count": 22,
+    "win_rate": 0.8182
+  },
+  "end_per_1000_scale": 1645.42,
+  "run_1k_actual": {
+    "initial_cash": 1000,
+    "final_value": 1706.96,
+    "total_return": 0.70696,
+    "max_drawdown": -0.129632,
+    "trade_count": 6,
+    "win_rate": 1.0,
+    "note": "Small account skips some contracts; path differs from scaled $1M"
+  },
+  "vs_v22_opts_live": {
+    "v22_ret": 0.598115,
+    "v22_dd": -0.111753,
+    "v22_sharpe": 1.281,
+    "v22_n": 22,
+    "v22_wr": 0.8182,
+    "v26_ret_delta": 0.0473,
+    "v26_dd_delta": 0.0184,
+    "v26_sharpe_delta": 0.1156,
+    "beats_v22": true
+  },
+  "ablations_failed": [
+    "vol expand gate",
+    "max_open=1 concentration",
+    "underlying -8% hard stop",
+    "streak downsize after loss",
+    "higher risk_pct 12-15% alone"
+  ],
+  "status": "pass_beats_v22",
+  "run": "runs/poc_va_v26_opts_evolve",
+  "tested_at": "2026-07-12"
+}

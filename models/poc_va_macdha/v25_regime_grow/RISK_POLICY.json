@@ -1,0 +1,65 @@
+{
+  "version": "v25_regime_grow",
+  "description": "Hybrid: equities when no A+ options; bet big on A+ options; cut losers fast; DD throttle.",
+  "parent_side_engine": "v23_devin_overlay",
+  "account_floor_pct": 0.50,
+  "drawdown": {
+    "soft_throttle": 0.08,
+    "halt_new": 0.18,
+    "flatten": 0.28
+  },
+  "equity": {
+    "base_risk_pct": 0.01,
+    "max_risk_pct": 0.02,
+    "max_positions": 4,
+    "kelly_fraction": 0.5,
+    "min_confidence": 0.6,
+    "hedge_when_no_options": true
+  },
+  "options": {
+    "base_risk_pct": 0.12,
+    "attack_risk_pct": 0.22,
+    "max_risk_pct": 0.25,
+    "max_concurrent": 2,
+    "min_confidence": 0.72,
+    "attack_confidence": 0.82,
+    "prefer_debit_spread": true,
+    "min_dte": 14,
+    "max_dte": 45,
+    "target_delta": 0.4,
+    "cut_loser_pct": -0.3,
+    "stagnant_sessions": 2,
+    "stagnant_opt_move": 0.08,
+    "stagnant_und_move": 0.02,
+    "trail_arm_pct": 0.4,
+    "trail_giveback_pct": 0.25,
+    "force_flat_dte": 5
+  },
+  "conviction": {
+    "weights": {
+      "model_conf": 0.4,
+      "vol_z": 0.25,
+      "trend_ok": 0.2,
+      "macro_ok": 0.15
+    },
+    "vol_z_full": 2.0,
+    "vol_z_half": 1.0
+  },
+  "feedback": {
+    "streak_full_wins": 3,
+    "after_loss_mult": 0.35,
+    "after_1_2_wins_mult": 0.7,
+    "after_3_wins_mult": 1.15,
+    "max_feedback_mult": 1.25,
+    "min_feedback_mult": 0.25
+  },
+  "macro": {
+    "block_xlp_spy_defensive": true,
+    "require_qqq_for_attack": true
+  },
+  "grow_target": {
+    "start_cash": 1000,
+    "target_cash": 1000000,
+    "note": "Eval metric is path quality + time to target under DD caps — not fantasy full-cash every day."
+  }
+}

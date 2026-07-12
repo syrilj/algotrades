@@ -1,0 +1,33 @@
+{
+  "portfolio": {
+    "total_return": 1.7429211114639176,
+    "max_drawdown": -0.11426637137759296,
+    "sharpe": 2.314947394262595,
+    "win_rate": 0.6521739130434783,
+    "trade_count": 92,
+    "profit_factor": null,
+    "final_value": 27429.211114639176
+  },
+  "source": "evolve_v36_validate screen full window",
+  "parent": "v23_devin_overlay",
+  "genome": {
+    "base_model": "v23_devin_overlay",
+    "track": "equity_ohlcv",
+    "risk_pct": 0.1299130820631128,
+    "after_loss_mult": 0.7301300336239749,
+    "after_win_mult": 1.090498909168135,
+    "halt_dd": 0.2580624927496595,
+    "soft_dd": 0.09857074824249364,
+    "vol_z_min": 0.1488221687645734,
+    "min_confidence": 0.5445775410248687,
+    "meta_p_full": 0.55,
+    "meta_p_half": 0.45,
+    "dte_days": 21.0,
+    "otm_pct": 0.0,
+    "flatten_dd": 0.4,
+    "struct_weak_mult": 0.55,
+    "struct_good_mult": 1.15,
+    "lr": 0.18950293192435383,
+    "generation": 4
+  }
+}

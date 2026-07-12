@@ -1,0 +1,52 @@
+{
+  "version": "v31_selective_nodes_opts",
+  "status": "research_competitive_not_promoted",
+  "parent": "v28_feedback_opts",
+  "run": "runs/poc_va_v31_selective",
+  "window": "2024-08-01..2026-07-11",
+  "codes": ["IONQ.US", "AVGO.US", "HOOD.US", "MU.US"],
+  "portfolio": {
+    "initial_cash": 1000000,
+    "final_value": 1870243.77,
+    "total_return": 0.870244,
+    "annual_return": 0.383516,
+    "max_drawdown": -0.133361,
+    "sharpe": 1.3267,
+    "calmar": 2.8758,
+    "sortino": 0.9206,
+    "trade_count": 24,
+    "win_rate": 0.6667,
+    "profit_loss_ratio": 3.911
+  },
+  "vs_v28_baseline": {
+    "v28_ret": 1.040993,
+    "v28_dd": -0.111673,
+    "v28_sharpe": 1.4003,
+    "v28_n": 30,
+    "v28_wr": 0.8,
+    "delta_ret_pp": -17.07,
+    "delta_sharpe": -0.0736,
+    "note": "More selective (n 30→24), better PLR (2.37→3.91), lower WR and return. Keep v28 as OPTIONS full-window baseline."
+  },
+  "selectivity": {
+    "node_cloud_gate": true,
+    "stmacd_ob_chase_avoid": true,
+    "soft_vol_size": true,
+    "adaptive_dte": "10_high_vol_else_14"
+  },
+  "ablations": {
+    "nodes_only_no_ob_no_soft_vol_fixed_dte14": {
+      "run": "runs/poc_va_v31_nodes_only",
+      "total_return": 0.891505,
+      "max_drawdown": -0.129154,
+      "sharpe": 1.3735,
+      "trade_count": 24,
+      "win_rate": 0.6667,
+      "profit_loss_ratio": 4.255,
+      "note": "Closer to v28 Sharpe; still lower return"
+    }
+  },
+  "promotion": "do_not_promote_over_v28",
+  "next": "Walk-forward oos_rank_opts; soften room/cloud; Kalman/XGB secondary only if WF interesting",
+  "tested_at": "2026-07-12"
+}

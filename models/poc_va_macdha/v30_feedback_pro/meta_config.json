@@ -1,0 +1,19 @@
+{
+  "model_type": "feedback_loop",
+  "parent": "v28_feedback_opts",
+  "target": "trade_outcome",
+  "labeling": "triple_barrier",
+  "features": [
+    "confidence_score",
+    "size_frac",
+    "vol_surge",
+    "rv_percentile",
+    "sma200_ratio",
+    "narrative_mode",
+    "days_since_last_loss",
+    "drawdown_level",
+    "symbol_bucket"
+  ],
+  "training_window": "2024-08-01:2026-07-11",
+  "notes": "Prepare data for XGBoost meta-model training. Label = 1 if PnL > costs + buffer at exit barriers."
+}

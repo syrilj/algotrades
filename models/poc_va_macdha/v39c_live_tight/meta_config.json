@@ -1,0 +1,28 @@
+{
+  "feat_cols": [
+    "dist_poc", "dist_val", "dist_vwap", "ha_green", "above_vwap",
+    "vol_expand", "macd_hist", "block_red_flag_on", "htf_green", "atr_pct",
+    "conf", "spy_htf_green", "sym_TSLA", "sym_ARM", "sym_MU", "sym_SPY",
+    "sym_IONQ", "sym_APLD"
+  ],
+  "threshold": 0.50,
+  "parent": "v39b_live_adapt",
+  "research_stack": [
+    "v39b_live_adapt",
+    "v39c_dual_speed_vpa",
+    "v39c_soft_dd_atr",
+    "v39c_milder_midtrade_shrink"
+  ],
+  "genome": {
+    "risk_pct": 0.1299,
+    "after_loss_mult": 0.73,
+    "after_win_mult": 1.09,
+    "struct_good_mult": 1.15,
+    "struct_weak_mult": 0.55,
+    "meta_p_skip": 0.5,
+    "meta_p_full": 0.68
+  },
+  "params": {
+    "philosophy": "dual_speed_react_vpa_live"
+  }
+}

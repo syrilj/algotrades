@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { ModelRankRow } from "@/lib/types";
+import { analyzeHref, modelHref } from "@/lib/routes";
 import { ModelBadges } from "./ModelBadges";
 import { ScoreBar } from "./ScoreBar";
 
@@ -45,8 +46,8 @@ export function ModelSidePanel({ row, maxScore = 1, onClose }: ModelSidePanelPro
     );
   }
 
-  const analyzeHref = `/analyze?model=${encodeURIComponent(row.model)}`;
-  const detailHref = `/models/${encodeURIComponent(row.model)}`;
+  const withModelHref = analyzeHref({ model: row.model });
+  const detailHref = modelHref(row.model);
 
   return (
     <aside
@@ -162,7 +163,7 @@ export function ModelSidePanel({ row, maxScore = 1, onClose }: ModelSidePanelPro
           Model detail
         </Link>
         <Link
-          href={analyzeHref}
+          href={withModelHref}
           className="text-center text-[13px] py-2 rounded-sm transition-colors"
           style={{
             background: "transparent",

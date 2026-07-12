@@ -1,0 +1,10 @@
+{
+  "symbol": "ARM",
+  "action": "skip",
+  "reason": "spread max_loss $750 > budget $180 \u2014 wait cheaper IV/DTE",
+  "spot": 323.3900146484375,
+  "expiry": "2026-08-07",
+  "proposed_debit": 7.5,
+  "long_strike": 350.0,
+  "short_strike": 375.0
+}

@@ -1,0 +1,21 @@
+# TradingAlgoWork
+
+Agent guidance for this monorepo. Design rules below apply especially to `apps/trade-desk`.
+
+## Design Context
+
+### Users
+Solo day traders, swing/position traders, and quant/model researchers share one desk. Jobs: analyze a symbol under pressure, route live risk (equity/options), scan watch/picks, and rank engines. Context is often time-sensitive markets — the UI must feel trustworthy and fast, never playful or noisy.
+
+### Brand Personality
+**Precise · Institutional · Decisive.** Voice is terse operator English (“BUY NOW”, “Stand aside”). Emotion: calm confidence — like a well-run trading floor terminal, not a fintech startup.
+
+### Aesthetic Direction
+**Institutional terminal** — dense dark desk, steel teal brand, Source Serif display + IBM Plex body/mono. Bloomberg-adjacent hierarchy without pure black or neon “AI” chrome. Hairline panels, tabular nums, clear action color semantics (buy / breakout / wait / avoid). Anti-references: cyan-purple gradients, glassmorphism cards, hero metric templates, Inter-only SaaS dashboards.
+
+### Design Principles
+1. **Signal over chrome** — every pixel serves decision speed; decoration only if it aids scan.
+2. **Action color is law** — verdict and mode colors map 1:1 to buy / breakout / wait / avoid.
+3. **One click → full path** — stocks, ranks, and nav always deep-link into Analyze/Live with working auto and symbol context.
+4. **Dense but legible** — institutional density with clear type hierarchy; never sparse empty cards.
+5. **Honest empty states** — idle desk teaches the next action; errors name the failure.

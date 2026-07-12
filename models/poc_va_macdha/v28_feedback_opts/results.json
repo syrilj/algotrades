@@ -1,0 +1,35 @@
+{
+  "version": "v28_feedback_opts",
+  "status": "OPTIONS_FULL_WINDOW_BASELINE",
+  "parent": "v27_lse_opts",
+  "promoted_from": "runs/poc_va_feedback_loop/v28_surgical_plus_cooloff",
+  "window": "2024-08-01..2026-07-11",
+  "codes": ["IONQ.US", "AVGO.US", "HOOD.US", "MU.US"],
+  "engine": "options",
+  "settings": {
+    "narrative_mode": "surgical",
+    "loss_cooloff_days": 10,
+    "use_conf_tier": true,
+    "dte_days": 14,
+    "risk_pct": 0.10
+  },
+  "portfolio": {
+    "initial_cash": 1000000,
+    "final_value": 2040992.82,
+    "total_return": 1.040993,
+    "annual_return": 0.447633,
+    "max_drawdown": -0.111673,
+    "sharpe": 1.4003,
+    "sortino": 1.134,
+    "calmar": 4.0084,
+    "trade_count": 30,
+    "win_rate": 0.8,
+    "profit_loss_ratio": 2.3731
+  },
+  "caveats": [
+    "Full-window research peak; path-dependent on 2024H2 winners.",
+    "OPTIONS_WINNER.json may prefer OOS cold-start variants; v28 remains full-window execution DNA.",
+    "Do not stack hard volume/EMA filters on this DNA (v29 failure: +4.9% / Sharpe 0.45)."
+  ],
+  "tested_at": "2026-07-12"
+}

@@ -68,7 +68,7 @@
   "data_sources": [
     "yfinance"
   ],
-  "generated_at": "2026-07-12T00:34:45.769755Z",
+  "generated_at": "2026-07-12T01:31:24.723688Z",
   "metrics": {
     "annual_return": 0.015823,
     "calmar": 0.805,

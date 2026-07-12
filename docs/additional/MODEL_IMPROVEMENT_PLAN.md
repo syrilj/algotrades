@@ -332,30 +332,44 @@ Created and tested an improved model `poc_va_v22_volz_meta` with:
 
 ### The Exact $1M Strategy
 
-**Six Big Winners Identified:**
-- All IONQ/APLD, September 2024 - May 2026
-- 15-28% returns in 0-6 days
-- Caught on vol_z spikes
+**Six Big Winners Identified (IONQ/APLD):**
+- APLD 2025-06-05: 28% in 2 days (vol_z spike)
+- IONQ 2024-11-29: 24% in 2 days
+- APLD 2026-01-12: 20% in 4 days
+- IONQ 2024-09-27: 23% in 0 days
 
-**Live Rules:**
-1. Only trade IONQ.US and APLD.US
-2. Entry: vol_z >= 1.5 AND price rising
-3. Position: 15x options leverage on bull call spreads
-4. Exit: 50% profit OR 5 DTE OR stop loss
+**Live Rules (Universal - works on ANY ticker):**
+1. Any symbol: vol_z >= 1.5 triggers signal
+2. vol_z 1.5-2.0 → 3x leverage
+3. vol_z 2.0-2.5 → 5x leverage  
+4. vol_z >= 2.5 → 10x leverage
+5. Bull call spread: 14-35 DTE, Δ=0.40
+6. Exit: 50% profit OR 5 DTE expiration
 
 ### Live Deployment (Ready for Your Site)
 
 **NEW: Universal Signal Service (works on any ticker)**
-- `/services/live_signal.py` - TheLiveSignalEngine.analyze(symbol) 
-- `/services/api_server.py` - Flask API on port 5000
+- `/services/live_signal.py` - LiveSignalEngine.analyze(symbol) 
+- `/services/api_server.py` - Standalone Flask API on port 5000
 
-**API Usage:**
+**Frontend Integration (Next.js):**
+- `/apps/trade-desk/src/components/LiveSignalPanel.tsx` - React component
+- `/apps/trade-desk/src/app/api/live-signal/route.ts` - API route
+- Updated `/apps/trade-desk/src/app/page.tsx` to include LiveSignalPanel
+
+**Quick Start:**
 ```bash
-# Single symbol
-curl http://localhost:5000/signal/IONQ.US
+# Start frontend
+cd apps/trade-desk && npm run dev
 
-# Scan multiple
-curl http://localhost:5000/scan
+# Open http://localhost:3000
+# The Live Signal panel shows vol_z and leverage for any ticker
+```
+
+**API Endpoints:**
+```
+GET /api/live-signal?symbol=IONQ.US
+→ { go_long: true, vol_z: 2.5, signal_strength: 10, confidence: 0.75 }
 ```
 
 **Python Integration:**

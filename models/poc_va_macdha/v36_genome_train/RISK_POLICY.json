@@ -1,0 +1,16 @@
+{
+  "feedback": {
+    "after_loss_mult": 0.7301300336239749,
+    "after_1_2_wins_mult": 1.090498909168135,
+    "after_3_wins_mult": 1.190498909168135,
+    "streak_full_wins": 3,
+    "min_feedback_mult": 0.25,
+    "max_feedback_mult": 1.25
+  },
+  "drawdown": {
+    "soft_throttle": 0.09857074824249364,
+    "halt_new": 0.2580624927496595,
+    "flatten": 0.40806249274965944
+  },
+  "genome_generation": 4
+}

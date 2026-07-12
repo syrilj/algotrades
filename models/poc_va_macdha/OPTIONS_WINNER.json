@@ -1,0 +1,93 @@
+{
+  "winner": "v35_softstruct_bag8",
+  "stack": "options",
+  "selection_rule": "Best mean OOS score across pure holdout + walk-forward folds. Must beat prior OOS champ v34_bag6_opts.",
+  "updated_at": "2026-07-12T05:05:00Z",
+  "oos_artifact": "runs/poc_va_v33_loops/inline/RESULTS_INLINE.json",
+  "findings": "models/poc_va_macdha/v35_softstruct_bag8/LIVE.md",
+  "champion_oos": {
+    "id": "v35_soft_bag8",
+    "model_dir": "v35_softstruct_bag8",
+    "mean_oos_score": 0.1458,
+    "mean_oos_ret": 0.1019,
+    "mean_oos_dd": -0.1013,
+    "fold_wins": "4/5 vs v29 AND 4/5 vs v34_bag6; loses only wf_fold3 (2026H1)",
+    "beats_v34": true,
+    "v34_mean_oos_score": 0.1018,
+    "sensitivity": "struct_weak_mult 0.55->0.70: OOS 0.1505, full +73.8% (not knife-edge)",
+    "defaults": {
+      "risk_pct": 0.1,
+      "dte_days": 21,
+      "otm_pct": 0.0,
+      "halt_dd": 0.3,
+      "flatten_dd": 0.45,
+      "narrative_mode": "surgical",
+      "min_size_frac": 0.35,
+      "loss_cooloff_days": 0,
+      "use_soft_structure": true,
+      "struct_good_mult": 1.15,
+      "struct_weak_mult": 0.55,
+      "bag": [
+        "IONQ.US",
+        "AVGO.US",
+        "HOOD.US",
+        "MU.US",
+        "TSLA.US",
+        "GME.US",
+        "COIN.US",
+        "RKLB.US"
+      ]
+    }
+  },
+  "interaction_finding": "bag8 WITHOUT soft-structure overlay FAILS OOS (-0.039); overlay's weak-structure downsizing is what makes the wide bag safe. Composition > either component.",
+  "full_window_reference": {
+    "v35_soft_bag8": {
+      "total_return": 0.73,
+      "max_drawdown": -0.0907,
+      "sharpe": 1.78,
+      "trade_count": 28,
+      "win_rate": 0.86,
+      "years_to_1000x_at_cagr": 24.5
+    },
+    "v34_bag6": {
+      "total_return": 0.66009,
+      "max_drawdown": -0.07766,
+      "sharpe": 1.5876,
+      "trade_count": 26,
+      "win_rate": 0.8462,
+      "years_to_1000x_at_cagr": 26.5
+    },
+    "v29_surgical_only": {
+      "total_return": 0.6299,
+      "max_drawdown": -0.1325,
+      "sharpe": 1.1992,
+      "trade_count": 24,
+      "win_rate": 0.75,
+      "years_to_1000x_at_cagr": 27.5
+    }
+  },
+  "growth_sleeve_not_default": {
+    "id": "blend_v35bag8_strong_70",
+    "oos": 0.114,
+    "full_ret": 0.857,
+    "full_dd": -0.065,
+    "yrs": 21.7,
+    "artifact": "runs/poc_va_v33_loops/BLEND_RESULTS.json",
+    "note": "70/30 with v32 soft_strong, monthly rebal, 4/5 fold wins. soft_strong alone still FAILS OOS - never unblended."
+  },
+  "killed_this_loop": [
+    "v32 soft_struct/strong standalone: OOS fail (-0.0017 / 0.0089) \u2014 +108-113% full-window is path-dependent",
+    "risk_pct 15-20%: less growth (equity budget depletion) AND OOS collapse (r20 mean -0.0285)",
+    "vol_z boost sizing (0.0195) and fractional-Kelly sizing (0.0169): both below v29 baseline",
+    "otm5, bag_tsla-alone: no improvement",
+    "v35_bag8 (wide bag, no overlay): OOS -0.039 - wide bag unsafe without soft-structure sizing"
+  ],
+  "previous_options_default": "v34_bag6_opts",
+  "caveats": [
+    "wf_fold3 (2026H1) is v35's one lost fold (+4.9% vs v34 +13.9%, DD -15%); v34_bag6 is the fallback if the newest regime persists.",
+    "The two big 2025 OOS folds overlap in calendar (~1 independent observation, not 2); wins spread across TSLA/RKLB/IONQ/GME.",
+    "~20 variants scored on the same 5 folds this cycle - fold selection pressure is real; treat live paper fills as true holdout.",
+    "BS-estimate premium + crude mtm (FINDINGS #7 open).",
+    "1k->1M at full-window CAGR ~24.5y (default) / ~21.7y (sleeve); no honest config reaches 1000x in single-digit years."
+  ]
+}

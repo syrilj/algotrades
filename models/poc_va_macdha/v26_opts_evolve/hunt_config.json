@@ -1,0 +1,10 @@
+{
+  "risk_pct": 0.10,
+  "dte_days": 14,
+  "otm_pct": 0.0,
+  "halt_dd": 0.30,
+  "flatten_dd": 0.45,
+  "initial_cash": 1000000,
+  "contract_multiplier": 100,
+  "max_contracts": 500
+}

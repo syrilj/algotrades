@@ -1,0 +1,9 @@
+{
+  "source": "yfinance",
+  "codes": ["IONQ.US", "AVGO.US", "NVDA.US", "AMD.US", "TSLA.US", "MSTR.US", "HOOD.US"],
+  "start_date": "2024-08-01",
+  "end_date": "2026-07-11",
+  "initial_cash": 1000,
+  "engine": "options",
+  "interval": "1D"
+}

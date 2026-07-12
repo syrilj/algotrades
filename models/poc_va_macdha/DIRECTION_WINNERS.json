@@ -1,0 +1,43 @@
+{
+  "updated_at": "2026-07-12T06:09:00Z",
+  "rule": "Direction only. Rank by hard OOS (2025-10→2026-07 + late 2025-07→2026-07) on core bag. You structure options.",
+  "cash_tested": 10000,
+  "bag": ["IONQ.US", "HOOD.US", "APLD.US", "TSLA.US", "NVDA.US"],
+  "primary_direction": "v15_meta_xgb",
+  "backup_direction": "v20b_macro_light",
+  "tertiary_direction": "v23_devin_overlay",
+  "options_entry_timing": "v32_soft_react_opts",
+  "why": {
+    "v15_meta_xgb": "Best pure OOS: +10.1% mean ret, Sharpe ~1.03, DD tiny. Full-window was mid-pack; OOS is what matters for paper.",
+    "v20b_macro_light": "2nd OOS equity. Macro light veto still useful.",
+    "v23_devin_overlay": "Strong full-window; weaker OOS than v15. Keep as backup risk-on.",
+    "v32_soft_react_opts": "Best full-window options DNA (+111% screen) but OOS near flat/neg. Use for entry *timing* only if you want options DNA; prefer v15 side if conflict."
+  },
+  "killed_on_oos": [
+    "v28_feedback_opts",
+    "v22_opts_live",
+    "v26_opts_evolve"
+  ],
+  "how_to_use_ibkr_paper": {
+    "1": "Load primary engine v15_meta_xgb",
+    "2": "signal > 0 → LONG direction (you pick the options structure)",
+    "3": "signal <= 0 → FLAT / close",
+    "4": "If primary silent and you want a second opinion: v20b_macro_light",
+    "5": "Do not auto-size options from backtest contract counts — your size, your structure"
+  },
+  "oos_rank": [
+    {"id": "v15_meta_xgb", "mean_ret": 0.101, "mean_sharpe": 1.03, "mode": "daily"},
+    {"id": "v20b_macro_light", "mean_ret": 0.060, "mean_sharpe": 0.63, "mode": "daily"},
+    {"id": "v23_devin_overlay", "mean_ret": 0.053, "mean_sharpe": 0.56, "mode": "daily"},
+    {"id": "v32_soft_react_opts", "mean_ret": -0.001, "mean_sharpe": 0.04, "mode": "options"},
+    {"id": "v28_feedback_opts", "mean_ret": -0.047, "mean_sharpe": -0.36, "mode": "options"},
+    {"id": "v22_opts_live", "mean_ret": -0.069, "mean_sharpe": -0.69, "mode": "options"},
+    {"id": "v26_opts_evolve", "mean_ret": -0.068, "mean_sharpe": -0.70, "mode": "options"}
+  ],
+  "screen_full_window_note": "Full-window options (v32 +111%) looked best but failed OOS — classic overfit trap. Paper follows OOS winners.",
+  "rerun": ".venv/bin/python tools/multi_feedback_loops.py --cash 10000 --top 6",
+  "artifacts": {
+    "board": "runs/poc_va_multi_loop/LEADERBOARD.md",
+    "state": "runs/poc_va_multi_loop/STATE.json"
+  }
+}

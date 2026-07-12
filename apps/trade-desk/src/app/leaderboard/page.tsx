@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import type { ApiEnvelope, ModelRankRow, ModelsCatalog } from "@/lib/types";
 import {
   LeaderboardControls,
@@ -11,6 +12,7 @@ import {
   ModelSidePanel,
   type LeaderboardRow,
 } from "@/components/leaderboard/ModelSidePanel";
+import { PageHeader } from "@/components/shell/PageHeader";
 
 async function fetchJson<T>(url: string): Promise<T> {
   const res = await fetch(url, { cache: "no-store" });
@@ -24,14 +26,23 @@ async function fetchJson<T>(url: string): Promise<T> {
   return body as T;
 }
 
-export default function LeaderboardPage() {
-  const [mode, setMode] = useState<LeaderboardMode>("portfolio");
-  const [symbol, setSymbol] = useState("IONQ");
+function LeaderboardPageInner() {
+  const searchParams = useSearchParams();
+  const qSymbol = searchParams.get("symbol")?.toUpperCase() ?? "";
+
+  const [mode, setMode] = useState<LeaderboardMode>(qSymbol ? "symbol" : "portfolio");
+  const [symbol, setSymbol] = useState(qSymbol || "IONQ");
   const [enginesOnly, setEnginesOnly] = useState(false);
   const [rows, setRows] = useState<LeaderboardRow[]>([]);
   const [selected, setSelected] = useState<LeaderboardRow | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!qSymbol) return;
+    setSymbol(qSymbol);
+    setMode("symbol");
+  }, [qSymbol]);
 
   const loadLeaderboard = useCallback(async () => {
     setLoading(true);
@@ -85,59 +96,36 @@ export default function LeaderboardPage() {
   );
 
   return (
-    <main
-      className="min-h-screen px-4 py-6 sm:px-6"
-      style={{
-        background: "var(--td-ink-950, #0B1014)",
-        color: "var(--td-ink-100, #E2E8F0)",
-        fontFamily: "var(--td-font-body, IBM Plex Sans, ui-sans-serif, system-ui, sans-serif)",
-      }}
-    >
-      <header className="mb-5 flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-[20px] font-medium leading-tight">Model Leaderboard</h1>
-          <p
-            className="text-[13px] mt-1"
-            style={{ color: "var(--td-ink-400, #64748B)" }}
-          >
-            Portfolio and per-symbol ranks from live registry — not a hardcoded list.
-          </p>
-        </div>
-        <LeaderboardControls
-          mode={mode}
-          symbol={symbol}
-          enginesOnly={enginesOnly}
-          onModeChange={setMode}
-          onSymbolChange={setSymbol}
-          onEnginesOnlyChange={setEnginesOnly}
-          onRefresh={() => void loadLeaderboard()}
-          loading={loading}
-        />
-      </header>
+    <div className="td-page">
+      <PageHeader
+        title="Model leaderboard"
+        description="Portfolio and per-symbol ranks from the live registry — not a hardcoded list."
+        actions={
+          <LeaderboardControls
+            mode={mode}
+            symbol={symbol}
+            enginesOnly={enginesOnly}
+            onModeChange={setMode}
+            onSymbolChange={setSymbol}
+            onEnginesOnlyChange={setEnginesOnly}
+            onRefresh={() => void loadLeaderboard()}
+            loading={loading}
+          />
+        }
+      />
 
       {error ? (
-        <p
-          className="mb-4 text-[13px]"
-          style={{ color: "var(--td-action-avoid, #A34848)" }}
-          role="alert"
-        >
+        <p className="td-alert td-alert--error" role="alert">
           {error}
         </p>
       ) : null}
 
       <div
-        className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_280px] gap-0 rounded-sm overflow-hidden"
-        style={{ border: "1px solid var(--td-ink-700, #243040)" }}
+        className="td-panel grid grid-cols-1 overflow-hidden lg:grid-cols-[minmax(0,1fr)_280px]"
       >
-        <div
-          className="min-w-0"
-          style={{ background: "var(--td-ink-900, #12181F)" }}
-        >
+        <div className="min-w-0">
           {loading && !rows.length ? (
-            <div
-              className="p-8 text-[13px]"
-              style={{ color: "var(--td-ink-400, #64748B)" }}
-            >
+            <div className="p-8 text-[13px]" style={{ color: "var(--td-ink-400)" }}>
               Loading ranks…
             </div>
           ) : (
@@ -154,6 +142,20 @@ export default function LeaderboardPage() {
           onClose={() => setSelected(null)}
         />
       </div>
-    </main>
+    </div>
+  );
+}
+
+export default function LeaderboardPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="td-page">
+          <p className="td-muted">Loading leaderboard…</p>
+        </div>
+      }
+    >
+      <LeaderboardPageInner />
+    </Suspense>
   );
 }

@@ -1,0 +1,10 @@
+{
+  "symbol": "NVDA",
+  "action": "skip",
+  "reason": "spread max_loss $460 > budget $180 \u2014 wait cheaper IV/DTE",
+  "spot": 210.9600067138672,
+  "expiry": "2026-08-07",
+  "proposed_debit": 4.595,
+  "long_strike": 215.0,
+  "short_strike": 230.0
+}

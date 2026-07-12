@@ -1,0 +1,48 @@
+{
+  "version": "v25_regime_grow",
+  "run": "runs/poc_va_v25_regime_grow",
+  "run_1k": "runs/poc_va_v25_1k",
+  "window": {
+    "start": "2024-08-01",
+    "end": "2026-07-11",
+    "interval": "1H"
+  },
+  "data": "yfinance real OHLCV",
+  "sleeve": "equity_hedge_only (0.85x v23 SIDE); options attack not in this BT",
+  "portfolio_1m_start": {
+    "initial_cash": 1000000,
+    "final_value": 2003789.1983873113,
+    "total_return": 1.0037891983873113,
+    "annual_return": 0.4369493151303345,
+    "max_drawdown": -0.07785324701389226,
+    "sharpe": 2.1049190180771644,
+    "profit_factor": 3.482,
+    "trade_count": 94,
+    "win_rate": 0.6595744680851063,
+    "benchmark_return": 2.930867
+  },
+  "portfolio_1k_start": {
+    "initial_cash": 1000,
+    "final_value": 2003.2229016331407,
+    "total_return": 1.0032229016331407,
+    "max_drawdown": -0.07784742019576879,
+    "sharpe": 2.1040227060101193,
+    "profit_factor": 3.4815,
+    "trade_count": 94,
+    "note": "Same ~2.0x path; $1000 -> ~$2003 equity-only over window"
+  },
+  "vs_v23_winner": {
+    "v23_total_return": 1.2998955223366484,
+    "v23_sharpe": 2.212014757839403,
+    "v23_max_drawdown": -0.09060901763421025,
+    "v23_profit_factor": 3.5438,
+    "v23_trade_count": 92,
+    "v25_ret_delta": -0.296,
+    "v25_sharpe_delta": -0.107,
+    "v25_dd_delta": 0.0128,
+    "interpretation": "v25 hedge sleeve is calmer (better DD) but lower return/Sharpe than full v23; not promoted over WINNER for pure equity"
+  },
+  "pass_bar": true,
+  "status": "pass_bar_ok_not_winner",
+  "tested_at": "2026-07-12T01:13:00Z"
+}

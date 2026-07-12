@@ -1,0 +1,47 @@
+{
+  "version": "v32_soft_react_opts",
+  "status": "beats_v28_full_window",
+  "parent": "v28_feedback_opts",
+  "approach": "soft_structure_size_not_hard_gate",
+  "promoted_ablation": "soft_struct",
+  "window": "2024-08-01..2026-07-11",
+  "codes": ["IONQ.US", "AVGO.US", "HOOD.US", "MU.US"],
+  "portfolio": {
+    "final_value": 2079966.65,
+    "total_return": 1.079967,
+    "max_drawdown": -0.124925,
+    "sharpe": 1.4887,
+    "trade_count": 34,
+    "win_rate": 0.7059,
+    "profit_loss_ratio": 4.1219
+  },
+  "vs_v28": {
+    "v28_ret": 1.040993,
+    "v28_sharpe": 1.4003,
+    "v28_dd": -0.111673,
+    "delta_ret_pp": 3.9,
+    "delta_sharpe": 0.088,
+    "note": "Size up at cloud+node+room (×1.15), size down weak structure (×0.55); never hard-block"
+  },
+  "ablation_leaderboard": [
+    {"id": "soft_struct", "ret": 1.080, "sharpe": 1.489, "dd": -0.125, "promoted": true},
+    {"id": "soft_struct_ob_os_dte", "ret": 1.083, "sharpe": 1.487, "dd": -0.125},
+    {"id": "soft_struct_strong", "ret": 1.134, "sharpe": 1.475, "dd": -0.126, "note": "max return, slightly lower Sharpe"},
+    {"id": "soft_full_exit_cloud", "ret": 1.078, "sharpe": 1.449, "dd": -0.130},
+    {"id": "v28_baseline", "ret": 1.041, "sharpe": 1.400, "dd": -0.112}
+  ],
+  "run": "runs/poc_va_v32_ablations/soft_struct",
+  "summary_path": "runs/poc_va_v32_ablations/ABLATION_SUMMARY.json",
+  "walk_forward": {
+    "artifact": "runs/poc_va_v32_wf/WF_SUMMARY.json",
+    "slice_wins_vs_v28": "3/3",
+    "promote": true,
+    "slices": {
+      "2024H2": {"v28_ret": 0.756, "v32_ret": 0.813, "v28_sharpe": 2.91, "v32_sharpe": 3.03},
+      "2025": {"v28_ret": -0.073, "v32_ret": -0.062, "v28_sharpe": -0.73, "v32_sharpe": -0.51, "note": "both negative regime"},
+      "2026H1": {"v28_ret": 0.112, "v32_ret": 0.123, "v28_sharpe": 0.749, "v32_sharpe": 0.751}
+    }
+  },
+  "promotion": "promote_over_v28_research",
+  "tested_at": "2026-07-12"
+}

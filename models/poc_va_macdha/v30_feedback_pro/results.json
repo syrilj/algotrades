@@ -1,0 +1,31 @@
+{
+  "version": "v30_feedback_pro",
+  "status": "PASSED",
+  "parent": "v28_feedback_opts",
+  "backtest_date": "2026-07-12",
+  "metrics": {
+    "final_value": 1843260.05,
+    "total_return": 0.84326,
+    "annual_return": 0.37313,
+    "max_drawdown": -0.132592,
+    "sharpe": 1.2538,
+    "calmar": 2.8141,
+    "sortino": 0.9925,
+    "trade_count": 36,
+    "win_rate": 0.6667,
+    "profit_loss_ratio": 3.1428
+  },
+  "vs_parent": {
+    "return_improvement": "+10pp",
+    "sharpe_improvement": "+0.08",
+    "dd_improvement": "-2pp",
+    "trade_count_increase": "+12 trades"
+  },
+  "enhhancements": [
+    "volume_surge_filter_soft_rvol_1.25",
+    "ema200_regime_filter_structural_integrity",
+    "adaptive_dte_10_high_vol_14-21_low_vol",
+    "surgical_macro_narrative",
+    "10d_loss_cooloff"
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "source": "yfinance",
+  "codes": [
+    "TSLA.US",
+    "MU.US",
+    "SPY.US",
+    "IONQ.US",
+    "APLD.US",
+    "XLP.US",
+    "QQQ.US"
+  ],
+  "start_date": "2024-08-01",
+  "end_date": "2026-07-11",
+  "initial_cash": 1000000,
+  "commission": 0.001,
+  "engine": "daily",
+  "extra_fields": null,
+  "interval": "1H",
+  "strategy": {
+    "name": "v36_genome_train",
+    "model_version": "v36_genome_train",
+    "note": "v20b + volume-z conviction overlay on meta-XGB sizing",
+    "mutate": "genome_train",
+    "vol_z_min": 0.1488221687645734,
+    "min_confidence": 0.5445775410248687,
+    "meta_p_full": 0.55,
+    "meta_p_half": 0.45,
+    "after_loss_mult": 0.7301300336239749,
+    "after_win_mult": 1.090498909168135,
+    "soft_dd": 0.09857074824249364,
+    "halt_dd": 0.2580624927496595,
+    "risk_pct": 0.1299130820631128,
+    "generation": 4,
+    "parent": "v23_devin_overlay"
+  }
+}

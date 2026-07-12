@@ -1,0 +1,32 @@
+{
+  "source": "yfinance",
+  "codes": [
+    "IONQ.US",
+    "AVGO.US",
+    "HOOD.US",
+    "MU.US"
+  ],
+  "start_date": "2024-08-01",
+  "end_date": "2026-07-11",
+  "initial_cash": 1000000,
+  "commission": 0.001,
+  "engine": "options",
+  "interval": "1D",
+  "options_config": {
+    "risk_free_rate": 0.05,
+    "contract_multiplier": 100,
+    "exercise_style": "american"
+  },
+  "strategy": {
+    "model_version": "v30_feedback_pro",
+    "parent": "v28_feedback_opts",
+    "style": "atm_adaptive_dte_volume_surge_ema200",
+    "codes": [
+      "IONQ.US",
+      "AVGO.US",
+      "HOOD.US",
+      "MU.US"
+    ],
+    "note": "v28 + volume surge + EMA200 regime + adaptive DTE"
+  }
+}

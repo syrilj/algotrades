@@ -1,0 +1,19 @@
+{
+  "source": "yfinance",
+  "codes": ["TSLA.US", "MSTR.US", "NVDA.US", "AMD.US", "META.US", "HOOD.US", "IONQ.US", "MU.US", "AVGO.US", "AAPL.US"],
+  "start_date": "2024-08-01",
+  "end_date": "2026-07-11",
+  "initial_cash": 1000000,
+  "commission": 0.001,
+  "engine": "options",
+  "interval": "1D",
+  "options_config": {
+    "risk_free_rate": 0.05,
+    "contract_multiplier": 100,
+    "exercise_style": "american"
+  },
+  "strategy": {
+    "model_version": "v31_vpa_vwap",
+    "note": "VPA effort/result + soft swing VWAP peg + vol_z size; research path to live"
+  }
+}

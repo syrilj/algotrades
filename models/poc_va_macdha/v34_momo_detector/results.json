@@ -1,0 +1,21 @@
+{
+  "version": "v34_momo_detector",
+  "status": "EARLY_PROMISE", 
+  "parent": "v32_soft_react_opts",
+  "backtest_date": "2026-07-12",
+  "key_finding": "$1K → $11K in ~75 days (Aug 2024 → Oct 2024) via IONQ/AVGO momentum explosions",
+  "metrics": {
+    "final_value": 11154.85,
+    "total_return": 10.15,
+    "max_drawdown": -0.23,
+    "sharpe": 1.49,
+    "win_rate": 0.69,
+    "profit_loss_ratio": 4.46
+  },
+  "big_winners_caught": [
+    {"symbol": "IONQ", "move": "28x", "period": "2024-10-10 to 2024-10-24"},
+    {"symbol": "AVGO", "move": "10x", "period": "2024-12-10 to 2024-12-18"}
+  ],
+  "problem": "Stopped issuing signals after Jan 2025 - universe dried up or contract limits hit",
+  "next_step": "Scale position sizing as equity grows; add more explosive names"
+}

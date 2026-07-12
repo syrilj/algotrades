@@ -6,6 +6,8 @@ import { useCallback, useEffect, useState } from "react";
 import type { ApiEnvelope, ModelsCatalog } from "@/lib/types";
 import { ModelBadges } from "@/components/leaderboard/ModelBadges";
 import { ScoreBar } from "@/components/leaderboard/ScoreBar";
+import { ModelFlow } from "@/components/models/ModelFlow";
+import { analyzeHref } from "@/lib/routes";
 
 type ModelDetail = {
   id: string;
@@ -252,7 +254,7 @@ export default function ModelDetailPage() {
               </p>
               <div className="flex flex-col gap-2 mt-auto">
                 <Link
-                  href={`/analyze?model=${encodeURIComponent(detail.id)}`}
+                  href={analyzeHref({ model: detail.id })}
                   className="text-center text-[13px] py-2 rounded-sm"
                   style={{
                     background: "var(--td-brand, #2F6F7A)",
@@ -274,6 +276,16 @@ export default function ModelDetailPage() {
               </div>
             </section>
           </div>
+
+          <section
+            className="p-4 rounded-sm mb-6"
+            style={{
+              background: "var(--td-ink-900, #12181F)",
+              border: "1px solid var(--td-ink-700, #243040)",
+            }}
+          >
+            <ModelFlow model={detail.id} />
+          </section>
 
           <section
             className="p-4 rounded-sm"

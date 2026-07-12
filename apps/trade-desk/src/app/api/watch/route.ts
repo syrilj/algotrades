@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { normalizeAnalyze } from "@/lib/analyzeNormalize";
 import { isValidModelId, sanitizeSymbol } from "@/lib/format";
 import { runTradeDesk } from "@/lib/tradeDesk";
 import type { AnalyzeResponse, ApiEnvelope } from "@/lib/types";
@@ -21,6 +22,7 @@ type WatchBody = {
 type WatchSnapshot = {
   symbol: string;
   ok: boolean;
+  /** Full analyze payload (state + plan + model) for the board. */
   data?: AnalyzeResponse;
   error?: string;
 };
@@ -48,6 +50,9 @@ function parseSymbols(v: string[] | string | undefined): string[] {
 /**
  * Watch CLI is a live TTY loop and does not emit reliable --json snapshots.
  * Fan-out: one analyze call per symbol (capped), return array of snapshots.
+ *
+ * IMPORTANT: runTradeDesk() already returns the analyze object (state/plan/model).
+ * Do not read `.data` on that object — it is undefined and emptied the board.
  */
 export async function POST(req: Request) {
   let body: WatchBody;
@@ -130,10 +135,12 @@ export async function POST(req: Request) {
 
   const settled = await Promise.allSettled(
     symbols.map(async (symbol) => {
-      const data = (await runTradeDesk([
-        symbol,
-        ...shared,
-      ])) as AnalyzeResponse;
+      const raw = await runTradeDesk([symbol, ...shared]);
+      const data = normalizeAnalyze(raw);
+      // Prefer symbol on state for board row extraction
+      if (data.state && !data.state.symbol) {
+        data.state.symbol = symbol;
+      }
       return { symbol, data };
     }),
   );
@@ -141,6 +148,7 @@ export async function POST(req: Request) {
   const snapshots: WatchSnapshot[] = settled.map((r, i) => {
     const symbol = symbols[i]!;
     if (r.status === "fulfilled") {
+      // r.value = { symbol, data: AnalyzeResponse } — attach full analyze payload
       return { symbol, ok: true, data: r.value.data };
     }
     return {
@@ -151,12 +159,17 @@ export async function POST(req: Request) {
   });
 
   const anyOk = snapshots.some((s) => s.ok);
+  const failed = snapshots.filter((s) => !s.ok).map((s) => s.symbol);
   return envelope(
     {
       ok: anyOk,
       command: "watch",
       data: { symbols, model, snapshots },
-      error: anyOk ? undefined : "All symbol analyzes failed",
+      error: anyOk
+        ? failed.length
+          ? `Partial: failed ${failed.join(", ")}`
+          : undefined
+        : "All symbol analyzes failed",
     },
     anyOk ? 200 : 502,
   );

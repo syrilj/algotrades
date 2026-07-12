@@ -1,7 +1,23 @@
 import { spawn } from "child_process";
+import crypto from "crypto";
 import fs from "fs/promises";
+import os from "os";
 import path from "path";
-import { modelsRoot, pythonBin, repoRoot, tradeDeskScript } from "./paths";
+import {
+  livePlanScript,
+  modelsRoot,
+  optionsPickerScript,
+  paperLedgerScript,
+  portfolioOptimizerScript,
+  pythonBin,
+  repoRoot,
+  riskAssessmentScript,
+  riskManagerScript,
+  sectorWatchlistScript,
+  symbolRankerScript,
+  tradeDeskScript,
+  vpaScanScript,
+} from "./paths";
 import type { ModelsCatalog, ModelRankRow } from "./types";
 
 const DEFAULT_TIMEOUT_MS = 120_000;
@@ -20,24 +36,33 @@ function extractJson(stdout: string): unknown {
   return JSON.parse(trimmed.slice(start));
 }
 
-export async function runTradeDesk(
+function runPythonScript(
+  script: string,
   args: string[],
+  label: string,
   timeoutMs = DEFAULT_TIMEOUT_MS,
+  forceJsonFlag = true,
 ): Promise<unknown> {
   const py = pythonBin();
-  const script = tradeDeskScript();
   const cwd = repoRoot();
+  const fullArgs = forceJsonFlag ? [...args, "--json"] : args;
 
   return new Promise((resolve, reject) => {
-    const child = spawn(py, [script, ...args, "--json"], {
+    const child = spawn(py, [script, ...fullArgs], {
       cwd,
-      env: { ...process.env, PYTHONUNBUFFERED: "1" },
+      env: {
+        ...process.env,
+        PYTHONUNBUFFERED: "1",
+        PYTHONPATH: [cwd, path.join(cwd, "tools"), path.join(cwd, "services")]
+          .concat(process.env.PYTHONPATH ? [process.env.PYTHONPATH] : [])
+          .join(path.delimiter),
+      },
     });
     let stdout = "";
     let stderr = "";
     const timer = setTimeout(() => {
       child.kill("SIGTERM");
-      reject(new Error(`trade_desk timed out after ${timeoutMs}ms`));
+      reject(new Error(`${label} timed out after ${timeoutMs}ms`));
     }, timeoutMs);
 
     child.stdout.on("data", (d: Buffer) => {
@@ -55,7 +80,7 @@ export async function runTradeDesk(
       if (code !== 0) {
         reject(
           new Error(
-            `trade_desk exited ${code}: ${stderr.slice(-800) || stdout.slice(-400)}`,
+            `${label} exited ${code}: ${stderr.slice(-800) || stdout.slice(-400)}`,
           ),
         );
         return;
@@ -71,6 +96,119 @@ export async function runTradeDesk(
       }
     });
   });
+}
+
+export async function runTradeDesk(
+  args: string[],
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+): Promise<unknown> {
+  return runPythonScript(tradeDeskScript(), args, "trade_desk", timeoutMs);
+}
+
+/** Full live ticket: features + macro + v25 risk + options structure. */
+export async function runLivePlan(
+  args: string[],
+  timeoutMs = 90_000,
+): Promise<unknown> {
+  return runPythonScript(livePlanScript(), args, "live_plan", timeoutMs);
+}
+
+export async function runSymbolRanker(
+  args: string[],
+  timeoutMs = 30_000,
+): Promise<unknown> {
+  return runPythonScript(symbolRankerScript(), args, "symbol_ranker", timeoutMs);
+}
+
+export async function runPaperLedger(
+  args: string[],
+  timeoutMs = 30_000,
+): Promise<unknown> {
+  return runPythonScript(paperLedgerScript(), args, "paper_ledger", timeoutMs);
+}
+
+/** Direct options structure pick (bull call spread / long call). */
+export async function runOptionsPicker(
+  args: string[],
+  timeoutMs = 60_000,
+): Promise<unknown> {
+  return runPythonScript(optionsPickerScript(), args, "options_picker", timeoutMs);
+}
+
+export async function runRiskManager(
+  args: string[],
+  timeoutMs = 30_000,
+): Promise<unknown> {
+  return runPythonScript(riskManagerScript(), args, "risk_manager", timeoutMs);
+}
+
+/** Research-backed risk assessment (Kelly, VaR/ES, drawdown, Sharpe/Sortino/Calmar). */
+export async function runRiskAssessment(
+  input: Record<string, unknown>,
+  timeoutMs = 30_000,
+): Promise<unknown> {
+  const tmp = path.join(os.tmpdir(), `risk-assessment-${crypto.randomUUID()}.json`);
+  await fs.writeFile(tmp, JSON.stringify(input), "utf8");
+  try {
+    const raw = await runPythonScript(
+      riskAssessmentScript(),
+      ["assess", "--json-file", tmp],
+      "risk_assessment",
+      timeoutMs,
+    );
+    const envelope = raw as { ok?: boolean; data?: unknown; error?: string };
+    if (envelope?.ok === false) {
+      throw new Error(envelope.error || "risk assessment failed");
+    }
+    return envelope?.data ?? envelope;
+  } finally {
+    await fs.unlink(tmp).catch(() => {});
+  }
+}
+
+/** Research VPA+VWAP scan (CALL/PUT bias + DNA peg tags). Not 80% WR live. */
+export async function runVpaScan(
+  args: string[],
+  timeoutMs = 180_000,
+): Promise<unknown> {
+  return runPythonScript(vpaScanScript(), args, "vpa_scan", timeoutMs);
+}
+
+/** Sector RS vs SPY weekly watchlist (research). */
+export async function runSectorWatchlist(
+  args: string[] = [],
+  timeoutMs = 90_000,
+): Promise<unknown> {
+  return runPythonScript(
+    sectorWatchlistScript(),
+    args,
+    "sector_watchlist",
+    timeoutMs,
+  );
+}
+
+/** Portfolio optimiser (MPT, efficient frontier, risk parity, factor tilt). */
+export async function runPortfolioOptimizer(
+  input: Record<string, unknown>,
+  timeoutMs = 30_000,
+): Promise<unknown> {
+  const tmp = path.join(os.tmpdir(), `portfolio-${crypto.randomUUID()}.json`);
+  await fs.writeFile(tmp, JSON.stringify(input), "utf8");
+  try {
+    const raw = await runPythonScript(
+      portfolioOptimizerScript(),
+      ["--input", tmp],
+      "portfolio_optimizer",
+      timeoutMs,
+    );
+    const envelope = raw as { ok?: boolean; data?: unknown; error?: string };
+    if (envelope?.ok === false) {
+      throw new Error(envelope.error || "portfolio optimizer failed");
+    }
+    return envelope?.data ?? envelope;
+  } finally {
+    await fs.unlink(tmp).catch(() => {});
+  }
 }
 
 async function readJsonSafe<T>(file: string): Promise<T | null> {
@@ -154,35 +292,51 @@ export async function loadModelsCatalog(): Promise<ModelsCatalog> {
   }
 
   let defaultModel = "v15_meta_xgb";
+  let deskEngines: string[] = [];
+  const kindById: Record<string, "equity" | "options" | "other"> = {};
   try {
     const tools = path.join(repoRoot(), "tools");
     const reg = await runPythonSnippet(
-      `import sys,json; sys.path.insert(0, ${JSON.stringify(tools)}); from model_registry import DEFAULT_MODEL, list_engine_models; print(json.dumps({"default": DEFAULT_MODEL, "engines": list_engine_models()}))`,
+      `import sys,json; sys.path.insert(0, ${JSON.stringify(tools)}); from model_registry import DEFAULT_MODEL, list_engine_models, list_desk_engines, engine_kind; print(json.dumps({"default": DEFAULT_MODEL, "engines": list_engine_models(), "desk_engines": list_desk_engines(), "kinds": {m: engine_kind(m) for m in list_engine_models()}}))`,
     );
-    const parsed = JSON.parse(reg) as { default: string; engines: string[] };
+    const parsed = JSON.parse(reg) as {
+      default: string;
+      engines: string[];
+      desk_engines?: string[];
+      kinds?: Record<string, "equity" | "options" | "other">;
+    };
     defaultModel = parsed.default || defaultModel;
     if (parsed.engines?.length) {
       const set = new Set([...parsed.engines, ...engines]);
       engines.length = 0;
       engines.push(...[...set].sort());
     }
+    deskEngines = (parsed.desk_engines ?? engines.filter((id) => !id.includes("opts"))).slice().sort();
+    if (parsed.kinds) Object.assign(kindById, parsed.kinds);
   } catch {
     /* filesystem fallback */
+    deskEngines = engines.filter((id) => !id.includes("opts"));
   }
 
   const winner = winnerDoc?.winner ?? null;
-  const models = versionDirs.map((id) => ({
-    id,
-    has_engine: engines.includes(id),
-    is_default: id === defaultModel,
-    is_winner: id === winner,
-  }));
+  const models = versionDirs.map((id) => {
+    const kind = kindById[id] ?? (id.includes("opts") ? "options" : engines.includes(id) ? "equity" : "other");
+    return {
+      id,
+      has_engine: engines.includes(id),
+      is_default: id === defaultModel,
+      is_winner: id === winner,
+      kind,
+      desk_compatible: deskEngines.includes(id) || kind === "equity",
+    };
+  });
 
   return {
     default_model: defaultModel,
     winner,
     previous_winner: winnerDoc?.previous_winner ?? null,
     engines,
+    desk_engines: deskEngines,
     all_versions: versionDirs,
     models,
     updated_at: winnerDoc?.updated_at ?? null,
