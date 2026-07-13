@@ -10,6 +10,7 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
+from backtest.metrics import calc_bars_per_year
 from tools.evolve import regime_gate
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -187,6 +188,17 @@ def _regime_slices(
     return slices
 
 
+def _bars_per_day(run_dir: Path) -> float:
+    cfg = run_dir / "config.json"
+    if cfg.exists():
+        try:
+            interval = json.loads(cfg.read_text()).get("interval", "1D")
+            return calc_bars_per_year(interval, "yfinance") / 252.0
+        except Exception:
+            pass
+    return 1.0
+
+
 def build_direction_report(
     trades_csv: str | Path,
     bars: dict[str, pd.DataFrame],
@@ -198,13 +210,14 @@ def build_direction_report(
     run_dir = trades_csv.parent.parent
     trades = _pair_trades(trades_csv)
     initial_cash = _initial_cash(run_dir)
+    bpd = _bars_per_day(run_dir)
 
     if regime_parquet is None:
         regime_parquet = ROOT / "models" / "_shared" / "regime" / "regime_daily.parquet"
     else:
         regime_parquet = Path(regime_parquet)
 
-    hit_rates = {f"hit_{k}d": _hit_rate(trades, bars, k) for k in ks}
+    hit_rates = {f"hit_{k}d": _hit_rate(trades, bars, max(1, int(k * bpd))) for k in ks}
     mfe_mae = _mfe_mae(trades, bars)
     slices = _regime_slices(trades, initial_cash, regime_parquet)
 

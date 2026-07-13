@@ -55,3 +55,10 @@
 - Re-run the v41 loop: `.venv/bin/python tools/feedback_loop_v41.py --quick --cash 1000`
 - Re-run a single model: `dmr.run_one(model, mode="daily", codes=EQUITY_WINNER_BAG, start="2024-08-01", end="2026-07-11", tag="verify", force_1d=False, cash=1000)`
 - Run market runtime tests: `python -m unittest discover -s tests -v`
+
+## evolve_direction_v1
+- Driver: `runs/evolve_direction_v1/driver.py` with commands `phase0`, `campaign` (2-gen smoke), `campaign-full` (10-gen autonomous).
+- Default run: `.venv/bin/python runs/evolve_direction_v1/driver.py --cash 1000000 phase0`.
+- `backtest.runner` routes `source="local"` to `CryptoEngine`, which uses `slippage` (not `slippage_us`) and ignores `commission`. `tools/dynamic_model_rank.py` monkey-patches `runner._create_market_engine` so `source="local"` with `us_equity`/`hk_equity` symbols uses `GlobalEquityEngine` for correct `slippage_us` handling while keeping `LocalLoader`/`data_cache`.
+- Phase 0 baseline at `$1M` (`1H` folds): `v39b_live_adapt` passes 13/13 audit gates (pooled ret ~1.38, max DD ~9.7%, Sharpe ~3.24).
+- Smoke campaign: 2 generations x 7 direction variants (base, add_arm, drop_xlp, add_nvda_pltr, add_mstr_coin, slip_stress_15, comm_tight) all run; best-of-generation `base` passes lockbox/audit.

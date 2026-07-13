@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import math
+import json
 from pathlib import Path
 from typing import Any
 
@@ -10,6 +11,8 @@ import pandas as pd
 
 SLIPPAGE_BASE = 0.0010
 SLIPPAGE_STRESS = 0.0020
+
+ROOT = Path(__file__).resolve().parents[2]
 
 
 def _pnl_at_slippage(
@@ -80,11 +83,13 @@ def adjust_trades_for_slippage(
 
 
 def adjust_equity_for_slippage(
-    equity: pd.Series, trades: pd.DataFrame, slippage_per_side: float
+    equity: pd.Series, trades: pd.DataFrame, slippage_per_side: float, cash: float = 1.0
 ) -> pd.Series:
     """Approximate equity curve under ``slippage_per_side``.
 
     Costs are realised at exit timestamps and propagated forward.
+    ``equity`` is assumed to be a normalized (1.0 start) series; ``cash`` is the
+    account scale so that dollar-delta adjustments are scaled correctly.
     """
     if equity.empty or trades.empty:
         return equity.copy()
@@ -93,11 +98,17 @@ def adjust_equity_for_slippage(
     if "exit_time" not in adjusted.columns or "pnl" not in adjusted.columns:
         return equity.copy()
 
-    base_slippage = float(adjusted["slippage"].iloc[0]) if "slippage" in adjusted.columns else SLIPPAGE_BASE
     delta = adjusted["pnl"] - trades["pnl"]
     delta.index = adjusted["exit_time"]
-    cum = delta.groupby(level=0).sum().reindex(equity.index, method="ffill").fillna(0.0).cumsum()
-    return equity + cum
+    delta_by_time = delta.groupby(level=0).sum()
+    # align each exit-time delta to the first equity bar at or after that time
+    aligned = pd.Series(0.0, index=equity.index)
+    target_idx = equity.index.get_indexer(delta_by_time.index, method="bfill")
+    for i, ti in enumerate(target_idx):
+        if ti >= 0:
+            aligned.iloc[ti] += delta_by_time.iloc[i]
+    cum = aligned.cumsum()
+    return equity + cum / cash
 
 
 def probe_slippage_applied(
@@ -117,29 +128,40 @@ def probe_slippage_applied(
         raise RuntimeError("trades.csv empty")
 
     # Use exit rows for symbol lookup (entry row has the symbol, exit row has pnl)
+    cfg = json.loads((run_dir / "config.json").read_text())
+    interval = str(cfg.get("interval", "1D")).lower()
+    if interval not in ("1h", "1d"):
+        interval = "1h" if "h" in interval else "1d"
+    cache_dir = ROOT / "data_cache" / interval
+
+    def load_cache(symbol: str):
+        for name in [symbol, symbol.replace(".US", ""), symbol.lstrip("^").replace(".US", "")]:
+            p = cache_dir / f"{name}.parquet"
+            if p.exists():
+                df = pd.read_parquet(p)
+                df.index = pd.to_datetime(df.index).tz_localize(None)
+                return df[["open", "high", "low", "close", "volume"]].astype(float)
+        return None
+
     probe_rows = []
     for i in range(0, min(len(df) - 1, n_probe * 2), 2):
         entry = df.iloc[i]
         exit_ = df.iloc[i + 1]
         symbol = str(entry.get("code", ""))
-        ohlcv = run_dir / "artifacts" / f"ohlcv_{symbol}.csv"
-        if not ohlcv.exists():
+        ohlcv_df = load_cache(symbol)
+        if ohlcv_df is None:
             continue
-        probe_rows.append((entry, exit_, ohlcv))
+        probe_rows.append((entry, exit_, ohlcv_df))
     if not probe_rows:
-        raise RuntimeError("no ohlcv files to probe slippage")
+        raise RuntimeError("no data cache to probe slippage")
 
     tolerance = 0.001  # 0.1% — loose enough to survive 1D rounding and 1H date match
-    for entry, exit_, ohlcv in probe_rows:
+    for entry, exit_, ohlcv_df in probe_rows:
         symbol = str(entry.get("code", ""))
         entry_side = str(entry.get("side", "buy")).lower()
-        exit_side = str(exit_.get("side", "sell")).lower()
         direction = 1 if entry_side == "buy" else -1
         entry_ts = pd.to_datetime(entry["timestamp"])
         exit_ts = pd.to_datetime(exit_["timestamp"])
-
-        ohlcv_df = pd.read_csv(ohlcv, index_col=0, parse_dates=True)
-        ohlcv_df.index = ohlcv_df.index.tz_localize(None)
 
         # 1D exact match; 1H may have multiple bars on same date
         def best_match(ts: pd.Timestamp, price: float, is_entry: bool) -> float | None:

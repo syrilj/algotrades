@@ -93,11 +93,20 @@ def fold_utility(m: dict[str, Any]) -> float:
     U_f = ret + 0.35*min(sharpe,3) + 0.15*min(calmar,10) + 0.05*wr
           - 0.55*max(0,|dd|-0.15) - 50*(|dd|>=0.25)
     """
-    ret = float(m.get("ret") or 0.0)
-    sharpe = float(m.get("sharpe") or 0.0)
-    calmar = float(m.get("calmar") or 0.0)
-    dd = abs(float(m.get("dd") or m.get("max_drawdown") or 0.0))
-    wr = float(m.get("wr") or m.get("win_rate") or 0.0)
+    def _num(v):
+        if isinstance(v, complex):
+            return 0.0
+        try:
+            f = float(v)
+            return f if np.isfinite(f) else 0.0
+        except Exception:
+            return 0.0
+
+    ret = _num(m.get("ret"))
+    sharpe = _num(m.get("sharpe"))
+    calmar = _num(m.get("calmar"))
+    dd = abs(_num(m.get("dd") if m.get("dd") is not None else m.get("max_drawdown")))
+    wr = _num(m.get("wr") if m.get("wr") is not None else m.get("win_rate"))
 
     raw = (
         ret

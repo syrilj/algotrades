@@ -30,6 +30,25 @@ from statistics import mean
 from typing import Any
 
 from backtest.runner import main as bt_main
+import backtest.runner as _runner
+from backtest.engines.global_equity import GlobalEquityEngine
+
+# backtest.runner routes unknown sources to CryptoEngine. source="local" uses
+# LocalLoader (data_cache) but should still get the US/HK equity engine for
+# proper slippage_us / commission handling.
+_original_create_market_engine = _runner._create_market_engine
+
+
+def _create_market_engine_for_local(source: str, config: dict, codes: list[str]):
+    if source == "local" and codes:
+        markets = {_runner._detect_market(c) for c in codes}
+        if len(markets) == 1 and markets & {"us_equity", "hk_equity"}:
+            market = _runner._detect_submarket(codes)
+            return GlobalEquityEngine(config, market=market)
+    return _original_create_market_engine(source, config, codes)
+
+
+_runner._create_market_engine = _create_market_engine_for_local
 
 ROOT = Path(__file__).resolve().parents[1]
 MODELS_ROOT = ROOT / "models" / "poc_va_macdha"

@@ -105,12 +105,12 @@ def _trade_records_from_df(trades: pd.DataFrame) -> list[TradeRecord]:
     return records
 
 
-def _stressor_metrics(trades: pd.DataFrame, equity: pd.Series, bars_per_year: int) -> dict[str, Any]:
+def _stressor_metrics(trades: pd.DataFrame, equity: pd.Series, bars_per_year: int, cash: float = 1_000_000.0) -> dict[str, Any]:
     """PASS_BAR metrics under SLIPPAGE_STRESS total per-side."""
     if trades.empty or equity.empty:
         return {}
     adj_trades = costs.adjust_trades_for_slippage(trades, costs.SLIPPAGE_STRESS)
-    adj_equity = costs.adjust_equity_for_slippage(equity, trades, costs.SLIPPAGE_STRESS)
+    adj_equity = costs.adjust_equity_for_slippage(equity, trades, costs.SLIPPAGE_STRESS, cash=cash)
     return folds.fold_metrics(adj_trades, adj_equity, bars_per_year)
 
 
@@ -218,7 +218,7 @@ def evaluate_gates(candidate: dict[str, Any]) -> list[dict[str, Any]]:
     )
 
     # 7 PASS_BAR at SLIPPAGE_STRESS
-    stress = _stressor_metrics(candidate["trades"], candidate["equity"], candidate["bars_per_year"])
+    stress = _stressor_metrics(candidate["trades"], candidate["equity"], candidate["bars_per_year"], cash=candidate.get("cash", 1_000_000.0))
     gates.append(
         {
             "gate_id": 7,
@@ -305,8 +305,10 @@ def evaluate_gates(candidate: dict[str, Any]) -> list[dict[str, Any]]:
     )
 
     # 12 auditor source scan + WF
-    run_dir = Path(candidate.get("run_dir", "."))
-    engine_path = run_dir / "code" / "signal_engine.py"
+    model_dir = Path(candidate.get("model_dir", candidate.get("run_dir", ".")))
+    engine_path = model_dir / "signal_engine.py"
+    if not engine_path.exists():
+        engine_path = model_dir / "code" / "signal_engine.py"
     findings = auditor.audit_source(engine_path)
     max_sev = max(
         (0 if f.severity == "info" else 1 if f.severity == "warn" else 2 if f.severity == "fail" else 3)

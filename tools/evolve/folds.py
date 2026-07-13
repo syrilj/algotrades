@@ -232,9 +232,15 @@ def fold_metrics(
             "avg_hold_days": 0.0,
         }
 
-    ret = float(equity.iloc[-1] / equity.iloc[0] - 1.0)
     n_bars = len(equity)
-    ann_ret = (1.0 + ret) ** (bars_per_year / max(n_bars, 1)) - 1.0
+    ratio = equity / equity.iloc[0]
+    ratio = ratio.replace(0, 1e-9).where(ratio > 0, 1e-9)
+    log_rets = np.log(ratio)
+    total_log = float(log_rets.iloc[-1])
+    if not np.isfinite(total_log):
+        total_log = float(np.log(1e-9))
+    ann_ret = float(np.exp(total_log * (bars_per_year / max(n_bars, 1))) - 1.0)
+    ret = float(equity.iloc[-1] / equity.iloc[0] - 1.0)
 
     port_ret = equity.pct_change().fillna(0.0)
     vol = float(port_ret.std())
@@ -244,7 +250,7 @@ def fold_metrics(
     dd = (equity - peak) / peak.replace(0, 1)
     max_dd = float(dd.min())
 
-    calmar = ann_ret / max(abs(max_dd), 0.02)
+    calmar = float(ann_ret / max(abs(max_dd), 0.02))
 
     if trades.empty or "pnl" not in trades.columns:
         wr = 0.0

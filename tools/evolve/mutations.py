@@ -221,3 +221,87 @@ def promote_mutation_to_models(
         shutil.rmtree(dest)
     shutil.copytree(mut["model_dir"], dest)
     return dest
+
+
+# Direction-equity mutation menu for evolve_direction_v1.
+# Each spec is a runtime variant (no source copy needed) via config codes / extra_cfg.
+DIRECTION_MUTATION_MENU: list[dict[str, Any]] = [
+    {
+        "name": "base",
+        "codes": None,  # use parent
+        "extra_cfg": {},
+        "hypothesis": "Parent control arm.",
+    },
+    {
+        "name": "add_arm",
+        "codes": ["TSLA.US", "MU.US", "SPY.US", "IONQ.US", "APLD.US", "XLP.US", "QQQ.US", "ARM.US"],
+        "extra_cfg": {},
+        "hypothesis": "Add ARM back to the bag.",
+    },
+    {
+        "name": "drop_xlp",
+        "codes": ["TSLA.US", "MU.US", "SPY.US", "IONQ.US", "APLD.US", "QQQ.US"],
+        "extra_cfg": {},
+        "hypothesis": "Drop XLP (REGIME_FLAT) to concentrate capacity.",
+    },
+    {
+        "name": "add_nvda_pltr",
+        "codes": ["TSLA.US", "MU.US", "SPY.US", "IONQ.US", "APLD.US", "XLP.US", "QQQ.US", "NVDA.US", "PLTR.US"],
+        "extra_cfg": {},
+        "hypothesis": "Expand to high-momentum tech names.",
+    },
+    {
+        "name": "add_mstr_coin",
+        "codes": ["TSLA.US", "MU.US", "SPY.US", "IONQ.US", "APLD.US", "XLP.US", "QQQ.US", "MSTR.US", "COIN.US"],
+        "extra_cfg": {},
+        "hypothesis": "Add crypto-correlated high-beta exposure.",
+    },
+    {
+        "name": "slip_stress_15",
+        "codes": None,
+        "extra_cfg": {"slippage_us": 0.0015},
+        "hypothesis": "Stress slippage to 15 bps per side.",
+    },
+    {
+        "name": "comm_tight",
+        "codes": None,
+        "extra_cfg": {"commission": 0.0005},
+        "hypothesis": "Tighter commission for optimistic capacity test.",
+    },
+]
+
+
+def spawn_direction_variants(
+    base_model: dict[str, Any],
+    menu: list[dict[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    """Build runtime variant specs for direction-equity evolution."""
+    menu = menu or DIRECTION_MUTATION_MENU
+    base_codes = base_model.get("codes") or []
+    if not base_codes:
+        cfg = base_model.get("model_dir") / "config.json" if base_model.get("model_dir") else None
+        if cfg and cfg.exists():
+            try:
+                base_codes = json.loads(cfg.read_text()).get("codes", [])
+            except Exception:
+                pass
+    if not base_codes:
+        base_codes = ["TSLA.US", "MU.US", "SPY.US", "IONQ.US", "APLD.US", "XLP.US", "QQQ.US"]
+
+    variants = []
+    for spec in menu:
+        codes = spec.get("codes") or base_codes
+        vid = f"{base_model['id']}_{spec['name']}"
+        variants.append(
+            {
+                "id": vid,
+                "parent": base_model["id"],
+                "model_dir": base_model["model_dir"],
+                "src_dir": base_model["src_dir"],
+                "codes": list(codes),
+                "extra_cfg": dict(spec.get("extra_cfg", {})),
+                "mutations": [{"name": spec["name"], "hypothesis": spec.get("hypothesis", "")}],
+                "interval": "1H",
+            }
+        )
+    return variants
