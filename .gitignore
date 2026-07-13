@@ -8,6 +8,33 @@
 credentials.json
 secrets/
 
+# Runtime streaming data
+market_runtime.db
+
+# Feedback loop outputs are generated
+runs/feedback_loop_*/
+
+# Node / Next.js / build artifacts
+node_modules/
+.next/
+out/
+build/
+coverage/
+.turbo/
+*.tsbuildinfo
+
+# Generated run artifacts and data caches
+runs/*/
+runs/*.md
+runs/evolve_latest
+*.log
+data_cache/
+**/artifacts/
+*.parquet
+*.pkl
+*.npy
+
+
 # Local env / caches
 .venv/
 venv/
