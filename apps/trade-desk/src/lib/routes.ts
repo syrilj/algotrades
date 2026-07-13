@@ -24,8 +24,8 @@ export function liveHref(symbol?: string): string {
 
 export function optionsHref(symbol?: string): string {
   const s = symbol?.trim().toUpperCase();
-  if (!s) return "/options";
-  return `/options?symbol=${encodeURIComponent(s)}`;
+  if (!s) return "/live?mode=options";
+  return `/live?mode=options&symbol=${encodeURIComponent(s)}`;
 }
 
 export function leaderboardHref(symbol?: string): string {

@@ -72,9 +72,12 @@ class LiveSignalEngine:
         
         return {'vwap': vwap.iloc[-1], 'uptrend': bool(uptrend.iloc[-1])}
     
-    def analyze(self, symbol: str) -> Dict[str, Any]:
+    def analyze(self, symbol: str, df: pd.DataFrame | None = None) -> Dict[str, Any]:
         """Analyze a symbol and return signal dict.
-        
+
+        If ``df`` is provided it must have columns Open, High, Low, Close, Volume
+        with a DatetimeIndex. Otherwise the engine fetches from yfinance.
+
         Returns:
             {
                 'symbol': str,
@@ -90,15 +93,17 @@ class LiveSignalEngine:
             }
         """
         sym = symbol.upper().replace(".US", "")
-        
-        # Fetch data
-        try:
-            ticker = yf.Ticker(sym)
-            df = ticker.history(period="60d", interval="1h")
-            if df.empty or len(df) < 20:
-                return {'symbol': symbol, 'error': 'no_data'}
-        except Exception as e:
-            return {'symbol': symbol, 'error': str(e)}
+
+        # Fetch data if not supplied
+        if df is None:
+            try:
+                ticker = yf.Ticker(sym)
+                df = ticker.history(period="60d", interval="1h")
+            except Exception as e:
+                return {'symbol': symbol, 'error': str(e)}
+
+        if df.empty or len(df) < 20:
+            return {'symbol': symbol, 'error': 'no_data'}
         
         # Calculate features
         vol_z = self._vol_z(df['Volume'], self.params['vol_lookback'])

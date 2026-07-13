@@ -18,6 +18,8 @@ import {
   type PipelinePhase,
 } from "@/components/pipeline/PipelineFlow";
 import { RiskAssessmentPanel } from "@/components/risk/RiskAssessmentPanel";
+import { QuickActionRail } from "@/components/command-center/QuickActionRail";
+import { TickerInsightCard } from "@/components/command-center/TickerInsightCard";
 import { PageHeader } from "@/components/shell/PageHeader";
 import type { AnalyzeResponse, ApiEnvelope, ModelMetaConfig } from "@/lib/types";
 
@@ -155,6 +157,7 @@ function AnalyzePageInner() {
   const size = result?.size ?? null;
   const running = phase === "running";
   const showPipeline = phase === "running" || phase === "done" || phase === "error";
+  const commandCenterIdle = phase === "idle" && !symbol && !qSymbol;
 
   return (
     <div className="td-page">
@@ -178,6 +181,19 @@ function AnalyzePageInner() {
         }
       />
 
+      {commandCenterIdle ? (
+        <section className="td-panel p-4" aria-labelledby="command-center-title">
+          <p className="td-eyebrow">Command center · ready</p>
+          <h2 id="command-center-title" className="mt-1 text-lg font-semibold text-slate-50">
+            Route the next decision from one ticker.
+          </h2>
+          <p className="mt-1 max-w-2xl text-sm text-slate-400">
+            Start with a symbol to build an operator ticket, then use the research desk to validate the
+            setup. No signal is shown until analysis has actually run.
+          </p>
+        </section>
+      ) : null}
+
       <AnalyzeForm
         ref={formRef}
         initialSymbol={symbol || qSymbol}
@@ -186,6 +202,31 @@ function AnalyzePageInner() {
         onSubmit={runAnalyze}
         onModelChange={setActiveModel}
       />
+
+      {commandCenterIdle ? (
+        <>
+          <QuickActionRail />
+          <section className="grid grid-cols-1 gap-3 md:grid-cols-3" aria-label="Desk entry points">
+            <TickerInsightCard
+              symbol="TICKET"
+              eyebrow="Next action"
+              insight="Enter a ticker above to generate the full signal ticket with action, levels, and sizing."
+            />
+            <TickerInsightCard
+              symbol="WATCH"
+              eyebrow="Saved context"
+              insight="Open your watch list to choose a name and return here with symbol context."
+              href="/watch"
+            />
+            <TickerInsightCard
+              symbol="PICKS"
+              eyebrow="Research queue"
+              insight="Review existing picks when you want a candidate before running analysis."
+              href="/picks"
+            />
+          </section>
+        </>
+      ) : null}
 
       {error ? (
         <div className="td-alert td-alert--error" role="alert">
@@ -207,16 +248,18 @@ function AnalyzePageInner() {
         </div>
       ) : null}
 
-      {/* Hero: verdict first */}
-      <VerdictPanel
-        symbol={symbol || state?.symbol}
-        state={state}
-        plan={plan}
-        size={size}
-        model={result?.model}
-        selection={result?.model_selection}
-        empty={phase === "idle" || (phase === "running" && !result)}
-      />
+      {/* Hero: verdict first once a symbol is in the workflow */}
+      {!commandCenterIdle ? (
+        <VerdictPanel
+          symbol={symbol || state?.symbol}
+          state={state}
+          plan={plan}
+          size={size}
+          model={result?.model}
+          selection={result?.model_selection}
+          empty={phase === "idle" || (phase === "running" && !result)}
+        />
+      ) : null}
 
       {phase === "done" && state ? (
         <ModelComputeTrace
@@ -244,7 +287,7 @@ function AnalyzePageInner() {
       ) : null}
 
       {/* Levels visual — only when we have state */}
-      {state || phase === "idle" ? <LevelsPanel state={state} /> : null}
+      {state || (phase === "idle" && !commandCenterIdle) ? <LevelsPanel state={state} /> : null}
 
       {/* Secondary research panels */}
       {phase === "done" || phase === "error" ? (

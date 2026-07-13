@@ -231,7 +231,7 @@ export function EvolveDesk() {
     }
   }, [track]);
 
-  const ranking = board?.run?.ranking ?? [];
+  const ranking = useMemo(() => board?.run?.ranking ?? [], [board?.run?.ranking]);
   const finalize = board?.run?.finalize;
   const winners = board?.winners;
 

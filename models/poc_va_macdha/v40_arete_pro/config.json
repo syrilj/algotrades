@@ -1,0 +1,27 @@
+{
+  "source": "yfinance",
+  "codes": [
+    "TSLA.US",
+    "MU.US",
+    "SPY.US",
+    "IONQ.US",
+    "APLD.US",
+    "XLP.US",
+    "QQQ.US",
+    "SMH.US",
+    "SOXL.US",
+    "VXX.US",
+    "IWM.US"
+  ],
+  "start_date": "2024-08-01",
+  "end_date": "2026-07-11",
+  "initial_cash": 1000,
+  "commission": 0.001,
+  "engine": "daily",
+  "interval": "1H",
+  "strategy": {
+    "model_version": "v40_arete_pro",
+    "parent": "v39b_live_adapt",
+    "note": "v39b live-adapt base with Arete Trading overlay filters"
+  }
+}

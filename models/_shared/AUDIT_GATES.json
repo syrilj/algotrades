@@ -1,0 +1,83 @@
+{
+  "version": "evolve_direction_v1",
+  "gates": [
+    {
+      "id": 1,
+      "name": "pooled_pass_bar",
+      "threshold": "PF>=1.2, Sharpe>=0.5, n>=40, expectancy>0 after costs, |DD|<=0.25 every fold",
+      "checks": ["pooled_pf", "pooled_sharpe", "pooled_n", "pooled_expectancy", "per_fold_dd"]
+    },
+    {
+      "id": 2,
+      "name": "fold_utility_positive",
+      "threshold": "U_f > 0 in >=3/4 folds, n>=8 per fold",
+      "checks": ["fold_utility_positive_count", "per_fold_n"]
+    },
+    {
+      "id": 3,
+      "name": "signflip_significant",
+      "threshold": "sign-flip p <= 0.05",
+      "checks": ["signflip_pvalue"]
+    },
+    {
+      "id": 4,
+      "name": "mc_dd_path",
+      "threshold": "MC DD-path p >= 0.05",
+      "checks": ["mc_dd_pvalue"]
+    },
+    {
+      "id": 5,
+      "name": "bootstrap_sharpe_positive",
+      "threshold": "bootstrap Sharpe 95% CI low > 0",
+      "checks": ["sharpe_ci_low"]
+    },
+    {
+      "id": 6,
+      "name": "deflated_sharpe",
+      "threshold": "DSR >= 0.95",
+      "checks": ["dsr"]
+    },
+    {
+      "id": 7,
+      "name": "pass_bar_at_stress_slippage",
+      "threshold": "PASS_BAR holds at total per-side slippage 0.0020",
+      "checks": ["stress_pf", "stress_sharpe", "stress_n", "stress_expectancy", "stress_dd"]
+    },
+    {
+      "id": 8,
+      "name": "slippage_perturbation",
+      "threshold": "slippage +/-20%: mean fitness >= 0.6x base, none < 0",
+      "checks": ["perturb_fitness_mean", "perturb_fitness_min"]
+    },
+    {
+      "id": 9,
+      "name": "track_b_floor",
+      "threshold": "Track B pooled ret>0, |DD|<=0.30; DURABLE_CLAIM requires full PASS_BAR on Track B",
+      "checks": ["track_b_ret", "track_b_dd"]
+    },
+    {
+      "id": 10,
+      "name": "regime_slices",
+      "threshold": "expectancy>0 in >=2/3 regime slices, no slice |DD|>0.25",
+      "checks": ["regime_positive_ratio", "regime_max_dd"]
+    },
+    {
+      "id": 11,
+      "name": "direction_hit",
+      "threshold": "hit@5d > 50% with binomial p <= 0.10 and expectancy > 0",
+      "checks": ["hit_5_rate", "hit_5_pvalue", "hit_expectancy"]
+    },
+    {
+      "id": 12,
+      "name": "source_scan_and_wf",
+      "threshold": "auditor source scan clean (no fail/block) and walk-forward stitched",
+      "checks": ["auditor_verdict", "wf_consistency"]
+    },
+    {
+      "id": 13,
+      "name": "lockbox_binding",
+      "threshold": "LOCKBOX fitness > 0 and binding",
+      "checks": ["lockbox_fitness"]
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "description": " evolve_direction_v1 unified selection objective. Selection happens on purged OOS folds.",
+  "formula": "FITNESS = reliability(n_pooled, 40) * ( mean_f(U_f) - 0.5 * std_f(U_f) )",
+  "fold_utility": {
+    "ret_weight": 1.0,
+    "sharpe_weight": 0.35,
+    "calmar_weight": 0.15,
+    "win_rate_weight": 0.05,
+    "drawdown_soft": 0.15,
+    "drawdown_soft_penalty": 0.55,
+    "drawdown_hard": 0.25,
+    "drawdown_hard_penalty": 50.0,
+    "sharpe_cap": 3.0,
+    "calmar_cap": 10.0,
+    "formula": "U_f = ret + 0.35*min(sharpe,3) + 0.15*min(calmar,10) + 0.05*wr - 0.55*max(0,|dd|-0.15) - 50*(|dd|>=0.25)"
+  },
+  "fitness": {
+    "reliability": "min(1, n_pooled / 40)",
+    "std_ddof": 0,
+    "formula": "FITNESS = reliability(n_pooled,40) * ( mean_f(U_f) - 0.5*std_f(U_f) )"
+  },
+  "note": "Never use model_registry.score_metrics for selection. This is the only selection metric."
+}

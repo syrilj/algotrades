@@ -1,0 +1,21 @@
+{
+  "base_models": ["v39b_live_adapt", "v39d_confluence"],
+  "mode": "perf_weighted",
+  "forward_bars": 3,
+  "target_threshold": 0.01,
+  "warmup": 80,
+  "learning_rate": 0.02,
+  "alpha": 0.0001,
+  "loss": "log_loss",
+  "feature_deltas": true,
+  "feature_extra": true,
+  "fallback": "v39b_live_adapt",
+  "proba_threshold": 0.5,
+  "signal_mode": "binary",
+  "return_scale": 100.0,
+  "perf_lookback": 60,
+  "perf_temperature": 0.5,
+  "perf_min_weight": 0.0,
+  "perf_forward": 3,
+  "perf_metric": "return_per_dd"
+}

@@ -1,0 +1,14 @@
+{
+  "enable_ma": true,
+  "enable_fib": true,
+  "enable_sox": true,
+  "enable_vix": true,
+  "enable_rs": true,
+  "enable_vol": true,
+  "ma_fast": 22,
+  "ma_slow": 55,
+  "fib_look": 50,
+  "rs_look": 5,
+  "vol_sma": 20,
+  "vol_surge": 1.25
+}

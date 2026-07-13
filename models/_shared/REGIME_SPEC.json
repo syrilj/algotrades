@@ -1,0 +1,37 @@
+{
+  "default_parquet": "models/_shared/regime/regime_daily.parquet",
+  "build": {
+    "start": "2018-01-01",
+    "end": "today",
+    "inputs": {
+      "index": ["SPY", "QQQ"],
+      "defensive": ["XLP", "HYG", "LQD"],
+      "vix": "^VIX",
+      "rates": "^TNX",
+      "credit": ["HYG", "LQD"],
+      "sectors": ["XLK", "XLF", "XLE", "XLV", "XLY", "XLI", "XLU", "XLB", "XLC"]
+    }
+  },
+  "thresholds": {
+    "risk_on": 0.30,
+    "risk_off": -0.30
+  },
+  "sector_map": {
+    "TSLA.US": "XLY.US",
+    "MU.US": "XLK.US",
+    "SPY.US": "SPY.US",
+    "IONQ.US": "XLK.US",
+    "APLD.US": "XLK.US",
+    "XLP.US": "XLP.US",
+    "QQQ.US": "XLK.US",
+    "ARM.US": "XLK.US",
+    "COIN.US": "XLF.US",
+    "RKLB.US": "XLI.US",
+    "NVDA.US": "XLK.US",
+    "PLTR.US": "XLK.US",
+    "MSTR.US": "XLF.US",
+    "HYG.US": "HYG.US",
+    "LQD.US": "LQD.US"
+  },
+  "note": "Index_ok uses previous-day score; sector_ok uses previous-day regime flag for the mapped sector."
+}

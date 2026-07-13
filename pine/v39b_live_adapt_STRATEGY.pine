@@ -1,0 +1,380 @@
+//@version=6
+// =============================================================================
+// v39b_live_adapt — BEST LIVE EQUITY MODEL (desk WINNER)
+// =============================================================================
+// Port of models/poc_va_macdha/v39b_live_adapt for TradingView strategy testing.
+//
+// Philosophy (react, don't predict):
+//   SIDE  = structure nodes (POC / Value Area) + HTF MACD-HA
+//   SIZE  = continuous Coulling VPA score (effort/result) + mom + vol_regime
+//   EXITS = ATR stop / trail + soft VPA collapse
+//
+// VPA rules match Python volume_price_state() + vpa_score_to_mult():
+//   - look=3, vol_sma=14, stop_look=5
+//   - light negative weights (v39b halved stack)
+//   - NO hard stand-aside / no_demand entry kill (soft size only)
+//   - size uses score + 0.35*mom, amplified when vol_regime > 0.8
+//
+// Chart: 1H or 2H. HTF bias default 4H (240).
+// Caution: VP is rolling approx. No XGB meta / live streak. Not 1:1 $ PnL.
+// =============================================================================
+
+strategy(
+     title              = "v39b Live Adapt (WINNER)",
+     shorttitle         = "v39b",
+     overlay            = true,
+     max_bars_back      = 5000,
+     initial_capital    = 100000,
+     default_qty_type   = strategy.percent_of_equity,
+     default_qty_value  = 10,
+     commission_type    = strategy.commission.percent,
+     commission_value   = 0.1,
+     pyramiding         = 0,
+     process_orders_on_close = true,
+     calc_on_every_tick = false
+)
+
+// ── Inputs ───────────────────────────────────────────────────────────────────
+grpS = "Structure (SIDE)"
+vaPct     = input.float(70.0, "Value Area %", minval=50, maxval=95, group=grpS) / 100.0
+vpRows    = input.int(25, "VP rows", minval=10, maxval=50, group=grpS)
+vpLook    = input.int(20, "VP lookback bars", minval=10, maxval=100, group=grpS)
+useHtf    = input.bool(true, "Require HTF MACD-HA green", group=grpS)
+htfTf     = input.timeframe("240", "HTF (4H=240, D=D)", group=grpS)
+useVwap   = input.bool(false, "Require above session VWAP", group=grpS)
+useInVa   = input.bool(true, "Require price in Value Area", group=grpS)
+usePoc    = input.bool(true, "Require close >= POC", group=grpS)
+// Soft only — v39b removed stand-aside floor. Keep false unless debugging.
+useVpaEntryFloor = input.bool(false, "Hard VPA entry floor (OFF = v39b)", group=grpS)
+minVpaEntry = input.float(-1.50, "Hard VPA floor if enabled", step=0.05, group=grpS)
+blockDump = input.bool(true, "Block dump bars (specialist DNA)", group=grpS)
+// no_demand is SOFT score only — never hard-block (was a Pine bug)
+
+grpV = "VPA score (SIZE — matches Python)"
+volSma    = input.int(14, "Vol SMA (fast)", minval=5, group=grpV)
+volLook   = input.int(3, "Price/Vol look", minval=2, maxval=10, group=grpV)
+stopLook  = input.int(5, "Stop/top memory bars", minval=3, group=grpV)
+// Coulling weights — v39b light negatives
+wStopRec  = input.float(1.00, "W stopping reclaim", group=grpV)
+wNoSup    = input.float(0.75, "W no-supply test", group=grpV)
+wSpring   = input.float(0.55, "W spring", group=grpV)
+wConfirm  = input.float(0.50, "W confirm up", group=grpV)
+wHealthy  = input.float(0.20, "W healthy pull", group=grpV)
+wStopVol  = input.float(0.25, "W stopping volume", group=grpV)
+wNoDem    = input.float(0.40, "W no-demand (penalty)", group=grpV)
+wClimax   = input.float(0.45, "W climax recent (penalty)", group=grpV)
+wEffort   = input.float(0.30, "W effort anomaly (penalty)", group=grpV)
+wTop      = input.float(0.28, "W topping recent (penalty)", group=grpV)
+wUpthrust = input.float(0.35, "W upthrust (penalty)", group=grpV)
+wDump     = input.float(0.40, "W dump (penalty)", group=grpV)
+wRedFlag  = input.float(0.22, "W red-flag up (penalty)", group=grpV)
+momW      = input.float(0.35, "Mom blend into size score", group=grpV)
+volRegAmp = input.float(0.15, "Vol-regime amplify factor", group=grpV)
+
+grpE = "EMA cloud (path soft)"
+useCloud  = input.bool(true, "Use EMA cloud soft bias", group=grpE)
+emaFast   = input.int(9, "EMA fast", group=grpE)
+emaMid    = input.int(21, "EMA mid", group=grpE)
+emaSlow   = input.int(55, "EMA slow", group=grpE)
+
+grpX = "Exits / risk"
+basePct   = input.float(10.0, "% equity base size", minval=1, maxval=100, group=grpX)
+stopAtr   = input.float(1.5, "Hard stop ATR mult", minval=0.5, step=0.1, group=grpX)
+trailAtr  = input.float(2.5, "Trail ATR mult", minval=0.5, step=0.1, group=grpX)
+armAtr    = input.float(1.0, "Arm trail after ATR mult", minval=0.2, step=0.1, group=grpX)
+exitVpa   = input.bool(true, "Soft exit on VPA collapse", group=grpX)
+vpaExitTh = input.float(-0.85, "VPA mom exit thresh", step=0.05, group=grpX)
+vpaExitSc = input.float(-0.35, "VPA score exit thresh", step=0.05, group=grpX)
+// Armed underwater hard VPA exit (Python LIVE_RECIPE)
+exitArmedVpa = input.bool(true, "Armed exit: mom<=-1.1 score<=-0.6 UW", group=grpX)
+maxBars   = input.int(48, "Max bars in trade (0=off)", minval=0, group=grpX)
+
+grpD = "Display"
+showVp    = input.bool(true, "Show POC/VAL/VAH", group=grpD)
+showCloud = input.bool(true, "Show EMA cloud", group=grpD)
+showVpa   = input.bool(true, "Show VPA info table", group=grpD)
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+f_ema(src, len) => ta.ema(src, len)
+
+// Standardized MACD HA green (desk)
+f_macd_ha_green(fastL, slowL) =>
+    hl = high - low
+    macd = (f_ema(close, fastL) - f_ema(close, slowL)) / math.max(f_ema(hl, slowL), 1e-10) * 100.0
+    o = nz(macd[1], macd)
+    h = math.max(macd, o)
+    l = math.min(macd, o)
+    c = macd
+    var float haO = na
+    haC = (o + h + l + c) / 4.0
+    haO := na(haO[1]) ? (o + c) / 2.0 : (haO[1] + haC[1]) / 2.0
+    haC > haO
+
+htfGreen = useHtf ? request.security(syminfo.tickerid, htfTf, f_macd_ha_green(12, 26), barmerge.gaps_off, barmerge.lookahead_off) : true
+
+// Volume profile approx (prior lookback only — no current bar, no lookahead)
+f_vp() =>
+    hi = ta.highest(high[1], vpLook)
+    lo = ta.lowest(low[1], vpLook)
+    step = (hi - lo) / vpRows
+    float poc = lo + (hi - lo) * 0.5
+    float vah = hi
+    float val = lo
+    if step > 0
+        bins = array.new_float(vpRows, 0.0)
+        for i = 1 to vpLook
+            for k = 0 to vpRows - 1
+                binLo = lo + k * step
+                if high[i] >= binLo and low[i] < binLo + step
+                    br = high[i] - low[i]
+                    w = br == 0 ? 1.0 : step / br
+                    array.set(bins, k, array.get(bins, k) + volume[i] * w)
+        pocIdx = array.indexof(bins, array.max(bins))
+        target = array.sum(bins) * vaPct
+        acc = array.get(bins, pocIdx)
+        above = pocIdx
+        below = pocIdx
+        while acc < target
+            if below == 0 and above == vpRows - 1
+                break
+            va = above < vpRows - 1 ? array.get(bins, above + 1) : 0.0
+            vb = below > 0 ? array.get(bins, below - 1) : 0.0
+            if va == 0 and vb == 0
+                break
+            if va >= vb
+                above += 1
+                acc += va
+            else
+                below -= 1
+                acc += vb
+        poc := lo + (pocIdx + 0.5) * step
+        vah := lo + (above + 1.0) * step
+        val := lo + below * step
+    [poc, vah, val]
+
+[poc, vah, val] = f_vp()
+
+// Session VWAP proxy (desk has swing-anchored; this is stable for TV)
+vap = ta.vwap
+aboveVwap = close >= vap
+
+// =============================================================================
+// Coulling VPA continuous score — 1:1 with Python volume_price_state()
+// =============================================================================
+vsma = ta.sma(volume, volSma)
+priceUp = close > close[volLook]
+priceDn = close < close[volLook]
+volUp = volume > vsma
+volRising = volume > volume[volLook]
+volFalling = volume < volume[volLook]
+
+confirmUp = priceUp and (volUp or volRising)
+redFlagUp = priceUp and volFalling and not volUp
+healthyPull = priceDn and volFalling
+dump = priceDn and volRising and volUp
+
+spread = high - low
+// Python: rolling mean with min_periods=4; ta.sma is fine after warmup
+spreadMa = ta.sma(spread, 14)
+narrow = spread < 0.75 * spreadMa
+wide = spread > 1.25 * spreadMa
+volLow = volume < 0.70 * vsma
+volHigh = volume > 1.50 * vsma
+volClimax = volume > 2.0 * vsma
+green = close > open
+red = close < open
+ret1 = close / close[1] - 1.0
+
+// Stopping / topping use PRIOR direction into this bar (Python prior_dn/up)
+priorDn = close[1] < close[volLook + 1]
+priorUp = close[1] > close[volLook + 1]
+stoppingVol = priorDn and volHigh and narrow
+toppingVol = priorUp and volHigh and narrow
+
+// no_demand / no_supply: SOFT only (never hard entry kill)
+noDemand = (priceUp or green) and volLow
+noSupply = (priceDn or red) and volLow
+
+effortAnom = (wide and volLow) or (wide and priceUp and not volUp and volFalling)
+buyingClimax = priceUp and volClimax and wide
+// selling_climax computed in Python but not in score — omit from score
+
+stopRecent = ta.highest(stoppingVol ? 1.0 : 0.0, stopLook) > 0
+topRecent = ta.highest(toppingVol ? 1.0 : 0.0, stopLook) > 0
+climaxRecent = ta.highest(buyingClimax ? 1.0 : 0.0, stopLook) > 0
+
+stoppingReclaim = stopRecent and green and ret1 > 0.004 and not dump
+noSupplyTest = stopRecent and noSupply and green
+commitment = confirmUp or stoppingReclaim or noSupplyTest
+
+// Spring / upthrust vs prior look window (exclude current: high[1]/low[1] roll)
+priorHigh = ta.highest(high[1], volLook)
+priorLow = ta.lowest(low[1], volLook)
+upthrust = high > priorHigh and close < open and close < priorHigh
+spring = low < priorLow and close > open and close > priorLow
+
+// Continuous score (v39b light negatives) — exact Python stack
+vpaScore =
+     (stoppingReclaim ? wStopRec : 0.0)
+   + (noSupplyTest ? wNoSup : 0.0)
+   + (spring ? wSpring : 0.0)
+   + (confirmUp ? wConfirm : 0.0)
+   + (healthyPull ? wHealthy : 0.0)
+   + (stoppingVol ? wStopVol : 0.0)
+   - (noDemand ? wNoDem : 0.0)
+   - (climaxRecent ? wClimax : 0.0)
+   - (effortAnom ? wEffort : 0.0)
+   - (topRecent ? wTop : 0.0)
+   - (upthrust ? wUpthrust : 0.0)
+   - (dump ? wDump : 0.0)
+   - (redFlagUp ? wRedFlag : 0.0)
+
+vpaScore := math.max(-2.0, math.min(2.5, vpaScore))
+
+// Fast live adapt: score momentum vs 8-bar mean
+vpaMa = ta.sma(vpaScore, 8)
+vpaMom = math.max(-1.5, math.min(1.5, vpaScore - vpaMa))
+
+// vol_z LAG 1 bar (Python .shift(1)) — no same-bar volume peek for regime
+volStd = ta.stdev(volume, 14)
+volZRaw = (volume - vsma) / math.max(volStd, 1e-10)
+volZ = nz(volZRaw[1], 0.0)
+volRegime = math.max(0.0, math.min(3.0, ta.sma(math.abs(volZ), 10)))
+
+// ── vpa_score_to_mult (Python exact) ─────────────────────────────────────────
+// s = score + 0.35*mom; if vol_regime>0.8 amplify; then bucket
+f_vpa_mult(score, mom, vreg) =>
+    s = score + momW * mom
+    if vreg > 0.8
+        s := s * (1.0 + volRegAmp * math.min(vreg, 2.0))
+    s >= 1.25 ? 1.20 :
+     s >= 0.60 ? 1.12 :
+     s >= 0.20 ? 1.06 :
+     s >= -0.20 ? 1.00 :
+     s >= -0.70 ? 0.82 :
+     s >= -1.25 ? 0.68 : 0.55
+
+vpaMult = f_vpa_mult(vpaScore, vpaMom, volRegime)
+
+// Demand node: near VAL/POC within ~0.75 ATR
+atr = ta.atr(14)
+nearVal = not na(val) and math.abs(close - val) <= 0.75 * atr
+nearPoc = not na(poc) and math.abs(close - poc) <= 0.75 * atr
+demandNode = nearVal or nearPoc
+
+// Python: demand_node and (vpa_score + 0.25*mom) >= 0 → ×1.12
+if demandNode and (vpaScore + 0.25 * vpaMom) >= 0.0
+    vpaMult := vpaMult * 1.12
+
+// Soft structure confluence at node (desk overlay)
+structureGood = close <= (val + vah) / 2.0 and f_macd_ha_green(12, 26)
+if structureGood and demandNode and vpaScore >= 0.20 and vpaMom >= -0.10
+    vpaMult := vpaMult * 1.08
+
+// EMA cloud soft path bias
+eF = f_ema(close, emaFast)
+eM = f_ema(close, emaMid)
+eS = f_ema(close, emaSlow)
+emaBull = eF > eM and eM > eS
+emaBear = eF < eM and eM < eS
+if useCloud
+    if emaBull
+        vpaMult := vpaMult * 1.06
+    if emaBear
+        vpaMult := vpaMult * 0.90
+
+vpaMult := math.max(0.35, math.min(1.45, vpaMult))
+
+// ── Primary SIDE gates (structure first — VPA does not choose side) ──────────
+pocOk = not usePoc or (not na(poc) and close >= poc)
+inVa = not useInVa or (not na(val) and not na(vah) and close >= val and close <= vah)
+vwapOk = not useVwap or aboveVwap
+// Optional hard floor only if user enables (default OFF = v39b)
+vpaFloorOk = not useVpaEntryFloor or vpaScore >= minVpaEntry
+// Dump block is specialist DNA (soft-ish hard for TV safety)
+notDumpOk = not blockDump or not dump
+
+// CRITICAL FIX: do NOT hard-block no_demand — only soft in score
+longSide = pocOk and inVa and htfGreen and vwapOk and vpaFloorOk and notDumpOk
+
+// Prefer commitment (confirm / reclaim / no-supply test) for display, not hard gate
+longPreferred = longSide and (commitment or demandNode)
+
+// ── Size: actually apply VPA mult to shares ───────────────────────────────────
+// Python sizes via mult; TV must pass qty or VPA does nothing
+qtyPct = basePct * vpaMult
+qtyShares = math.max(1.0, (strategy.equity * qtyPct / 100.0) / math.max(close, syminfo.mintick))
+
+// ── Entries / exits ──────────────────────────────────────────────────────────
+if longSide and strategy.position_size == 0
+    strategy.entry("L", strategy.long, qty=qtyShares, comment="v39b L vpa=" + str.tostring(vpaScore, "#.##") + " x" + str.tostring(vpaMult, "#.##"))
+
+if strategy.position_size > 0
+    entryPx = strategy.position_avg_price
+    hardStop = entryPx - stopAtr * atr
+    strategy.exit("X", from_entry="L", stop=hardStop, trail_offset=trailAtr * atr / syminfo.mintick, trail_points=armAtr * atr / syminfo.mintick)
+
+    inProfit = close > entryPx + armAtr * atr
+    underwater = close < entryPx
+
+    // Unarmed soft exits (LIVE_RECIPE)
+    vpaCollapse = exitVpa and vpaMom <= vpaExitTh and vpaScore <= vpaExitSc and not inProfit
+    climaxOut = climaxRecent and vpaScore < 0 and not inProfit
+    if vpaCollapse or climaxOut
+        strategy.close("L", comment="vpa_soft_exit")
+
+    // Armed + collapsing + underwater
+    if exitArmedVpa and inProfit == false and underwater and vpaMom <= -1.10 and vpaScore <= -0.60
+        strategy.close("L", comment="vpa_armed_uw")
+
+    if maxBars > 0 and strategy.opentrades > 0
+        barsIn = bar_index - strategy.opentrades.entry_bar_index(0)
+        if barsIn >= maxBars
+            strategy.close("L", comment="max_bars")
+
+// ── Plots ────────────────────────────────────────────────────────────────────
+plot(showVp ? poc : na, "POC", color=color.new(color.orange, 0), linewidth=2)
+plot(showVp ? val : na, "VAL", color=color.new(color.teal, 20), linewidth=1)
+plot(showVp ? vah : na, "VAH", color=color.new(color.red, 40), linewidth=1)
+plot(useVwap ? vap : na, "VWAP", color=color.new(color.blue, 50))
+
+p1 = plot(showCloud ? eF : na, "EMA9", color=color.new(color.aqua, 60))
+p2 = plot(showCloud ? eS : na, "EMA55", color=color.new(color.gray, 70))
+fill(p1, p2, color=emaBull ? color.new(color.teal, 85) : emaBear ? color.new(color.maroon, 88) : color.new(color.gray, 92))
+
+bgcolor(longPreferred ? color.new(color.teal, 90) : longSide ? color.new(color.teal, 95) : na, title="Long structure")
+plotshape(longSide and strategy.position_size == 0, title="Entry", style=shape.triangleup, location=location.belowbar, size=size.tiny, color=color.teal, text="L")
+
+// Hidden plots for alert / strategy diagnostics
+plot(vpaScore, "VPA score", display=display.none)
+plot(vpaMom, "VPA mom", display=display.none)
+plot(vpaMult, "VPA mult", display=display.none)
+
+// Info table
+var table t = table.new(position.top_right, 2, 10, bgcolor=color.new(color.black, 70), border_width=1)
+if barstate.islast and showVpa
+    table.cell(t, 0, 0, "v39b LIVE", text_color=color.white, text_size=size.small)
+    table.cell(t, 1, 0, "WINNER", text_color=color.teal, text_size=size.small)
+    table.cell(t, 0, 1, "VPA score", text_color=color.gray, text_size=size.tiny)
+    table.cell(t, 1, 1, str.tostring(vpaScore, "#.##"), text_color=vpaScore >= 0 ? color.lime : color.red, text_size=size.small)
+    table.cell(t, 0, 2, "VPA mom", text_color=color.gray, text_size=size.tiny)
+    table.cell(t, 1, 2, str.tostring(vpaMom, "#.##"), text_color=color.white, text_size=size.small)
+    table.cell(t, 0, 3, "vol_regime", text_color=color.gray, text_size=size.tiny)
+    table.cell(t, 1, 3, str.tostring(volRegime, "#.##"), text_color=color.white, text_size=size.small)
+    table.cell(t, 0, 4, "Size mult", text_color=color.gray, text_size=size.tiny)
+    table.cell(t, 1, 4, str.tostring(vpaMult, "#.##"), text_color=color.aqua, text_size=size.small)
+    table.cell(t, 0, 5, "HTF HA", text_color=color.gray, text_size=size.tiny)
+    table.cell(t, 1, 5, htfGreen ? "GREEN" : "RED", text_color=htfGreen ? color.lime : color.red, text_size=size.small)
+    table.cell(t, 0, 6, "Node", text_color=color.gray, text_size=size.tiny)
+    table.cell(t, 1, 6, demandNode ? "DEMAND" : "—", text_color=demandNode ? color.orange : color.gray, text_size=size.small)
+    table.cell(t, 0, 7, "Side", text_color=color.gray, text_size=size.tiny)
+    table.cell(t, 1, 7, longSide ? "LONG OK" : "WAIT", text_color=longSide ? color.lime : color.gray, text_size=size.small)
+    table.cell(t, 0, 8, "Flags", text_color=color.gray, text_size=size.tiny)
+    flags = (noDemand ? "nDem " : "") + (dump ? "dump " : "") + (commitment ? "commit " : "") + (redFlagUp ? "rFlag" : "")
+    table.cell(t, 1, 8, flags == "" ? "—" : flags, text_color=color.yellow, text_size=size.tiny)
+    table.cell(t, 0, 9, "TF tip", text_color=color.gray, text_size=size.tiny)
+    table.cell(t, 1, 9, "1H / 2H", text_color=color.white, text_size=size.tiny)
+
+// Alerts
+alertcondition(longSide and strategy.position_size == 0, title="v39b Long setup", message="v39b LONG {{ticker}} @ {{close}}")
+alertcondition(longPreferred and strategy.position_size == 0, title="v39b Preferred long", message="v39b PREFERRED LONG {{ticker}} @ {{close}} (commit/node)")

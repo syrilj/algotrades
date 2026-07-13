@@ -1,199 +1,23 @@
-"use client";
+import { Suspense } from "react";
+import { ModelsCatalogView } from "@/components/models/ModelsCatalogView";
 
-import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
-import type { ApiEnvelope, EngineModelInfo, ModelsCatalog } from "@/lib/types";
-import { ModelBadges } from "@/components/leaderboard/ModelBadges";
-import { PageHeader } from "@/components/shell/PageHeader";
-import { modelHref } from "@/lib/routes";
-
-async function fetchCatalog(): Promise<ModelsCatalog> {
-  const res = await fetch("/api/models", { cache: "no-store" });
-  if (!res.ok) throw new Error(`HTTP ${res.status}`);
-  const body = (await res.json()) as ApiEnvelope<ModelsCatalog> | ModelsCatalog;
-  if (body && typeof body === "object" && "ok" in body) {
-    const env = body as ApiEnvelope<ModelsCatalog>;
-    if (!env.ok || !env.data) throw new Error(env.error || "Failed to load models");
-    return env.data;
-  }
-  return body as ModelsCatalog;
-}
-
-function buildModelsList(catalog: ModelsCatalog): EngineModelInfo[] {
-  if (catalog.models?.length) return catalog.models;
-
-  const engineSet = new Set(catalog.engines ?? []);
-  const versions = catalog.all_versions?.length
-    ? catalog.all_versions
-    : [...engineSet];
-  const ids = [...new Set([...versions, ...engineSet])].sort();
-
-  return ids.map((id) => ({
-    id,
-    has_engine: engineSet.has(id),
-    is_default: id === catalog.default_model,
-    is_winner: Boolean(catalog.winner && id === catalog.winner),
-  }));
-}
+export const metadata = {
+  title: "Models · Trade Desk",
+  description: "All discovered model versions (engines + non-engines).",
+};
 
 export default function ModelsCatalogPage() {
-  const [catalog, setCatalog] = useState<ModelsCatalog | null>(null);
-  const [models, setModels] = useState<EngineModelInfo[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [view, setView] = useState<"grid" | "list">("grid");
-
-  const refresh = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await fetchCatalog();
-      setCatalog(data);
-      setModels(buildModelsList(data));
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load catalog");
-      setModels([]);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void refresh();
-  }, [refresh]);
-
   return (
-    <div className="td-page">
-      <PageHeader
-        title="Models"
-        description={
-          <>
-            All discovered versions (engines + non-engines). Refresh after adding a new{" "}
-            <code className="text-[12px]">v*</code> folder.
-          </>
-        }
-        meta={
-          catalog ? (
-            <span className="tabular" style={{ fontFamily: "var(--td-font-mono)" }}>
-              {models.length} models · default {catalog.default_model}
-              {catalog.winner ? ` · winner ${catalog.winner}` : ""}
-              {catalog.updated_at ? ` · updated ${catalog.updated_at}` : ""}
-            </span>
-          ) : null
-        }
-        actions={
-          <div className="flex items-center gap-2">
-            <div
-              className="inline-flex overflow-hidden rounded-[var(--td-radius-sm)]"
-              style={{ border: "1px solid var(--td-ink-600)" }}
-              role="group"
-              aria-label="View mode"
-            >
-              {(["grid", "list"] as const).map((v) => (
-                <button
-                  key={v}
-                  type="button"
-                  onClick={() => setView(v)}
-                  className="px-3 py-1.5 text-[13px] capitalize"
-                  style={{
-                    background: view === v ? "var(--td-brand)" : "var(--td-ink-800)",
-                    color: view === v ? "var(--td-ink-50)" : "var(--td-ink-300)",
-                  }}
-                  aria-pressed={view === v}
-                >
-                  {v}
-                </button>
-              ))}
-            </div>
-            <button
-              type="button"
-              onClick={() => void refresh()}
-              disabled={loading}
-              className="td-btn td-btn-ghost"
-            >
-              {loading ? "Refreshing…" : "Refresh"}
-            </button>
-          </div>
-        }
-      />
-
-      {error ? (
-        <p className="td-alert td-alert--error" role="alert">
-          {error}
-        </p>
-      ) : null}
-
-      {loading && !models.length ? (
-        <p className="td-muted">Discovering models from API…</p>
-      ) : null}
-
-      {!loading && !models.length && !error ? (
-        <p className="td-muted">No models discovered yet.</p>
-      ) : null}
-
-      {view === "grid" ? (
-        <ul className="m-0 grid list-none grid-cols-1 gap-3 p-0 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {models.map((m) => (
-            <li key={m.id}>
-              <Link
-                href={modelHref(m.id)}
-                className="td-panel block h-full p-4 no-underline transition-colors hover:border-[var(--td-brand)]"
-                style={{
-                  boxShadow: m.is_winner
-                    ? "inset 2px 0 0 var(--td-brand)"
-                    : undefined,
-                }}
-              >
-                <p
-                  className="mb-2 text-[14px] font-medium"
-                  style={{ fontFamily: "var(--td-font-mono)" }}
-                >
-                  {m.id}
-                </p>
-                <ModelBadges
-                  isWinner={m.is_winner}
-                  isDefault={m.is_default}
-                  hasEngine={m.has_engine}
-                />
-              </Link>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <ul className="td-panel m-0 list-none overflow-hidden p-0">
-          {models.map((m) => (
-            <li
-              key={m.id}
-              style={{
-                borderBottom: "1px solid var(--td-ink-800)",
-                boxShadow: m.is_winner
-                  ? "inset 2px 0 0 var(--td-brand)"
-                  : undefined,
-              }}
-            >
-              <Link
-                href={modelHref(m.id)}
-                className="td-row-link flex flex-wrap items-center justify-between gap-2 px-4 py-3 no-underline"
-              >
-                <span
-                  className="text-[13px]"
-                  style={{
-                    fontFamily: "var(--td-font-mono)",
-                    color: "var(--td-ink-100)",
-                  }}
-                >
-                  {m.id}
-                </span>
-                <ModelBadges
-                  isWinner={m.is_winner}
-                  isDefault={m.is_default}
-                  hasEngine={m.has_engine}
-                />
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
+    <Suspense
+      fallback={
+        <div className="td-page">
+          <p className="td-muted">Discovering models…</p>
+        </div>
+      }
+    >
+      <div className="td-page">
+        <ModelsCatalogView showHeader />
+      </div>
+    </Suspense>
   );
 }

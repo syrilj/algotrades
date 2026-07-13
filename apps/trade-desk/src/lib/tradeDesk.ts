@@ -106,11 +106,80 @@ export async function runTradeDesk(
   return runPythonScript(tradeDeskScript(), args, "trade_desk", timeoutMs);
 }
 
-/** Full live ticket: features + macro + v25 risk + options structure. */
+function livePlanArgsToBody(
+  args: string[],
+): Record<string, string | number | boolean | undefined> {
+  const body: Record<string, string | number | boolean | undefined> = {};
+  for (let i = 0; i < args.length; i++) {
+    const key = args[i];
+    switch (key) {
+      case "--symbol":
+        body.symbol = args[++i];
+        break;
+      case "--account":
+        body.account = Number(args[++i]);
+        break;
+      case "--peak":
+        body.peak = Number(args[++i]);
+        break;
+      case "--history":
+        body.history = args[++i];
+        break;
+      case "--model":
+        body.model = args[++i];
+        break;
+      case "--symbols":
+        body.symbols = args[++i];
+        break;
+      case "--no-model":
+        body.no_model = true;
+        break;
+      case "--scan":
+        body.scan = true;
+        break;
+      default:
+        break;
+    }
+  }
+  return body;
+}
+
+async function callMarketRuntimePlan(
+  args: string[],
+  timeoutMs: number,
+): Promise<unknown> {
+  const url = process.env.MARKET_RUNTIME_URL;
+  if (!url) {
+    throw new Error("MARKET_RUNTIME_URL not set");
+  }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(`${url.replace(/\/$/, "")}/plan`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(livePlanArgsToBody(args)),
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      throw new Error(`market-runtime /plan returned ${res.status}`);
+    }
+    return await res.json();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Full live ticket: features + macro + v25 risk + options structure.
+ *  Prefers the streaming market-runtime service when MARKET_RUNTIME_URL is set.
+ */
 export async function runLivePlan(
   args: string[],
   timeoutMs = 90_000,
 ): Promise<unknown> {
+  if (process.env.MARKET_RUNTIME_URL) {
+    return callMarketRuntimePlan(args, timeoutMs);
+  }
   return runPythonScript(livePlanScript(), args, "live_plan", timeoutMs);
 }
 

@@ -262,6 +262,9 @@ def run_one(
     force_1d: bool = True,
     reuse: bool = True,
     cash: float | None = None,
+    source: str = "yfinance",
+    interval: str | None = None,
+    extra_cfg: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Run one backtest; return metrics dict with $ PnL at `cash`."""
     mid = model["id"]
@@ -308,9 +311,9 @@ def run_one(
     run_code = run_dir / "code"
     _copy_model_code(model, run_code)
 
-    interval = "1D" if force_1d else model.get("interval", "1D")
+    final_interval = interval if interval is not None else ("1D" if force_1d else model.get("interval", "1D"))
     if mode == "options":
-        interval = "1D"
+        final_interval = "1D"
 
     # Scale max contracts roughly with cash (capacity honesty at $10k)
     max_contracts = max(1, int(500 * (cash / 1_000_000)))
@@ -329,14 +332,14 @@ def run_one(
             pass
 
     cfg = {
-        "source": "yfinance",
+        "source": source,
         "codes": codes,
         "start_date": start,
         "end_date": end,
         "initial_cash": cash,
         "commission": commission,
         "engine": mode,
-        "interval": interval,
+        "interval": final_interval,
         "options_config": {
             "risk_free_rate": 0.05,
             "contract_multiplier": 100,
@@ -349,6 +352,8 @@ def run_one(
             "cash": cash,
         },
     }
+    if extra_cfg:
+        cfg.update(extra_cfg)
     run_dir.mkdir(parents=True, exist_ok=True)
     (run_dir / "config.json").write_text(json.dumps(cfg, indent=2))
 

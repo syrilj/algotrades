@@ -1,52 +1,344 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>Trading Algo Live Signals</title>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Live Trading Signals</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&family=Lora:wght@400;500;600&display=swap" rel="stylesheet" />
   <style>
-    body { font-family: -apple-system, sans-serif; margin: 20px; background: #1a1a2e; color: #eee; }
-    .signal-card { background: #16213e; padding: 15px; margin: 10px 0; border-radius: 8px; border-left: 4px solid #00ff88; }
-    .signal-card.high { border-left-color: #ff4444; }
-    .signal-card.low { border-left-color: #4488ff; }
-    .vol-z { font-size: 1.5em; font-weight: bold; color: #00ff88; }
-    .no-signal { opacity: 0.5; }
-    button { background: #0f3460; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; }
-    button:hover { background: #1a53ff; }
+    :root {
+      /* Anthropic brand palette — dark background interpretation */
+      --brand-dark: #141413;
+      --brand-light: #faf9f5;
+      --brand-mid: #b0aea5;
+      --brand-subtle: #e8e6dc;
+      --accent-orange: #d97757;
+      --accent-blue: #6a9bcc;
+      --accent-green: #788c5d;
+
+      --surface: #1a1a18;
+      --surface-elevated: #242420;
+      --border: rgba(232, 230, 220, 0.12);
+      --text: var(--brand-light);
+      --text-secondary: var(--brand-mid);
+      --text-muted: #8c8a82;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      color-scheme: dark;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: radial-gradient(ellipse at top, #1d1d1b 0%, var(--brand-dark) 60%);
+      color: var(--text);
+      font-family: 'Lora', Georgia, serif;
+      font-size: 15px;
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .container {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 48px 24px 64px;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+      margin-bottom: 40px;
+      padding-bottom: 24px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .brand-mark {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px;
+      height: 36px;
+      border-radius: 6px;
+      background: var(--surface-elevated);
+      border: 1px solid var(--border);
+      color: var(--accent-orange);
+      font-family: 'Poppins', Arial, sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+    }
+
+    h1 {
+      margin: 0;
+      font-family: 'Poppins', Arial, sans-serif;
+      font-size: 28px;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      color: var(--text);
+    }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .last-updated {
+      color: var(--text-secondary);
+      font-size: 13px;
+    }
+
+    button {
+      appearance: none;
+      border: 1px solid var(--accent-orange);
+      background: transparent;
+      color: var(--accent-orange);
+      font-family: 'Poppins', Arial, sans-serif;
+      font-size: 13px;
+      font-weight: 500;
+      padding: 8px 18px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 120ms ease, color 120ms ease;
+    }
+
+    button:hover {
+      background: var(--accent-orange);
+      color: var(--brand-dark);
+    }
+
+    .signals {
+      display: grid;
+      gap: 14px;
+    }
+
+    .card {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 20px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 18px 22px;
+      opacity: 0;
+      transform: translateY(8px);
+      animation: fadeIn 420ms cubic-bezier(0.16, 1, 0.3, 1) forwards;
+      animation-delay: var(--delay, 0ms);
+    }
+
+    @media (max-width: 640px) {
+      .card {
+        grid-template-columns: 1fr;
+        gap: 12px;
+      }
+    }
+
+    .card-accent {
+      width: 4px;
+      height: 44px;
+      border-radius: 2px;
+      background: var(--text-muted);
+    }
+
+    .card-accent.accent-orange { background: var(--accent-orange); }
+    .card-accent.accent-blue { background: var(--accent-blue); }
+    .card-accent.accent-green { background: var(--accent-green); }
+
+    .card-main {
+      min-width: 0;
+    }
+
+    .symbol {
+      margin: 0;
+      font-family: 'Poppins', Arial, sans-serif;
+      font-size: 18px;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+    }
+
+    .verdict {
+      display: inline-block;
+      margin-top: 6px;
+      font-family: 'Poppins', Arial, sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    .verdict.accent-orange { color: var(--accent-orange); }
+    .verdict.accent-blue { color: var(--accent-blue); }
+    .verdict.accent-green { color: var(--accent-green); }
+
+    .metrics {
+      display: flex;
+      gap: 28px;
+      flex-wrap: wrap;
+    }
+
+    .metric {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .metric-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-secondary);
+    }
+
+    .metric-value {
+      font-variant-numeric: tabular-nums;
+      font-family: 'Lora', Georgia, serif;
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .empty,
+    .loading,
+    .error {
+      padding: 48px 24px;
+      text-align: center;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface);
+      color: var(--text-secondary);
+    }
+
+    .error {
+      color: var(--accent-orange);
+      background: rgba(217, 119, 87, 0.08);
+    }
+
+    @keyframes fadeIn {
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
   </style>
 </head>
 <body>
-  <h1>📈 Live Trading Signals ($1K → $1M)</h1>
-  
-  <div id="signals"></div>
-  <button onclick="scan()">Refresh Signals</button>
-  
+  <div class="container">
+    <header>
+      <div class="brand">
+        <span class="brand-mark">TA</span>
+        <h1>Live Trading Signals</h1>
+      </div>
+      <div class="controls">
+        <span class="last-updated" id="asof">--</span>
+        <button id="refresh" type="button">Refresh</button>
+      </div>
+    </header>
+
+    <main id="signals" class="signals">
+      <p class="loading">Loading signals…</p>
+    </main>
+  </div>
+
   <script>
+    const container = document.getElementById('signals');
+    const asofEl = document.getElementById('asof');
+    const refreshBtn = document.getElementById('refresh');
+
+    function formatTime(iso) {
+      if (!iso) return '--';
+      const d = new Date(iso);
+      return d.toLocaleString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+    }
+
+    function accentFor(signal) {
+      if (!signal.go_long) return 'muted';
+      const s = signal.signal_strength || 0;
+      if (s >= 5) return 'orange';
+      if (s >= 3) return 'blue';
+      return 'green';
+    }
+
+    function render(data) {
+      const signals = (data && data.signals) || [];
+      if (!signals.length) {
+        container.innerHTML = '<p class="empty">No signals. Stand aside.</p>';
+        return;
+      }
+
+      asofEl.textContent = data.asof ? `Updated ${formatTime(data.asof)}` : 'No data';
+
+      container.innerHTML = signals.map((s, i) => {
+        const accent = accentFor(s);
+        return `
+          <article class="card" style="--delay: ${i * 60}ms">
+            <div class="card-accent accent-${accent}"></div>
+            <div class="card-main">
+              <h2 class="symbol">${s.symbol}</h2>
+              <span class="verdict accent-${accent}">${s.go_long ? 'Go Long' : 'Stand Aside'}</span>
+            </div>
+            <div class="metrics">
+              <div class="metric">
+                <span class="metric-label">Leverage</span>
+                <span class="metric-value">${s.signal_strength ? s.signal_strength.toFixed(1) + 'x' : '—'}</span>
+              </div>
+              <div class="metric">
+                <span class="metric-label">Vol Z</span>
+                <span class="metric-value">${s.vol_z ?? 0}</span>
+              </div>
+              <div class="metric">
+                <span class="metric-label">Confidence</span>
+                <span class="metric-value">${(s.confidence * 100).toFixed(0)}%</span>
+              </div>
+              <div class="metric">
+                <span class="metric-label">Price</span>
+                <span class="metric-value">$${s.price}</span>
+              </div>
+            </div>
+          </article>
+        `;
+      }).join('');
+    }
+
     async function scan() {
-      const symbols = ['IONQ.US', 'APLD.US', 'TSLA.US', 'META.US', 'NVDA.US'];
-      
-      const container = document.getElementById('signals');
-      container.innerHTML = '<p>Loading...</p>';
-      
-      for (const symbol of symbols) {
-        try {
-          const res = await fetch(`/signal/${symbol}`);
-          const data = await res.json();
-          
-          const card = document.createElement('div');
-          card.className = `signal-card ${data.signal_strength > 5 ? 'high' : data.signal_strength > 0 ? 'low' : ''}`;
-          card.innerHTML = `
-            <strong>${symbol}</strong> ${data.go_long ? '🚀 GO LONG' : '⏸️ No Signal'}
-            <div class="vol-z">vol_z: ${data.vol_z || 0}</div>
-            <small>Confidence: ${(data.confidence * 100).toFixed(0)}% | Leverage: ${data.signal_strength}x | Price: $${data.price}</small>
-          `;
-          container.appendChild(card);
-        } catch (e) {
-          console.error(e);
-        }
+      container.innerHTML = '<p class="loading">Loading signals…</p>';
+      asofEl.textContent = 'Updating…';
+      try {
+        const res = await fetch('/scan');
+        if (!res.ok) throw new Error(`Server error ${res.status}`);
+        const data = await res.json();
+        render(data);
+      } catch (e) {
+        container.innerHTML = `<p class="error">Could not load signals: ${e.message}</p>`;
+        asofEl.textContent = '--';
       }
     }
-    
+
+    refreshBtn.addEventListener('click', scan);
     scan();
-    setInterval(scan, 60000); // Auto-refresh every minute
+    setInterval(scan, 60000);
   </script>
 </body>
 </html>

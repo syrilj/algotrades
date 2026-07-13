@@ -33,7 +33,7 @@ function ModeBadge({ mode }: { mode?: string }) {
   );
 }
 
-function OptionsDeskInner() {
+function OptionsDeskInner({ showHeader = true }: { showHeader?: boolean }) {
   const searchParams = useSearchParams();
   const qSymbol = searchParams.get("symbol")?.toUpperCase() ?? "";
 
@@ -91,9 +91,9 @@ function OptionsDeskInner() {
   const attack =
     plan?.mode?.toUpperCase().includes("OPTIONS") === true && isBuy;
 
-  return (
-    <div className="td-page">
-      <PageHeader
+  const body = (
+    <>
+      {showHeader && <PageHeader
         title="Options"
         description="Structure + risk mode + what to do. Live strikes from the picker; v22 robust is research only."
         actions={
@@ -111,7 +111,7 @@ function OptionsDeskInner() {
             </div>
           ) : null
         }
-      />
+      />}
 
       <section className="td-toolbar">
         <div className="td-toolbar__row">
@@ -401,20 +401,25 @@ function OptionsDeskInner() {
           </section>
         </div>
       ) : null}
-    </div>
+    </>
   );
+  return showHeader ? <div className="td-page">{body}</div> : body;
 }
 
-export function OptionsDesk() {
+export function OptionsDesk({ showHeader = true }: { showHeader?: boolean }) {
   return (
     <Suspense
       fallback={
-        <div className="td-page">
+        showHeader ? (
+          <div className="td-page">
+            <p className="td-muted">Loading options desk…</p>
+          </div>
+        ) : (
           <p className="td-muted">Loading options desk…</p>
-        </div>
+        )
       }
     >
-      <OptionsDeskInner />
+      <OptionsDeskInner showHeader={showHeader} />
     </Suspense>
   );
 }

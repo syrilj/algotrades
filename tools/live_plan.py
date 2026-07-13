@@ -17,14 +17,18 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
 import numpy as np
 import pandas as pd
 import yfinance as yf
+from dotenv import load_dotenv
+
+load_dotenv()
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -32,6 +36,7 @@ sys.path.insert(0, str(ROOT / "tools"))
 sys.path.insert(0, str(ROOT / "services"))
 
 from live_signal import LiveSignalEngine  # noqa: E402
+from services.market_runtime import LSEAdapter  # noqa: E402
 from options_picker import propose as options_propose  # noqa: E402
 from risk_manager import (  # noqa: E402
     PortfolioState,
@@ -60,7 +65,58 @@ def _daily_close(ticker: str, period: str = "6mo") -> pd.Series:
     return s.dropna()
 
 
-def macro_regime() -> dict[str, Any]:
+def _lse_symbol(sym: str) -> str:
+    s = sym.strip().upper().replace(".US", "")
+    # LSE FX convention is CCY/CCY (e.g. EUR/GBP)
+    if len(s) == 6 and s.isalpha() and "/" not in s:
+        s = f"{s[:3]}/{s[3:]}"
+    return s
+
+
+def _lse_candles_to_df(candles: list[dict]) -> pd.DataFrame:
+    if not candles:
+        return pd.DataFrame()
+    df = pd.DataFrame(candles)
+    df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
+    df = df.set_index("timestamp").sort_index()
+    rename = {"open": "Open", "high": "High", "low": "Low", "close": "Close", "volume": "Volume"}
+    df = df.rename(columns={k: v for k, v in rename.items() if k in df.columns})
+    for col in ["Open", "High", "Low", "Close", "Volume"]:
+        if col not in df.columns:
+            df[col] = 0.0
+    df = df[["Open", "High", "Low", "Close", "Volume"]].astype(float)
+    return df
+
+
+def _daily_close_lse(adapter: LSEAdapter, ticker: str) -> pd.Series:
+    try:
+        start = (datetime.now(timezone.utc) - timedelta(days=180)).isoformat()
+        candles = adapter.client.candles(_lse_symbol(ticker), "1d", start=start, limit=500)
+        df = _lse_candles_to_df(candles)
+        if not df.empty:
+            s = df["Close"].astype(float)
+            s.index = pd.to_datetime(s.index)
+            if getattr(s.index, "tz", None) is not None:
+                s.index = s.index.tz_localize(None)
+            return s.dropna()
+    except Exception as e:  # noqa: BLE001
+        print(f"[live_plan] LSE daily close failed for {ticker}: {e}")
+    return pd.Series(dtype=float)
+
+
+def _intraday_df_lse(adapter: LSEAdapter, symbol: str) -> pd.DataFrame | None:
+    try:
+        start = (datetime.now(timezone.utc) - timedelta(days=60)).isoformat()
+        candles = adapter.client.candles(_lse_symbol(symbol), "1h", start=start, limit=2000)
+        df = _lse_candles_to_df(candles)
+        if not df.empty and len(df) >= 20:
+            return df
+    except Exception as e:  # noqa: BLE001
+        print(f"[live_plan] LSE intraday failed for {symbol}: {e}")
+    return None
+
+
+def macro_regime(adapter: LSEAdapter | None = None) -> dict[str, Any]:
     """Research-backed macro: QQQ trend + XLP/SPY defensive block (v20b/v23)."""
     out: dict[str, Any] = {
         "qqq_ok": True,
@@ -71,9 +127,14 @@ def macro_regime() -> dict[str, Any]:
         "error": None,
     }
     try:
-        qqq = _daily_close("QQQ")
-        spy = _daily_close("SPY")
-        xlp = _daily_close("XLP")
+        if adapter is not None:
+            qqq = _daily_close_lse(adapter, "QQQ")
+            spy = _daily_close_lse(adapter, "SPY")
+            xlp = _daily_close_lse(adapter, "XLP")
+        else:
+            qqq = _daily_close("QQQ")
+            spy = _daily_close("SPY")
+            xlp = _daily_close("XLP")
         if len(qqq) >= 50:
             ema20 = qqq.ewm(span=20, adjust=False).mean()
             ema50 = qqq.ewm(span=50, adjust=False).mean()
@@ -153,11 +214,20 @@ def plan_symbol(
     use_model: bool = True,
     open_equity: int = 0,
     open_options: int = 0,
+    lse_adapter: LSEAdapter | None = None,
 ) -> dict[str, Any]:
     model = model or _default_equity_model()
     pol = load_policy()
     eng = LiveSignalEngine()
-    live = eng.analyze(symbol)
+
+    # Prefer LSE when an adapter is available, otherwise live_signal fetches yfinance.
+    adapter = lse_adapter
+    if adapter is None and os.environ.get("LSE_API_KEY"):
+        adapter = LSEAdapter(api_key=os.environ.get("LSE_API_KEY"))
+    df = _intraday_df_lse(adapter, symbol) if adapter is not None else None
+    if df is not None and (df.empty or len(df) < 20):
+        df = None
+    live = eng.analyze(symbol, df=df)
     if live.get("error"):
         return {
             "ok": False,
@@ -166,7 +236,7 @@ def plan_symbol(
             "asof_utc": datetime.now(timezone.utc).isoformat(),
         }
 
-    macro = macro_regime()
+    macro = macro_regime(adapter)
     model_info: dict[str, Any] = {"ok": False, "skipped": not use_model}
     if use_model:
         # trade_desk understands auto / WINNER ids
@@ -346,14 +416,22 @@ def scan(
     account: float = 1000.0,
     peak: float | None = None,
     use_model: bool = False,
+    lse_adapter: LSEAdapter | None = None,
 ) -> dict[str, Any]:
     """Scan universe; default skips heavy model analyze for speed (live features + macro)."""
     syms = symbols or DEFAULT_SCAN
-    macro = macro_regime()
+    macro = macro_regime(lse_adapter)
     rows = []
     for s in syms:
         # light path: no per-symbol model for scan speed
-        plan = plan_symbol(s, account=account, peak=peak, use_model=use_model, model=_default_equity_model())
+        plan = plan_symbol(
+            s,
+            account=account,
+            peak=peak,
+            use_model=use_model,
+            model=_default_equity_model(),
+            lse_adapter=lse_adapter,
+        )
         if not plan.get("ok"):
             continue
         t = plan["ticket"]
@@ -407,10 +485,13 @@ def main(argv: list[str] | None = None) -> int:
     if args.history.strip():
         hist = [float(x) for x in args.history.split(",") if x.strip()]
 
+    lse_api_key = os.environ.get("LSE_API_KEY")
+    lse_adapter = LSEAdapter(api_key=lse_api_key) if lse_api_key else None
+
     if args.scan:
         syms = [s.strip() for s in args.symbols.split(",") if s.strip()] or None
         # default scan is light (no per-name model analyze) for live speed
-        out = scan(syms, account=args.account, peak=args.peak or None, use_model=False)
+        out = scan(syms, account=args.account, peak=args.peak or None, use_model=False, lse_adapter=lse_adapter)
         if args.json:
             print(json.dumps(out, indent=2, default=str))
         else:
@@ -433,6 +514,7 @@ def main(argv: list[str] | None = None) -> int:
         history=hist,
         model=args.model,
         use_model=not args.no_model,
+        lse_adapter=lse_adapter,
     )
     if args.json:
         print(json.dumps(out, indent=2, default=str))

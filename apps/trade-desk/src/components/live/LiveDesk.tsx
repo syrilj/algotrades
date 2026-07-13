@@ -37,7 +37,7 @@ function ModeBadge({ mode }: { mode?: string }) {
   );
 }
 
-function LiveDeskInner() {
+function LiveDeskInner({ showHeader = true }: { showHeader?: boolean }) {
   const searchParams = useSearchParams();
   const qSymbol = searchParams.get("symbol")?.toUpperCase() ?? "";
 
@@ -128,9 +128,9 @@ function LiveDeskInner() {
   const live = plan?.live;
   const opt = plan?.options;
 
-  return (
-    <div className="td-page">
-      <PageHeader
+  const body = (
+    <>
+      {showHeader && <PageHeader
         title="Live desk"
         description="Risk mode ticket: stand aside · equity hedge · options attack. Numbered steps first; features secondary."
         actions={
@@ -151,7 +151,7 @@ function LiveDeskInner() {
             </div>
           ) : null
         }
-      />
+      />}
 
       <section className="td-toolbar">
         <div className="td-toolbar__row">
@@ -474,20 +474,25 @@ function LiveDeskInner() {
           </table>
         </section>
       ) : null}
-    </div>
+    </>
   );
+  return showHeader ? <div className="td-page">{body}</div> : body;
 }
 
-export function LiveDesk() {
+export function LiveDesk({ showHeader = true }: { showHeader?: boolean }) {
   return (
     <Suspense
       fallback={
-        <div className="td-page">
+        showHeader ? (
+          <div className="td-page">
+            <p className="td-muted">Loading live desk…</p>
+          </div>
+        ) : (
           <p className="td-muted">Loading live desk…</p>
-        </div>
+        )
       }
     >
-      <LiveDeskInner />
+      <LiveDeskInner showHeader={showHeader} />
     </Suspense>
   );
 }

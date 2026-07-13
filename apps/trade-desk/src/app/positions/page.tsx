@@ -1,12 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
+import { Suspense, useCallback, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
+import { PortfolioDesk } from "@/components/portfolio/PortfolioDesk";
 import { PositionsTable } from "@/components/positions/PositionsTable";
 import { PageHeader } from "@/components/shell/PageHeader";
 import type { ApiEnvelope, PositionsResponse } from "@/lib/types";
 
-export default function PositionsPage() {
+type PositionsView = "open" | "portfolio" | "history";
+
+function PositionsDesk() {
+  const searchParams = useSearchParams();
+  const rawView = searchParams.get("view");
+  const view: PositionsView = rawView === "portfolio" || rawView === "history" ? rawView : "open";
   const [data, setData] = useState<PositionsResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -72,31 +80,71 @@ export default function PositionsPage() {
         }
       />
 
-      <div className="mb-3">
-        <button
-          type="button"
-          className="td-btn td-btn-ghost"
-          disabled={loading}
-          onClick={() => void refresh()}
-        >
-          {loading ? "Refreshing…" : "Refresh marks"}
-        </button>
-      </div>
+      <nav className="mb-4 flex flex-wrap gap-1 border-b border-[var(--td-ink-700)]" aria-label="Positions views" role="tablist">
+        {([
+          ["open", "Open Positions", "/positions"],
+          ["portfolio", "Portfolio", "/positions?view=portfolio"],
+          ["history", "History / Risk", "/positions?view=history"],
+        ] as const).map(([key, label, href]) => (
+          <Link
+            key={key}
+            href={href}
+            className={`td-btn ${view === key ? "td-btn-primary" : "td-btn-ghost"}`}
+            role="tab"
+            aria-selected={view === key}
+            aria-controls={`positions-panel-${key}`}
+          >
+            {label}
+          </Link>
+        ))}
+      </nav>
 
-      {error ? (
-        <div className="td-alert td-alert--error mb-3" role="alert">
-          {error}
+      {view === "portfolio" ? (
+        <div id="positions-panel-portfolio" role="tabpanel">
+          <PortfolioDesk />
         </div>
-      ) : null}
+      ) : (
+        <div id={`positions-panel-${view}`} role="tabpanel">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              className="td-btn td-btn-ghost"
+              disabled={loading}
+              onClick={() => void refresh()}
+            >
+              {loading ? "Refreshing…" : "Refresh marks"}
+            </button>
+            {view === "history" ? (
+              <span className="text-[12px]" style={{ color: "var(--td-ink-400)" }}>
+                Closed outcomes and live model stats; no performance is inferred when the ledger is empty.
+              </span>
+            ) : null}
+          </div>
 
-      <div className="td-panel overflow-hidden p-3">
-        <PositionsTable
-          positions={data?.positions ?? []}
-          statsRows={data?.stats.rows ?? []}
-          onClose={handleClose}
-          closingId={closingId}
-        />
-      </div>
+          {error ? (
+            <div className="td-alert td-alert--error mb-3" role="alert">
+              {error}
+            </div>
+          ) : null}
+
+          <div className="td-panel overflow-hidden p-3">
+            <PositionsTable
+              positions={data?.positions ?? []}
+              statsRows={data?.stats.rows ?? []}
+              onClose={handleClose}
+              closingId={closingId}
+            />
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+export default function PositionsPage() {
+  return (
+    <Suspense fallback={<div className="td-page"><div className="td-panel p-3">Loading positions hub…</div></div>}>
+      <PositionsDesk />
+    </Suspense>
   );
 }

@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from typing import Any
 
+import numpy as np
+
 
 def reliability(n: int, claim_min: int = 40) -> float:
     """Scale score by sample adequacy; thin n cannot dominate the board."""
@@ -83,3 +85,43 @@ def enrich_scores(row: dict[str, Any], *, dd_hard: float = 0.25, claim_min: int 
     out["score_risk_adj"] = score_risk_adj(out)
     out["reliability"] = reliability(int(out.get("n") or 0), claim_min)
     return out
+
+
+def fold_utility(m: dict[str, Any]) -> float:
+    """Per-fold utility matching OBJECTIVE.json.
+
+    U_f = ret + 0.35*min(sharpe,3) + 0.15*min(calmar,10) + 0.05*wr
+          - 0.55*max(0,|dd|-0.15) - 50*(|dd|>=0.25)
+    """
+    ret = float(m.get("ret") or 0.0)
+    sharpe = float(m.get("sharpe") or 0.0)
+    calmar = float(m.get("calmar") or 0.0)
+    dd = abs(float(m.get("dd") or m.get("max_drawdown") or 0.0))
+    wr = float(m.get("wr") or m.get("win_rate") or 0.0)
+
+    raw = (
+        ret
+        + 0.35 * min(sharpe, 3.0)
+        + 0.15 * min(calmar, 10.0)
+        + 0.05 * wr
+        - 0.55 * max(0.0, dd - 0.15)
+    )
+    if dd >= 0.25:
+        raw -= 50.0
+    return raw
+
+
+def fold_fitness(fold_ms: list[dict[str, Any]]) -> float:
+    """Aggregate fitness across folds.
+
+    FITNESS = reliability(n_pooled, 40) * ( mean_f(U_f) - 0.5*std_f(U_f) )
+    """
+    if not fold_ms:
+        return -99.0
+    utilities = np.array([fold_utility(m) for m in fold_ms])
+    n_pooled = sum(int(m.get("n", 0)) for m in fold_ms)
+    if n_pooled == 0:
+        return -99.0
+    mean_u = float(utilities.mean())
+    std_u = float(utilities.std(ddof=0))
+    return reliability(n_pooled, 40) * (mean_u - 0.5 * std_u)
