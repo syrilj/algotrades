@@ -19,7 +19,7 @@ import {
   tradeDeskScript,
   vpaScanScript,
 } from "./paths";
-import type { ModelsCatalog, ModelRankRow } from "./types";
+import type { ModelMetaConfig, ModelsCatalog, ModelRankRow } from "./types";
 
 const DEFAULT_TIMEOUT_MS = 120_000;
 
@@ -351,6 +351,7 @@ export async function loadModelDetail(id: string): Promise<{
   model_md: string | null;
   results: unknown | null;
   hypothesis: string | null;
+  meta_config: ModelMetaConfig | null;
 }> {
   const root = modelsRoot();
   const dir = path.join(root, id);
@@ -374,6 +375,9 @@ export async function loadModelDetail(id: string): Promise<{
   }
 
   const results = await readJsonSafe(path.join(dir, "results.json"));
+  const meta_config = await readJsonSafe<ModelMetaConfig>(
+    path.join(dir, "meta_config.json"),
+  );
   let hypothesis: string | null = null;
   try {
     hypothesis = await fs.readFile(path.join(dir, "HYPOTHESIS.md"), "utf8");
@@ -381,7 +385,7 @@ export async function loadModelDetail(id: string): Promise<{
     hypothesis = null;
   }
 
-  return { id, has_engine, model_md, results, hypothesis };
+  return { id, has_engine, model_md, results, hypothesis, meta_config };
 }
 
 export async function runSupplyChain(

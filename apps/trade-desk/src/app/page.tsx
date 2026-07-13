@@ -7,20 +7,22 @@ import {
   type AnalyzeFormHandle,
   type AnalyzeFormValues,
 } from "@/components/analyze/AnalyzeForm";
+import { ModelComputeTrace } from "@/components/analyze/ModelComputeTrace";
 import { LevelsPanel } from "@/components/analyze/LevelsPanel";
 import { RankerPanel } from "@/components/analyze/RankerPanel";
 import { VerdictPanel } from "@/components/analyze/VerdictPanel";
 import { LiveSignalPanel } from "@/components/LiveSignalPanel";
+import { ModelTuningView } from "@/components/models/ModelTuningView";
 import {
   PipelineFlow,
   type PipelinePhase,
 } from "@/components/pipeline/PipelineFlow";
 import { RiskAssessmentPanel } from "@/components/risk/RiskAssessmentPanel";
 import { PageHeader } from "@/components/shell/PageHeader";
-import type { AnalyzeResponse, ApiEnvelope } from "@/lib/types";
+import type { AnalyzeResponse, ApiEnvelope, ModelMetaConfig } from "@/lib/types";
 
 const STAGE_COUNT = 8;
-const STAGE_MS = 420;
+const STAGE_MS = 280;
 
 function AnalyzePageInner() {
   const searchParams = useSearchParams();
@@ -37,6 +39,7 @@ function AnalyzePageInner() {
   const [symbol, setSymbol] = useState(qSymbol);
   const [activeModel, setActiveModel] = useState(qModel);
   const [account, setAccount] = useState(100_000);
+  const [metaConfig, setMetaConfig] = useState<ModelMetaConfig | null>(null);
 
   useEffect(() => {
     if (qSymbol) setSymbol(qSymbol);
@@ -45,6 +48,31 @@ function AnalyzePageInner() {
   useEffect(() => {
     if (qModel) setActiveModel(qModel);
   }, [qModel]);
+
+  useEffect(() => {
+    const modelId = result?.model || (activeModel !== "auto" ? activeModel : "");
+    if (!modelId) {
+      setMetaConfig(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/models?id=${encodeURIComponent(modelId)}`);
+        const json = (await res.json()) as ApiEnvelope<{
+          meta_config: ModelMetaConfig | null;
+        }>;
+        if (!cancelled && json.ok && json.data) {
+          setMetaConfig(json.data.meta_config ?? null);
+        }
+      } catch {
+        if (!cancelled) setMetaConfig(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeModel, result?.model]);
 
   useEffect(() => {
     if (phase !== "running") return;
@@ -189,6 +217,22 @@ function AnalyzePageInner() {
         selection={result?.model_selection}
         empty={phase === "idle" || (phase === "running" && !result)}
       />
+
+      {phase === "done" && state ? (
+        <ModelComputeTrace
+          state={state}
+          plan={plan}
+          size={size}
+          model={result?.model}
+          selection={result?.model_selection}
+        />
+      ) : null}
+
+      {phase === "done" && metaConfig ? (
+        <div className="td-panel p-3">
+          <ModelTuningView id={result?.model || activeModel} metaConfig={metaConfig} />
+        </div>
+      ) : null}
 
       {(symbol || state?.symbol || qSymbol) ? (
         <RankerPanel

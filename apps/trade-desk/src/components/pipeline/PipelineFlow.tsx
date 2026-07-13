@@ -280,7 +280,7 @@ export function PipelineFlow({
           return (
             <div key={stage.id} className="flex min-w-0 flex-1 items-stretch">
               <div
-                className="flex min-w-[88px] flex-1 flex-col gap-1.5 p-2 transition-[border-color,background,box-shadow] duration-[var(--td-dur-pipeline)] ease-[var(--td-ease)]"
+                className="flex min-w-[88px] flex-1 flex-col gap-1.5 p-2 transition-[border-color,background-color] duration-[var(--td-dur-pipeline)] ease-[var(--td-ease)]"
                 style={{
                   border: `1px solid ${colors.border}`,
                   background: colors.bg,
@@ -289,6 +289,7 @@ export function PipelineFlow({
                     stage.status === "running"
                       ? "td-pipeline-pulse 1.2s var(--td-ease) infinite"
                       : undefined,
+                  willChange: stage.status === "running" ? "box-shadow" : undefined,
                 }}
               >
                 <div className="flex items-center gap-1.5">

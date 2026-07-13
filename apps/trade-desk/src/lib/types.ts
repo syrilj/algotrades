@@ -141,6 +141,16 @@ export interface ModelsCatalog {
   selection_rule?: string | null;
 }
 
+export interface ModelMetaConfig {
+  feat_cols?: string[];
+  threshold?: number;
+  parent?: string;
+  research_stack?: string[];
+  genome?: Record<string, number>;
+  params?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
 export interface ApiEnvelope<T> {
   ok: boolean;
   command?: string;

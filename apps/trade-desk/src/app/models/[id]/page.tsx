@@ -3,10 +3,11 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
-import type { ApiEnvelope, ModelsCatalog } from "@/lib/types";
+import type { ApiEnvelope, ModelMetaConfig, ModelsCatalog } from "@/lib/types";
 import { ModelBadges } from "@/components/leaderboard/ModelBadges";
 import { ScoreBar } from "@/components/leaderboard/ScoreBar";
 import { ModelFlow } from "@/components/models/ModelFlow";
+import { ModelTuningView } from "@/components/models/ModelTuningView";
 import { analyzeHref } from "@/lib/routes";
 
 type ModelDetail = {
@@ -15,6 +16,7 @@ type ModelDetail = {
   model_md: string | null;
   results: Record<string, unknown> | null;
   hypothesis: string | null;
+  meta_config: ModelMetaConfig | null;
   is_default?: boolean;
   is_winner?: boolean;
   metrics?: {
@@ -285,6 +287,16 @@ export default function ModelDetailPage() {
             }}
           >
             <ModelFlow model={detail.id} />
+          </section>
+
+          <section
+            className="p-4 rounded-sm mb-6"
+            style={{
+              background: "var(--td-ink-900, #12181F)",
+              border: "1px solid var(--td-ink-700, #243040)",
+            }}
+          >
+            <ModelTuningView id={detail.id} metaConfig={detail.meta_config} />
           </section>
 
           <section
