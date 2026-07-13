@@ -1,0 +1,13 @@
+{
+  "variant_id": "v39d_confluence_tight_stop_all",
+  "parent": "v39d_confluence",
+  "mutations": [
+    {
+      "op": "set_routing_param",
+      "symbol": "__all__",
+      "key": "stop_atr",
+      "old": null,
+      "new": 1.0
+    }
+  ]
+}

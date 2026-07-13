@@ -712,3 +712,50 @@ export interface PositionsResponse {
   marked: boolean;
   asof: string;
 }
+
+export interface GammaStrike {
+  strike: number;
+  net_gex: number;
+  call_gex: number;
+  put_gex: number;
+}
+
+export interface GammaResponse {
+  symbol: string;
+  spot: number;
+  spot_source: string;
+  source?: string;
+  lse_error: string | null;
+  asof_utc: string;
+  expiries_used: string[];
+  net_dealer_gex: number;
+  near_spot_dealer_gex: number;
+  gex_sign: number;
+  regime: string;
+  call_wall: number | null;
+  put_wall: number | null;
+  call_wall_gex?: number;
+  put_wall_gex?: number;
+  dist_call_wall_pct: number | null;
+  dist_put_wall_pct: number | null;
+  approx_flip_strike: number | null;
+  dist_flip_pct?: number | null;
+  expected_move_pct: number | null;
+  expected_move_low: number | null;
+  expected_move_high: number | null;
+  max_pain: number | null;
+  otm_call_volume: number;
+  otm_call_oi: number;
+  otm_put_volume?: number;
+  otm_put_oi?: number;
+  total_oi?: number;
+  total_volume?: number;
+  n_contracts: number;
+  weight: string;
+  sign_convention: string;
+  squeeze_score?: number;
+  squeeze_label?: "bullish_squeeze" | "bearish_squeeze" | "neutral";
+  squeeze_components?: Record<string, number>;
+  by_strike: GammaStrike[];
+  error?: string;
+}

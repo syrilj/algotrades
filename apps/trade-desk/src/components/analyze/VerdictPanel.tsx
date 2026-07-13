@@ -10,7 +10,7 @@ import type {
 import { ActionChip, actionStyle } from "@/components/ui/ActionChip";
 import { ConfidenceMeter } from "@/components/ui/ConfidenceMeter";
 import { TradeButton } from "@/components/analyze/TradeButton";
-import { liveHref, optionsHref } from "@/lib/routes";
+import { gammaHref, liveHref, optionsHref } from "@/lib/routes";
 
 function fmt(n: number | null | undefined, digits = 2): string {
   if (n == null || !Number.isFinite(n)) return "—";
@@ -207,6 +207,9 @@ export function VerdictPanel({
         </Link>
         <Link href={optionsHref(sym)} className="td-btn td-btn-ghost no-underline">
           Options structure
+        </Link>
+        <Link href={gammaHref(sym)} className="td-btn td-btn-ghost no-underline">
+          Gamma
         </Link>
       </div>
 

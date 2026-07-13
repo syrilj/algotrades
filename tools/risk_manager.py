@@ -129,6 +129,14 @@ class SetupSnapshot:
     options_affordable: bool = True
     liquidity_ok: bool = True
     side: str = "long"  # long only for now
+    gex_regime: str = "flat"
+    gex_sign: int = 0
+    approx_flip_strike: float | None = None
+    call_wall: float | None = None
+    put_wall: float | None = None
+    squeeze_score: float = 0.0
+    squeeze_label: str = "neutral"
+    spot_price: float | None = None
 
 
 @dataclass
@@ -304,7 +312,7 @@ def plan_entry(setup: SetupSnapshot, state: PortfolioState, pol: dict[str, Any] 
             asof_utc=now,
         )
 
-    if setup.side != "long":
+    if setup.side not in ("long", "short"):
         return RiskDecision(
             mode="STAND_ASIDE",
             vehicle="none",
@@ -313,50 +321,97 @@ def plan_entry(setup: SetupSnapshot, state: PortfolioState, pol: dict[str, Any] 
             risk_pct=0.0,
             max_loss_dollars=0.0,
             conviction=conv,
-            reasons=["short side not enabled in v25 hybrid"],
+            reasons=[f"invalid side '{setup.side}' in v25 hybrid"],
             exit_rules=exit_rules,
             policy_version=str(pol.get("version", "v25")),
             asof_utc=now,
         )
 
-    if not setup.macro_ok and pol["macro"].get("block_xlp_spy_defensive", True):
-        return RiskDecision(
-            mode="STAND_ASIDE",
-            vehicle="none",
-            action="skip",
-            size_mult=0.0,
-            risk_pct=0.0,
-            max_loss_dollars=0.0,
-            conviction=conv,
-            reasons=["macro defensive (XLP/SPY) — stand aside"],
-            exit_rules=exit_rules,
-            policy_version=str(pol.get("version", "v25")),
-            asof_utc=now,
-        )
+    # Macro blocks
+    if setup.side == "long":
+        if not setup.macro_ok and pol["macro"].get("block_xlp_spy_defensive", True):
+            return RiskDecision(
+                mode="STAND_ASIDE",
+                vehicle="none",
+                action="skip",
+                size_mult=0.0,
+                risk_pct=0.0,
+                max_loss_dollars=0.0,
+                conviction=conv,
+                reasons=["macro defensive (XLP/SPY) — stand aside"],
+                exit_rules=exit_rules,
+                policy_version=str(pol.get("version", "v25")),
+                asof_utc=now,
+            )
+    else:
+        # For short setups, block if macro is bullish (long supportive)
+        if setup.macro_ok and pol["macro"].get("block_xlp_spy_defensive", True):
+            return RiskDecision(
+                mode="STAND_ASIDE",
+                vehicle="none",
+                action="skip",
+                size_mult=0.0,
+                risk_pct=0.0,
+                max_loss_dollars=0.0,
+                conviction=conv,
+                reasons=["macro bullish — stand aside for shorts"],
+                exit_rules=exit_rules,
+                policy_version=str(pol.get("version", "v25")),
+                asof_utc=now,
+            )
 
     opt = pol["options"]
     eq = pol["equity"]
+    qqq_supportive = setup.qqq_ok if setup.side == "long" else (not setup.qqq_ok)
     attack_ok = (
         conv >= float(opt["attack_confidence"])
         and setup.model_conf >= float(opt["min_confidence"])
         and setup.options_affordable
         and setup.liquidity_ok
-        and (setup.qqq_ok or not pol["macro"].get("require_qqq_for_attack", True))
+        and (qqq_supportive or not pol["macro"].get("require_qqq_for_attack", True))
         and state.open_options_n < int(opt["max_concurrent"])
         and not (setup.earnings_days is not None and setup.earnings_days <= 3)
     )
 
+    gex_reasons = []
+    gex_size_mult = 1.0
+
+    if setup.spot_price is not None and setup.approx_flip_strike is not None:
+        if setup.side == "long":
+            if setup.spot_price < setup.approx_flip_strike:
+                if conv < 0.70:
+                    attack_ok = False
+                    gex_reasons.append(f"GEX Flip Block: spot {setup.spot_price:.2f} < Zero-Gamma flip {setup.approx_flip_strike:.2f}")
+                else:
+                    gex_size_mult *= 0.75
+                    gex_reasons.append(f"Spot below Zero-Gamma flip ({setup.approx_flip_strike:.2f}) -> options size scaled down 25%")
+        else:
+            if setup.spot_price > setup.approx_flip_strike:
+                if conv < 0.70:
+                    attack_ok = False
+                    gex_reasons.append(f"GEX Flip Block for Put: spot {setup.spot_price:.2f} > Zero-Gamma flip {setup.approx_flip_strike:.2f} (positive GEX dampens shorts)")
+                else:
+                    gex_size_mult *= 0.75
+                    gex_reasons.append(f"Spot above Zero-Gamma flip ({setup.approx_flip_strike:.2f}) -> put size scaled down 25%")
+
+    if setup.gex_regime == "positive_gex_pin" and setup.side == "long":
+        gex_size_mult *= 0.70
+        gex_reasons.append("Positive GEX pinning regime -> options size scaled down 30%")
+    elif setup.gex_regime == "negative_gex_amplify" and setup.side == "long":
+        if conv >= 0.70:
+            gex_size_mult *= 1.15
+            gex_reasons.append("Negative GEX amplify regime -> options size boosted 15%")
+
     if attack_ok:
-        # BET BIG within hard cap
-        risk_pct = float(opt["attack_risk_pct"]) * fb * max(ddm, 0.35)
+        risk_pct = float(opt["attack_risk_pct"]) * fb * max(ddm, 0.35) * gex_size_mult
         risk_pct = float(min(float(opt["max_risk_pct"]), max(float(opt["base_risk_pct"]), risk_pct)))
-        size_mult = float(min(1.25, max(0.5, conv * fb * max(ddm, 0.5))))
+        size_mult = float(min(1.25, max(0.5, conv * fb * max(ddm, 0.5) * gex_size_mult)))
         reasons = [
             f"OPTIONS_ATTACK: conviction {conv:.2f} ≥ attack {float(opt['attack_confidence']):.2f}",
             f"feedback×{fb:.2f} dd_mult×{ddm:.2f}",
             "prefer debit spread; defined risk",
             "cut losers fast per exit_rules",
-        ]
+        ] + gex_reasons
         if setup.earnings_days is not None and setup.earnings_days <= 7:
             risk_pct = min(risk_pct, float(opt["base_risk_pct"]))
             reasons.append("earnings ≤7d — size capped to base options risk")
@@ -378,17 +433,26 @@ def plan_entry(setup: SetupSnapshot, state: PortfolioState, pol: dict[str, Any] 
     hedge = bool(eq.get("hedge_when_no_options", True))
     equity_ok = (
         hedge
+        and setup.side == "long"  # block equity shorting
         and setup.model_conf >= float(eq["min_confidence"])
         and setup.trend_ok
         and state.open_equity_n < int(eq["max_positions"])
         and ddm > 0
     )
+    
+    eq_gex_reasons = []
+    eq_gex_mult = 1.0
+    if setup.spot_price is not None and setup.approx_flip_strike is not None:
+        if setup.spot_price < setup.approx_flip_strike:
+            eq_gex_mult *= 0.80
+            eq_gex_reasons.append(f"Spot below Zero-Gamma flip ({setup.approx_flip_strike:.2f}) -> equity size scaled down 20%")
+
     if equity_ok:
-        risk_pct = float(eq["base_risk_pct"]) * fb * ddm
+        risk_pct = float(eq["base_risk_pct"]) * fb * ddm * eq_gex_mult
         if conv >= 0.75:
             risk_pct = min(float(eq["max_risk_pct"]), risk_pct * 1.25)
         risk_pct = float(min(float(eq["max_risk_pct"]), max(0.005, risk_pct)))
-        size_mult = float(min(1.0, max(0.25, setup.model_conf * fb * ddm)))
+        size_mult = float(min(1.0, max(0.25, setup.model_conf * fb * ddm * eq_gex_mult)))
         why_not_opt = []
         if conv < float(opt["attack_confidence"]):
             why_not_opt.append(f"conviction {conv:.2f} < attack bar")
@@ -398,6 +462,8 @@ def plan_entry(setup: SetupSnapshot, state: PortfolioState, pol: dict[str, Any] 
             why_not_opt.append("QQQ trend not ok for attack")
         if state.open_options_n >= int(opt["max_concurrent"]):
             why_not_opt.append("max concurrent options reached")
+        if gex_reasons:
+            why_not_opt.extend(gex_reasons)
         return RiskDecision(
             mode="EQUITY_HEDGE",
             vehicle="equity",

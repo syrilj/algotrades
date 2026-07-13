@@ -85,13 +85,13 @@ export function WatchBoard({
     return (
       <div className="flex flex-col items-center justify-center gap-2 px-4 py-16 text-center">
         <Radio
-          className="size-8 text-[var(--td-ink-500,#475569)]"
+          className="size-8 text-[var(--td-ink-500,#7e7e7e)]"
           strokeWidth={1.75}
         />
-        <p className="font-[family-name:var(--td-font-display,ui-serif,Georgia,serif)] text-xl text-[var(--td-ink-100,#E2E8F0)]">
+        <p className="font-[family-name:var(--td-font-display,Inter,ui-sans-serif,system-ui,sans-serif)] text-xl text-[var(--td-ink-100,#ffffff)]">
           No ticks yet
         </p>
-        <p className="max-w-sm text-[13px] text-[var(--td-ink-400,#64748B)]">
+        <p className="max-w-sm text-[13px] text-[var(--td-ink-400,#bbbbbb)]">
           {emptyHint}
         </p>
       </div>
@@ -102,8 +102,8 @@ export function WatchBoard({
     <div className="flex flex-col">
       <div className="overflow-x-auto">
         <table className="w-full min-w-[720px] border-collapse text-left text-[13px]">
-          <thead className="sticky top-0 z-10 bg-[var(--td-ink-700,#243040)]">
-            <tr className="border-b border-[var(--td-ink-600,#334155)] text-[11px] font-medium uppercase tracking-wide text-[var(--td-ink-300,#94A3B8)]">
+          <thead className="sticky top-0 z-10 bg-[var(--td-ink-700,#3c3c3c)]">
+            <tr className="border-b border-[var(--td-ink-600,#2b2b2b)] text-[11px] font-medium uppercase tracking-wide text-[var(--td-ink-300,#e6e6e6)]">
               <th className="px-3 py-2">Sym</th>
               <th className="px-3 py-2">Action</th>
               <th className="px-3 py-2 text-right">Price</th>
@@ -129,31 +129,31 @@ export function WatchBoard({
                   }}
                   tabIndex={0}
                   role="link"
-                  className="cursor-pointer border-b border-[var(--td-ink-600,#334155)]/60 bg-[var(--td-ink-900,#12181F)] transition-colors hover:bg-[var(--td-brand-soft,#2F6F7A26)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--td-brand,#2F6F7A)]"
+                  className="cursor-pointer border-b border-[var(--td-ink-600,#2b2b2b)]/60 bg-[var(--td-ink-900,#0d0d0d)] transition-colors hover:bg-[var(--td-brand-soft,#1c69d426)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--td-brand,#1c69d4)]"
                   style={{ boxShadow: `inset 3px 0 0 ${rail}` }}
                 >
-                  <td className="px-3 py-2 font-[family-name:var(--td-font-mono,ui-monospace,Menlo,monospace)] font-medium tabular-nums text-[var(--td-ink-100,#E2E8F0)]">
+                  <td className="px-3 py-2 font-[family-name:var(--td-font-mono,ui-monospace,Menlo,monospace)] font-medium tabular-nums text-[var(--td-ink-100,#ffffff)]">
                     {row.symbol}
                   </td>
                   <td className="px-3 py-2">
                     <ActionChip action={row.action} />
                   </td>
-                  <td className="px-3 py-2 text-right font-[family-name:var(--td-font-mono,ui-monospace,Menlo,monospace)] tabular-nums text-[var(--td-ink-200,#CBD5E1)]">
+                  <td className="px-3 py-2 text-right font-[family-name:var(--td-font-mono,ui-monospace,Menlo,monospace)] tabular-nums text-[var(--td-ink-200,#ffffff)]">
                     {fmtPrice(row.price)}
                   </td>
-                  <td className="px-3 py-2 text-right font-[family-name:var(--td-font-mono,ui-monospace,Menlo,monospace)] tabular-nums text-[var(--td-ink-200,#CBD5E1)]">
+                  <td className="px-3 py-2 text-right font-[family-name:var(--td-font-mono,ui-monospace,Menlo,monospace)] tabular-nums text-[var(--td-ink-200,#ffffff)]">
                     {fmtPct(row.confidence)}
                   </td>
-                  <td className="px-3 py-2 text-right font-[family-name:var(--td-font-mono,ui-monospace,Menlo,monospace)] tabular-nums text-[var(--td-ink-200,#CBD5E1)]">
+                  <td className="px-3 py-2 text-right font-[family-name:var(--td-font-mono,ui-monospace,Menlo,monospace)] tabular-nums text-[var(--td-ink-200,#ffffff)]">
                     {fmtPct(row.hitProbability)}
                   </td>
-                  <td className="px-3 py-2 text-right font-[family-name:var(--td-font-mono,ui-monospace,Menlo,monospace)] tabular-nums text-[var(--td-ink-200,#CBD5E1)]">
+                  <td className="px-3 py-2 text-right font-[family-name:var(--td-font-mono,ui-monospace,Menlo,monospace)] tabular-nums text-[var(--td-ink-200,#ffffff)]">
                     {fmtPrice(row.stop)}
                   </td>
-                  <td className="px-3 py-2 text-right font-[family-name:var(--td-font-mono,ui-monospace,Menlo,monospace)] tabular-nums text-[var(--td-ink-200,#CBD5E1)]">
+                  <td className="px-3 py-2 text-right font-[family-name:var(--td-font-mono,ui-monospace,Menlo,monospace)] tabular-nums text-[var(--td-ink-200,#ffffff)]">
                     {fmtRvol(row)}
                   </td>
-                  <td className="max-w-[140px] truncate px-3 py-2 text-[var(--td-ink-300,#94A3B8)]">
+                  <td className="max-w-[140px] truncate px-3 py-2 text-[var(--td-ink-300,#e6e6e6)]">
                     {row.model || "—"}
                   </td>
                 </tr>
@@ -163,10 +163,10 @@ export function WatchBoard({
         </table>
       </div>
 
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-[var(--td-ink-600,#334155)] bg-[var(--td-ink-800,#1A222C)] px-3 py-2 text-[11px] text-[var(--td-ink-400,#64748B)]">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-[var(--td-ink-600,#2b2b2b)] bg-[var(--td-ink-800,#1a1a1a)] px-3 py-2 text-[11px] text-[var(--td-ink-400,#bbbbbb)]">
         <span>
           last tick{" "}
-          <span className="tabular-nums text-[var(--td-ink-300,#94A3B8)]">
+          <span className="tabular-nums text-[var(--td-ink-300,#e6e6e6)]">
             {lastTick
               ? new Date(lastTick).toLocaleTimeString(undefined, {
                   hour12: false,
@@ -177,10 +177,10 @@ export function WatchBoard({
           </span>
         </span>
         {loading ? (
-          <span className="text-[var(--td-brand,#2F6F7A)]">refreshing</span>
+          <span className="text-[var(--td-brand,#1c69d4)]">refreshing</span>
         ) : null}
         {alerts.length > 0 ? (
-          <span className="text-[var(--td-ink-300,#94A3B8)]">
+          <span className="text-[var(--td-ink-300,#e6e6e6)]">
             alerts: {alerts.join(" · ")}
           </span>
         ) : null}

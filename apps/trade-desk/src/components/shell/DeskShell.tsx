@@ -15,6 +15,7 @@ const NAV = [
 const LEGACY_NAV = [
   { href: "/supply-chain", label: "Supply chain" },
   { href: "/options", label: "Options" },
+  { href: "/gamma", label: "Gamma" },
   { href: "/watch", label: "Watch" },
   { href: "/picks", label: "Picks" },
   { href: "/portfolio", label: "Portfolio" },

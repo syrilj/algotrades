@@ -452,25 +452,26 @@ def run_campaign(
     campaign_id: str = "evolve_campaign",
     menu: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
-    """Smoke campaign: 2 generations of direction variants."""
+    """Smoke campaign: 2 generations of direction + code variants."""
     from tools.evolve import mutations as mut
 
-    model = _build_model(base_model_dir)
+    base_model = _build_model(base_model_dir)
     _set_bridge("1h")
 
-    menu = menu or mut.DIRECTION_MUTATION_MENU
-    variants = mut.spawn_direction_variants(model, menu=menu)
+    menu = menu or mut.COMBINED_MUTATION_MENU
+    variants = mut.spawn_direction_variants(base_model, menu=menu)
     results: list[dict[str, Any]] = []
 
     for gen in range(generations):
         gen_results = []
         for variant in variants:
             variant_id = variant["id"]
-            parent = variant.get("parent", model["id"])
+            parent = variant.get("parent", base_model["id"])
             extra = variant.get("extra_cfg", {})
             try:
+                variant_model = _build_model(Path(variant["model_dir"]))
                 candidate = run_candidate(
-                    model,
+                    variant_model,
                     codes=variant["codes"],
                     slippage=extra.get("slippage_us", costs.SLIPPAGE_BASE),
                     cash=cash,
@@ -491,7 +492,8 @@ def run_campaign(
         # Promote best by fitness
         best = max(gen_results, key=lambda c: c["fitness"])
         try:
-            run_lockbox_and_audit(best, model, extra_cfg=best.get("extra_cfg", {}))
+            best_model = _build_model(Path(best["model_dir"]))
+            run_lockbox_and_audit(best, best_model, extra_cfg=best.get("extra_cfg", {}))
             write_trial(best)
         except Exception as exc:
             print(f"  LOCKBOX/audit fail for {best['id']}: {exc}", flush=True)

@@ -5,7 +5,9 @@ Options: hunt_config patches. Equity: config/strategy overlays only.
 """
 from __future__ import annotations
 
+import ast
 import json
+import re
 import shutil
 from pathlib import Path
 from typing import Any
@@ -271,12 +273,230 @@ DIRECTION_MUTATION_MENU: list[dict[str, Any]] = [
 ]
 
 
+# Code-level mutation menu for v39b signal_engine.py.
+# Each entry writes a temporary model bundle with a patched signal_engine.py.
+CODE_MUTATION_MENU: list[dict[str, Any]] = [
+    {
+        "name": "unblock_arm",
+        "add_codes": ["ARM.US"],
+        "code_mutation": {"op": "remove_from_set", "set_name": "TRADE_DROP", "symbol": "ARM.US"},
+        "hypothesis": "Remove ARM from TRADE_DROP and let it trade.",
+    },
+    {
+        "name": "allow_qqq",
+        "code_mutation": {"op": "remove_from_set", "set_name": "REGIME_FLAT", "symbol": "QQQ.US"},
+        "hypothesis": "Allow QQQ to trade by removing it from REGIME_FLAT.",
+    },
+    {
+        "name": "vwap_uptrend_tsla",
+        "code_mutation": {"op": "set_routing_flag", "symbol": "TSLA.US", "key": "require_vwap_uptrend", "value": True},
+        "hypothesis": "Require VWAP uptrend for TSLA entries.",
+    },
+    {
+        "name": "soft_confidence_tsla",
+        "code_mutation": [
+            {"op": "set_routing_flag", "symbol": "TSLA.US", "key": "soft_confidence", "value": True},
+            {"op": "set_routing_param", "symbol": "TSLA.US", "key": "min_confidence", "value": 0.55},
+        ],
+        "hypothesis": "Use soft confidence with lower threshold for TSLA.",
+    },
+    {
+        "name": "tight_stop_all",
+        "code_mutation": {"op": "set_routing_param", "symbol": "__all__", "key": "stop_atr", "value": 1.0},
+        "hypothesis": "Tighten hard stops to 1.0 ATR for all symbols.",
+    },
+    {
+        "name": "risk_pct_down",
+        "code_mutation": {"op": "set_genome", "key": "risk_pct", "value": 0.10},
+        "hypothesis": "Lower risk_pct to reduce position sizing.",
+    },
+    {
+        "name": "struct_good_up",
+        "code_mutation": {"op": "set_genome", "key": "struct_good_mult", "value": 1.25},
+        "hypothesis": "Boost struct_good multiplier for stronger structure.",
+    },
+]
+
+
+COMBINED_MUTATION_MENU: list[dict[str, Any]] = DIRECTION_MUTATION_MENU + CODE_MUTATION_MENU
+
+
+# Output directory used by tools.dynamic_model_rank (OUT/runs/<id>/).
+DMR_OUT = ROOT / "runs" / "poc_va_dynamic_rank"
+
+
+class SignalEngineMutator:
+    """Patch literal _ROUTING / _GENOME / top-level sets in signal_engine.py."""
+
+    def __init__(self, src: Path | str):
+        self.text = src if isinstance(src, str) else Path(src).read_text()
+        self._routing_match = re.search(r"^_ROUTING = (.*)$", self.text, re.MULTILINE)
+        self._genome_match = re.search(r"^_GENOME = .*?}$", self.text, re.MULTILINE | re.DOTALL)
+        if not self._routing_match or not self._genome_match:
+            raise ValueError("signal_engine.py must define _ROUTING and _GENOME top-level assigns")
+        self.routing: dict[str, Any] = ast.literal_eval(self._routing_match.group(1))
+        self.genome: dict[str, Any] = ast.literal_eval(
+            self._genome_match.group(0).split("=", 1)[1].strip()
+        )
+
+    def _write_routing(self) -> None:
+        self.text = re.sub(
+            r"^_ROUTING = .*$",
+            lambda _m: f"_ROUTING = {repr(self.routing)}",
+            self.text,
+            flags=re.MULTILINE,
+            count=1,
+        )
+
+    def _write_genome(self) -> None:
+        self.text = re.sub(
+            r"^_GENOME = .*?}$",
+            lambda _m: f"_GENOME = {repr(self.genome)}",
+            self.text,
+            flags=re.MULTILINE | re.DOTALL,
+            count=1,
+        )
+
+    def _symbols(self, symbol: str | None) -> list[str]:
+        if symbol is None or symbol == "__all__":
+            return list(self.routing.keys())
+        return [symbol]
+
+    def apply_mutation(self, spec: dict[str, Any]) -> dict[str, Any]:
+        """Apply one mutation spec and return a summary."""
+        op = spec["op"]
+        summary: dict[str, Any] = {"op": op}
+
+        if op == "set_routing_flag":
+            for sym in self._symbols(spec.get("symbol")):
+                old = bool(self.routing[sym][spec["key"]])
+                self.routing[sym][spec["key"]] = bool(spec["value"])
+                summary["symbol"] = spec.get("symbol", "__all__")
+                summary["key"] = spec["key"]
+                summary["old"] = old
+                summary["new"] = spec["value"]
+            self._write_routing()
+
+        elif op == "set_routing_param":
+            for sym in self._symbols(spec.get("symbol")):
+                old = self.routing[sym].get(spec["key"])
+                self.routing[sym][spec["key"]] = spec["value"]
+                summary["symbol"] = spec.get("symbol", "__all__")
+                summary["key"] = spec["key"]
+                summary["old"] = old
+                summary["new"] = spec["value"]
+            self._write_routing()
+
+        elif op == "scale_routing_param":
+            scale = float(spec["scale"])
+            for sym in self._symbols(spec.get("symbol")):
+                old = self.routing[sym].get(spec["key"])
+                if isinstance(old, bool):
+                    new = bool(old)
+                elif isinstance(old, (int, float)):
+                    new = old * scale
+                    if isinstance(old, int):
+                        new = int(round(new))
+                    else:
+                        new = round(new, 4)
+                else:
+                    new = old
+                self.routing[sym][spec["key"]] = new
+                summary["symbol"] = spec.get("symbol", "__all__")
+                summary["key"] = spec["key"]
+                summary["old"] = old
+                summary["new"] = new
+            self._write_routing()
+
+        elif op == "set_genome":
+            old = self.genome[spec["key"]]
+            self.genome[spec["key"]] = spec["value"]
+            summary["key"] = spec["key"]
+            summary["old"] = old
+            summary["new"] = spec["value"]
+            self._write_genome()
+
+        elif op == "scale_genome":
+            old = self.genome[spec["key"]]
+            new = round(old * float(spec["scale"]), 4)
+            self.genome[spec["key"]] = new
+            summary["key"] = spec["key"]
+            summary["old"] = old
+            summary["new"] = new
+            self._write_genome()
+
+        elif op in ("remove_from_set", "add_to_set"):
+            set_name = spec["set_name"]
+            symbol = spec["symbol"]
+            m = re.search(rf"^{set_name} = (.*)$", self.text, re.MULTILINE)
+            if not m:
+                raise ValueError(f"set {set_name} not found in signal_engine.py")
+            items = set(ast.literal_eval(m.group(1)))
+            old = sorted(items)
+            if op == "remove_from_set":
+                items.discard(symbol)
+            else:
+                items.add(symbol)
+            new = sorted(items)
+            self.text = re.sub(
+                rf"^{set_name} = .*$",
+                lambda _m: f"{set_name} = {repr(new)}",
+                self.text,
+                flags=re.MULTILINE,
+                count=1,
+            )
+            summary["set_name"] = set_name
+            summary["symbol"] = symbol
+            summary["old"] = old
+            summary["new"] = new
+
+        else:
+            raise ValueError(f"unknown mutation op: {op}")
+
+        return summary
+
+    def write(self, dest: Path) -> None:
+        dest.write_text(self.text)
+
+
+def apply_code_mutation(
+    base_model_dir: Path,
+    variant_id: str,
+    mutation_spec: dict[str, Any] | list[dict[str, Any]],
+    out_root: Path | None = None,
+) -> Path:
+    """Copy base model + patch signal_engine.py; return mutated model_dir."""
+    dest = (out_root or DMR_OUT / "runs") / variant_id
+    if dest.exists():
+        shutil.rmtree(dest)
+    dest.mkdir(parents=True, exist_ok=True)
+
+    # copy the minimal bundle needed to run
+    for name in ("config.json", "meta_config.json", "meta_xgb_final.json", "signal_engine.py"):
+        src = base_model_dir / name
+        if src.exists():
+            shutil.copy2(src, dest / name)
+
+    mutator = SignalEngineMutator(dest / "signal_engine.py")
+    specs = mutation_spec if isinstance(mutation_spec, list) else [mutation_spec]
+    summaries = [mutator.apply_mutation(s) for s in specs]
+    mutator.write(dest / "signal_engine.py")
+
+    (dest / "MUTATION.json").write_text(
+        json.dumps({"variant_id": variant_id, "parent": base_model_dir.name, "mutations": summaries}, indent=2)
+    )
+    return dest
+
+
 def spawn_direction_variants(
     base_model: dict[str, Any],
     menu: list[dict[str, Any]] | None = None,
 ) -> list[dict[str, Any]]:
-    """Build runtime variant specs for direction-equity evolution."""
-    menu = menu or DIRECTION_MUTATION_MENU
+    """Build runtime variant specs for direction-equity evolution.
+
+    Supports code_mutation specs that create temporary model bundles.
+    """
+    menu = menu or COMBINED_MUTATION_MENU
     base_codes = base_model.get("codes") or []
     if not base_codes:
         cfg = base_model.get("model_dir") / "config.json" if base_model.get("model_dir") else None
@@ -291,13 +511,22 @@ def spawn_direction_variants(
     variants = []
     for spec in menu:
         codes = spec.get("codes") or base_codes
+        if spec.get("add_codes"):
+            codes = list(codes) + [c for c in spec["add_codes"] if c not in codes]
         vid = f"{base_model['id']}_{spec['name']}"
+
+        model_dir = base_model["model_dir"]
+        src_dir = base_model["src_dir"]
+        if spec.get("code_mutation"):
+            model_dir = apply_code_mutation(Path(model_dir), vid, spec["code_mutation"])
+            src_dir = model_dir
+
         variants.append(
             {
                 "id": vid,
                 "parent": base_model["id"],
-                "model_dir": base_model["model_dir"],
-                "src_dir": base_model["src_dir"],
+                "model_dir": model_dir,
+                "src_dir": src_dir,
                 "codes": list(codes),
                 "extra_cfg": dict(spec.get("extra_cfg", {})),
                 "mutations": [{"name": spec["name"], "hypothesis": spec.get("hypothesis", "")}],

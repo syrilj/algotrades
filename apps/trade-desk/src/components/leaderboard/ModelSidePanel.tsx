@@ -34,9 +34,9 @@ export function ModelSidePanel({ row, maxScore = 1, onClose }: ModelSidePanelPro
       <aside
         className="p-4 text-[13px]"
         style={{
-          background: "var(--td-ink-900, #12181F)",
-          borderLeft: "1px solid var(--td-ink-700, #243040)",
-          color: "var(--td-ink-400, #64748B)",
+          background: "var(--td-ink-900, #0d0d0d)",
+          borderLeft: "1px solid var(--td-ink-700, #3c3c3c)",
+          color: "var(--td-ink-400, #bbbbbb)",
           minHeight: "12rem",
         }}
         aria-label="Model detail panel"
@@ -53,9 +53,9 @@ export function ModelSidePanel({ row, maxScore = 1, onClose }: ModelSidePanelPro
     <aside
       className="flex flex-col gap-4 p-4"
       style={{
-        background: "var(--td-ink-900, #12181F)",
-        borderLeft: "1px solid var(--td-ink-700, #243040)",
-        color: "var(--td-ink-200, #CBD5E1)",
+        background: "var(--td-ink-900, #0d0d0d)",
+        borderLeft: "1px solid var(--td-ink-700, #3c3c3c)",
+        color: "var(--td-ink-200, #ffffff)",
       }}
       aria-label={`Detail for ${row.model}`}
     >
@@ -63,7 +63,7 @@ export function ModelSidePanel({ row, maxScore = 1, onClose }: ModelSidePanelPro
         <div>
           <p
             className="text-[11px] uppercase tracking-wide"
-            style={{ color: "var(--td-ink-400, #64748B)" }}
+            style={{ color: "var(--td-ink-400, #bbbbbb)" }}
           >
             Rank #{row.rank}
           </p>
@@ -71,7 +71,7 @@ export function ModelSidePanel({ row, maxScore = 1, onClose }: ModelSidePanelPro
             className="text-[16px] font-medium mt-0.5"
             style={{
               fontFamily: "var(--td-font-mono, ui-monospace, Menlo, monospace)",
-              color: "var(--td-ink-100, #E2E8F0)",
+              color: "var(--td-ink-100, #ffffff)",
             }}
           >
             {row.model}
@@ -83,8 +83,8 @@ export function ModelSidePanel({ row, maxScore = 1, onClose }: ModelSidePanelPro
             onClick={onClose}
             className="text-[12px] px-2 py-1 rounded-sm"
             style={{
-              color: "var(--td-ink-400, #64748B)",
-              border: "1px solid var(--td-ink-700, #243040)",
+              color: "var(--td-ink-400, #bbbbbb)",
+              border: "1px solid var(--td-ink-700, #3c3c3c)",
             }}
             aria-label="Close panel"
           >
@@ -103,7 +103,7 @@ export function ModelSidePanel({ row, maxScore = 1, onClose }: ModelSidePanelPro
       <div>
         <p
           className="text-[12px] mb-1"
-          style={{ color: "var(--td-ink-400, #64748B)" }}
+          style={{ color: "var(--td-ink-400, #bbbbbb)" }}
         >
           Score
         </p>
@@ -122,7 +122,7 @@ export function ModelSidePanel({ row, maxScore = 1, onClose }: ModelSidePanelPro
           ] as const
         ).map(([label, value]) => (
           <div key={label}>
-            <dt style={{ color: "var(--td-ink-400, #64748B)", fontSize: 11 }}>
+            <dt style={{ color: "var(--td-ink-400, #bbbbbb)", fontSize: 11 }}>
               {label}
             </dt>
             <dd
@@ -141,8 +141,8 @@ export function ModelSidePanel({ row, maxScore = 1, onClose }: ModelSidePanelPro
         <div
           className="text-[12px] space-y-1 pt-2"
           style={{
-            borderTop: "1px solid var(--td-ink-700, #243040)",
-            color: "var(--td-ink-300, #94A3B8)",
+            borderTop: "1px solid var(--td-ink-700, #3c3c3c)",
+            color: "var(--td-ink-300, #e6e6e6)",
           }}
         >
           {row.code ? <p>Code: {row.code}</p> : null}
@@ -156,8 +156,9 @@ export function ModelSidePanel({ row, maxScore = 1, onClose }: ModelSidePanelPro
           href={detailHref}
           className="text-center text-[13px] py-2 rounded-sm transition-colors"
           style={{
-            background: "var(--td-brand, #2F6F7A)",
-            color: "var(--td-ink-100, #E2E8F0)",
+            background: "var(--td-canvas)",
+            border: "1px solid var(--td-ink)",
+            color: "var(--td-ink)",
           }}
         >
           Model detail
@@ -167,8 +168,8 @@ export function ModelSidePanel({ row, maxScore = 1, onClose }: ModelSidePanelPro
           className="text-center text-[13px] py-2 rounded-sm transition-colors"
           style={{
             background: "transparent",
-            border: "1px solid var(--td-ink-600, #334155)",
-            color: "var(--td-ink-200, #CBD5E1)",
+            border: "1px solid var(--td-ink)",
+            color: "var(--td-ink)",
           }}
         >
           Analyze with model

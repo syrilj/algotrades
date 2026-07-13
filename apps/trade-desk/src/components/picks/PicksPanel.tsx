@@ -43,7 +43,7 @@ export function PicksPanel({
         <div className="flex flex-col gap-1">
           <span className="td-label">Horizon</span>
           <div
-            className="inline-flex rounded-[4px] border border-[var(--td-ink-600,#334155)] p-0.5"
+            className="inline-flex rounded-md border border-[var(--td-hairline)] p-0.5"
             role="group"
             aria-label="Horizon"
           >
@@ -54,10 +54,10 @@ export function PicksPanel({
                   key={h}
                   type="button"
                   onClick={() => onChange({ ...value, horizon: h })}
-                  className={`h-7 min-w-[64px] rounded-[3px] px-3 text-[13px] font-medium capitalize ${
+                  className={`h-7 min-w-[64px] rounded-md px-3 text-[13px] font-medium capitalize ${
                     active
-                      ? "bg-[var(--td-brand,#2F6F7A)] text-[var(--td-ink-50,#F1F5F9)]"
-                      : "text-[var(--td-ink-300,#94A3B8)] hover:bg-[var(--td-ink-700,#243040)]"
+                      ? "bg-[var(--td-canvas)] text-[var(--td-ink)]"
+                      : "text-[var(--td-body)] hover:bg-[var(--td-hairline)]"
                   }`}
                 >
                   {h}
@@ -123,10 +123,10 @@ export function PicksPanel({
                 type="button"
                 onClick={() => toggleSector(sector)}
                 aria-pressed={active}
-                className={`rounded-[4px] border px-2 py-1 text-[12px] font-medium ${
+                className={`rounded-md border px-2 py-1 text-[12px] font-medium ${
                   active
-                    ? "border-[var(--td-brand,#2F6F7A)] bg-[var(--td-brand-soft,#2F6F7A26)] text-[var(--td-ink-100,#E2E8F0)]"
-                    : "border-[var(--td-ink-600,#334155)] bg-[var(--td-ink-900,#12181F)] text-[var(--td-ink-400,#64748B)] hover:text-[var(--td-ink-200,#CBD5E1)]"
+                    ? "border-[var(--td-brand,#1c69d4)] bg-[var(--td-brand-soft,#1c69d426)] text-[var(--td-ink-100,#ffffff)]"
+                    : "border-[var(--td-ink-600,#2b2b2b)] bg-[var(--td-ink-900,#0d0d0d)] text-[var(--td-ink-400,#bbbbbb)] hover:text-[var(--td-ink-200,#ffffff)]"
                 }`}
               >
                 {sector}

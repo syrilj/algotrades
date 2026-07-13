@@ -26,18 +26,18 @@ export function LeaderboardControls({
   return (
     <div
       className="flex flex-wrap items-end gap-3 gap-y-2"
-      style={{ color: "var(--td-ink-200, #CBD5E1)" }}
+      style={{ color: "var(--td-ink-200, #ffffff)" }}
     >
       <div className="flex flex-col gap-1">
         <span
           className="text-[12px] font-medium"
-          style={{ color: "var(--td-ink-400, #64748B)" }}
+          style={{ color: "var(--td-ink-400, #bbbbbb)" }}
         >
           Mode
         </span>
         <div
           className="inline-flex rounded-sm overflow-hidden"
-          style={{ border: "1px solid var(--td-ink-600, #334155)" }}
+          style={{ border: "1px solid var(--td-ink-600, #2b2b2b)" }}
           role="group"
           aria-label="Ranking mode"
         >
@@ -51,11 +51,11 @@ export function LeaderboardControls({
                 className="px-3 py-1.5 text-[13px] transition-colors"
                 style={{
                   background: active
-                    ? "var(--td-brand, #2F6F7A)"
-                    : "var(--td-ink-800, #1A222C)",
+                    ? "var(--td-canvas)"
+                    : "var(--td-surface-card)",
                   color: active
-                    ? "var(--td-ink-100, #E2E8F0)"
-                    : "var(--td-ink-300, #94A3B8)",
+                    ? "var(--td-ink)"
+                    : "var(--td-body)",
                 }}
                 aria-pressed={active}
               >
@@ -70,7 +70,7 @@ export function LeaderboardControls({
         <label className="flex flex-col gap-1">
           <span
             className="text-[12px] font-medium"
-            style={{ color: "var(--td-ink-400, #64748B)" }}
+            style={{ color: "var(--td-ink-400, #bbbbbb)" }}
           >
             Symbol
           </span>
@@ -80,9 +80,9 @@ export function LeaderboardControls({
             placeholder="IONQ"
             className="h-8 w-28 px-2 text-[13px] rounded-sm outline-none uppercase"
             style={{
-              background: "var(--td-ink-900, #12181F)",
-              border: "1px solid var(--td-ink-600, #334155)",
-              color: "var(--td-ink-100, #E2E8F0)",
+              background: "var(--td-surface-card)",
+              border: "1px solid var(--td-hairline)",
+              color: "var(--td-ink)",
               fontFamily: "var(--td-font-mono, ui-monospace, Menlo, monospace)",
             }}
             aria-label="Symbol"
@@ -95,7 +95,7 @@ export function LeaderboardControls({
           type="checkbox"
           checked={enginesOnly}
           onChange={(e) => onEnginesOnlyChange(e.target.checked)}
-          className="h-3.5 w-3.5 accent-[var(--td-brand,#2F6F7A)]"
+          className="h-3.5 w-3.5 accent-[var(--td-brand,#1c69d4)]"
         />
         <span className="text-[13px]">Engines only</span>
       </label>
@@ -107,9 +107,9 @@ export function LeaderboardControls({
           disabled={loading}
           className="h-8 px-3 text-[13px] rounded-sm transition-opacity disabled:opacity-50"
           style={{
-            background: "var(--td-ink-800, #1A222C)",
-            border: "1px solid var(--td-ink-600, #334155)",
-            color: "var(--td-ink-200, #CBD5E1)",
+            background: "transparent",
+            border: "1px solid var(--td-ink)",
+            color: "var(--td-ink)",
           }}
         >
           {loading ? "Refreshing…" : "Refresh"}

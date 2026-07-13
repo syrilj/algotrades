@@ -100,7 +100,7 @@ def _daily_close_lse(adapter: LSEAdapter, ticker: str) -> pd.Series:
                 s.index = s.index.tz_localize(None)
             return s.dropna()
     except Exception as e:  # noqa: BLE001
-        print(f"[live_plan] LSE daily close failed for {ticker}: {e}")
+        print(f"[live_plan] LSE daily close failed for {ticker}: {e}", file=sys.stderr)
     return pd.Series(dtype=float)
 
 
@@ -112,7 +112,7 @@ def _intraday_df_lse(adapter: LSEAdapter, symbol: str) -> pd.DataFrame | None:
         if not df.empty and len(df) >= 20:
             return df
     except Exception as e:  # noqa: BLE001
-        print(f"[live_plan] LSE intraday failed for {symbol}: {e}")
+        print(f"[live_plan] LSE intraday failed for {symbol}: {e}", file=sys.stderr)
     return None
 
 
@@ -244,10 +244,27 @@ def plan_symbol(
             symbol, model="auto" if model in ("", "auto") else model
         )
 
-    live_conf = float(live.get("confidence") or 0.0)
-    model_conf = model_info.get("confidence")
-    trend_ok = bool(live.get("swing_uptrend") or live.get("above_vwap") or live.get("macd_positive"))
-    conf = blend_confidence(live_conf, model_conf if model_info.get("ok") else None, bool(live.get("go_long")), trend_ok)
+    go_long = bool(live.get("go_long"))
+    go_short = bool(live.get("go_short"))
+    
+    # Bearish bias if short signal is active, or if long signal is flat and trend is down
+    is_bearish = go_short or (not go_long and not bool(live.get("macd_positive") or live.get("swing_uptrend") or live.get("above_vwap")))
+    
+    if is_bearish:
+        side = "short"
+        trend_ok = not bool(live.get("swing_uptrend") or live.get("above_vwap") or live.get("macd_positive"))
+        live_conf = float(live.get("confidence_bear") or 0.0)
+        model_conf = model_info.get("confidence")
+        model_conf_bear = 1.0 - model_conf if (model_conf is not None) else None
+        conf = blend_confidence(live_conf, model_conf_bear if model_info.get("ok") else None, go_short, trend_ok)
+        setup_trend_ok = trend_ok and bool((not live.get("macd_positive")) or go_short or conf >= 0.65)
+    else:
+        side = "long"
+        trend_ok = bool(live.get("swing_uptrend") or live.get("above_vwap") or live.get("macd_positive"))
+        live_conf = float(live.get("confidence") or 0.0)
+        model_conf = model_info.get("confidence")
+        conf = blend_confidence(live_conf, model_conf if model_info.get("ok") else None, go_long, trend_ok)
+        setup_trend_ok = trend_ok and bool(live.get("macd_positive") or go_long or conf >= 0.65)
 
     # Options affordability heuristic from research playbook
     ysym = _yf_symbol(symbol)
@@ -255,16 +272,37 @@ def plan_symbol(
     if account < 1500 and ysym in {"TSLA", "NVDA", "META", "AVGO"}:
         options_affordable = account >= 2000  # spreads only on larger book; still allow try
 
+    # Fetch option positioning & GEX
+    gex_data = {}
+    try:
+        from gamma_exposure import compute_gamma_exposure
+        gex_src = "lse" if os.environ.get("LSE_API_KEY") else "oi"
+        gex_data = compute_gamma_exposure(symbol, spot_source="auto", source=gex_src)
+    except Exception:
+        try:
+            from gamma_exposure import compute_gamma_exposure
+            gex_data = compute_gamma_exposure(symbol, spot_source="yfinance", source="oi")
+        except Exception:
+            pass
+
     setup = SetupSnapshot(
         symbol=ysym,
         model_conf=conf,
         vol_z=float(live.get("vol_z") or 0.0),
-        trend_ok=trend_ok and bool(live.get("macd_positive") or live.get("go_long") or conf >= 0.65),
+        trend_ok=setup_trend_ok,
         macro_ok=bool(macro.get("macro_ok", True)),
         qqq_ok=bool(macro.get("qqq_ok", True)),
         options_affordable=options_affordable,
         liquidity_ok=True,
-        side="long",
+        side=side,
+        gex_regime=str(gex_data.get("regime", "flat")),
+        gex_sign=int(gex_data.get("gex_sign", 0)),
+        approx_flip_strike=gex_data.get("approx_flip_strike"),
+        call_wall=gex_data.get("call_wall"),
+        put_wall=gex_data.get("put_wall"),
+        squeeze_score=float(gex_data.get("squeeze_score", 0.0)),
+        squeeze_label=str(gex_data.get("squeeze_label", "neutral")),
+        spot_price=gex_data.get("spot"),
     )
     peak_eq = float(peak if peak and peak > 0 else account)
     state = PortfolioState(
@@ -285,6 +323,7 @@ def plan_symbol(
                 account=account,
                 max_risk_pct=float(decision.risk_pct),
                 prefer_spread=True,
+                side=setup.side,
             )
         except Exception as e:  # noqa: BLE001
             options_plan = {"error": str(e), "action": "skip"}
@@ -390,6 +429,7 @@ def plan_symbol(
         "live": live,
         "macro": macro,
         "model": model_info,
+        "gex": gex_data,
         "blended_confidence": round(conf, 4),
         "decision": dec,
         "options": options_plan,

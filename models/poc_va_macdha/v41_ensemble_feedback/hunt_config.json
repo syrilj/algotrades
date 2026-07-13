@@ -1,5 +1,5 @@
 {
-  "base_models": ["v39b_live_adapt", "v39d_confluence"],
+  "base_models": ["v39b_live_adapt_tight_stop_all", "v39d_confluence"],
   "mode": "perf_weighted",
   "forward_bars": 3,
   "target_threshold": 0.01,
@@ -9,13 +9,13 @@
   "loss": "log_loss",
   "feature_deltas": true,
   "feature_extra": true,
-  "fallback": "v39b_live_adapt",
+  "fallback": "v39b_live_adapt_tight_stop_all",
   "proba_threshold": 0.5,
   "signal_mode": "binary",
   "return_scale": 100.0,
-  "perf_lookback": 60,
+  "perf_lookback": 90,
   "perf_temperature": 0.5,
-  "perf_min_weight": 0.0,
+  "perf_min_weight": 0.1,
   "perf_forward": 3,
-  "perf_metric": "return_per_dd"
+  "perf_metric": "raw_return"
 }

@@ -21,6 +21,10 @@ export function optionsPickerScript(): string {
   return path.join(repoRoot(), "tools", "options_picker.py");
 }
 
+export function gammaExposureScript(): string {
+  return path.join(repoRoot(), "tools", "gamma_exposure.py");
+}
+
 export function riskManagerScript(): string {
   return path.join(repoRoot(), "tools", "risk_manager.py");
 }

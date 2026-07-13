@@ -75,7 +75,7 @@ def _make_variant_model(
     }
 
 
-def _run_model(model: dict[str, Any], cash: float, tag: str) -> dict[str, Any]:
+def _run_model(model: dict[str, Any], cash: float, tag: str, source: str = "yfinance", interval: str | None = None) -> dict[str, Any]:
     return dmr.run_one(
         model,
         mode="daily",
@@ -86,6 +86,8 @@ def _run_model(model: dict[str, Any], cash: float, tag: str) -> dict[str, Any]:
         force_1d=False,
         reuse=True,
         cash=cash,
+        source=source,
+        interval=interval,
     )
 
 
@@ -114,26 +116,25 @@ def _variant_id(overrides: dict[str, Any]) -> str:
     else:
         base = f"v41_{mode}"
     models = overrides["base_models"]
-    if models == ["v39b_live_adapt", "v39d_confluence"]:
-        base += "_b39b39d"
-    elif models == ["v39b_live_adapt"]:
-        base += "_b39b"
-    elif models == ["v39d_confluence"]:
-        base += "_b39d"
-    elif models == ["v39b_live_adapt", "v39d_confluence", "v12_regime_router"]:
-        base += "_b39b39dv12"
-    elif models == ["v39b_live_adapt", "v12_regime_router"]:
-        base += "_b39bv12"
-    elif models == ["v39d_confluence", "v12_regime_router"]:
-        base += "_b39dv12"
-    elif models == ["v39b_live_adapt", "v39d_confluence", "v42_trend_breakout"]:
-        base += "_b39b39dv42"
-    elif models == ["v39d_confluence", "v42_trend_breakout"]:
-        base += "_b39dv42"
-    elif models == ["v39b_live_adapt", "v42_trend_breakout"]:
-        base += "_b39bv42"
-    else:
-        base += "_" + "_".join(models)
+    models_short = []
+    for m in models:
+        if m == "v39b_live_adapt":
+            models_short.append("b39b")
+        elif m == "v39d_confluence":
+            models_short.append("b39d")
+        elif m == "v39b_live_adapt_tight_stop_all":
+            models_short.append("tsb")
+        elif m == "v39d_confluence_tight_stop_all":
+            models_short.append("tsd")
+        elif m == "v12_regime_router":
+            models_short.append("v12")
+        elif m == "v42_trend_breakout":
+            models_short.append("v42")
+        elif m == "v44_true_levels":
+            models_short.append("v44")
+        else:
+            models_short.append(m)
+    base += "_" + "".join(models_short)
     if mode == "perf_weighted":
         base += f"_l{overrides['perf_lookback']}"
         t = overrides["perf_temperature"]
@@ -155,25 +156,21 @@ def build_variants(quick: bool, focused: bool = False) -> list[dict[str, Any]]:
     if quick:
         param_sets = [
             {"base_models": ["v39b_live_adapt", "v39d_confluence"], "perf_lookback": 60, "perf_temperature": 0.5, "perf_forward": 1},
-            {"base_models": ["v39b_live_adapt", "v39d_confluence"], "perf_lookback": 60, "perf_temperature": 1.0, "perf_forward": 1},
-            {"base_models": ["v39b_live_adapt", "v39d_confluence"], "perf_lookback": 90, "perf_temperature": 0.5, "perf_forward": 1},
-            {"base_models": ["v39b_live_adapt", "v39d_confluence"], "perf_lookback": 60, "perf_temperature": 0.5, "perf_forward": 3, "perf_metric": "sharpe"},
-            {"base_models": ["v39b_live_adapt", "v39d_confluence"], "perf_lookback": 60, "perf_temperature": 0.5, "perf_forward": 3, "perf_metric": "return_per_dd"},
-            {"base_models": ["v39b_live_adapt", "v39d_confluence", "v42_trend_breakout"], "perf_lookback": 60, "perf_temperature": 0.5, "perf_forward": 1},
-            {"base_models": ["v39b_live_adapt", "v39d_confluence", "v42_trend_breakout"], "perf_lookback": 90, "perf_temperature": 1.0, "perf_forward": 3, "perf_metric": "sharpe"},
-            {"base_models": ["v39d_confluence", "v42_trend_breakout"], "perf_lookback": 60, "perf_temperature": 0.5, "perf_forward": 1},
-            {"base_models": ["v39b_live_adapt", "v42_trend_breakout"], "perf_lookback": 60, "perf_temperature": 0.5, "perf_forward": 1},
-            {"base_models": ["v39b_live_adapt", "v39d_confluence"], "mode": "sgd_proba", "forward_bars": 3, "warmup": 80, "learning_rate": 0.02},
+            {"base_models": ["v39b_live_adapt_tight_stop_all", "v39d_confluence"], "perf_lookback": 60, "perf_temperature": 0.5, "perf_forward": 1},
+            {"base_models": ["v39b_live_adapt_tight_stop_all", "v44_true_levels"], "perf_lookback": 60, "perf_temperature": 0.5, "perf_forward": 1},
+            {"base_models": ["v39d_confluence", "v44_true_levels"], "perf_lookback": 60, "perf_temperature": 0.5, "perf_forward": 1},
+            {"base_models": ["v39d_confluence", "v44_true_levels"], "perf_lookback": 90, "perf_temperature": 0.5, "perf_forward": 1},
+            {"base_models": ["v39d_confluence", "v44_true_levels"], "perf_lookback": 90, "perf_temperature": 0.5, "perf_forward": 3, "perf_metric": "raw_return"},
         ]
     elif focused:
         model_combos = [
             ["v39b_live_adapt", "v39d_confluence"],
+            ["v39b_live_adapt_tight_stop_all", "v39d_confluence"],
+            ["v39b_live_adapt_tight_stop_all", "v39d_confluence_tight_stop_all"],
             ["v39d_confluence"],
-            ["v39b_live_adapt", "v39d_confluence", "v42_trend_breakout"],
-            ["v39d_confluence", "v42_trend_breakout"],
         ]
-        lookbacks = [30, 60, 90]
-        temperatures = [0.25, 0.5, 1.0]
+        lookbacks = [60, 90]
+        temperatures = [0.5, 1.0]
         forwards = [1, 3]
         min_weights = [0.0, 0.1]
 
@@ -193,12 +190,12 @@ def build_variants(quick: bool, focused: bool = False) -> list[dict[str, Any]]:
     else:
         model_combos = [
             ["v39b_live_adapt", "v39d_confluence"],
+            ["v39b_live_adapt_tight_stop_all", "v39d_confluence"],
+            ["v39b_live_adapt_tight_stop_all", "v39d_confluence_tight_stop_all"],
             ["v39d_confluence"],
             ["v39b_live_adapt"],
             ["v39b_live_adapt", "v39d_confluence", "v12_regime_router"],
-            ["v39b_live_adapt", "v39d_confluence", "v42_trend_breakout"],
-            ["v39d_confluence", "v42_trend_breakout"],
-            ["v39b_live_adapt", "v42_trend_breakout"],
+            ["v39b_live_adapt_tight_stop_all", "v39d_confluence", "v12_regime_router"],
         ]
         lookbacks = [30, 60, 90, 120]
         temperatures = [0.25, 0.5, 1.0, 2.0]
@@ -232,6 +229,8 @@ def main():
     parser.add_argument("--quick", action="store_true", help="Run focused 6-variant quick sweep")
     parser.add_argument("--focused", action="store_true", help="Run medium 42-variant focused sweep")
     parser.add_argument("--tag", type=str, default=TAG, help="Run tag for cache grouping")
+    parser.add_argument("--source", type=str, default="yfinance", help="Data source: local or yfinance")
+    parser.add_argument("--interval", type=str, default=None, help="Data interval (e.g. 1H)")
     args = parser.parse_args()
 
     cash = args.cash
@@ -241,7 +240,7 @@ def main():
         raise FileNotFoundError(f"v41 model not found: {V41_DIR}")
 
     # Discover teacher baselines for comparison.
-    baseline_models = dmr.discover_models(only=["v39b_live_adapt", "v39d_confluence"])
+    baseline_models = dmr.discover_models(only=["v39b_live_adapt", "v39d_confluence", "v39b_live_adapt_tight_stop_all", "v44_true_levels"])
     if not baseline_models:
         raise FileNotFoundError("baseline models not found")
 
@@ -253,26 +252,30 @@ def main():
 
     variants = build_variants(args.quick, args.focused)
 
-    print(f"[v41-feedback] cash=${cash:,.0f} codes={len(CODES)} variants={len(variants)}", flush=True)
+    tag = args.tag
+    if args.source != "yfinance":
+        tag = f"{tag}_{args.source}"
+
+    print(f"[v41-feedback] cash=${cash:,.0f} source={args.source} interval={args.interval or 'default'} codes={len(CODES)} variants={len(variants)}", flush=True)
     rows: list[dict[str, Any]] = []
 
     # Teacher baselines.
     for m in baseline_models:
         print(f"[v41-feedback] baseline {m['id']}", flush=True)
-        r = _run_model(m, cash, args.tag)
+        r = _run_model(m, cash, tag, source=args.source, interval=args.interval)
         print(f"  {_fmt(r)}", flush=True)
         rows.append(r)
 
     # Current v41 config.
     print("[v41-feedback] current v41_ensemble_feedback", flush=True)
-    r = _run_model(v41_base, cash, args.tag)
+    r = _run_model(v41_base, cash, tag, source=args.source, interval=args.interval)
     print(f"  {_fmt(r)}", flush=True)
     rows.append(r)
 
     # Variants.
     for m in variants:
         print(f"[v41-feedback] variant {m['id']}", flush=True)
-        r = _run_model(m, cash, args.tag)
+        r = _run_model(m, cash, tag, source=args.source, interval=args.interval)
         print(f"  {_fmt(r)}", flush=True)
         rows.append(r)
 
@@ -296,6 +299,8 @@ def main():
     state = {
         "timestamp": _now(),
         "cash": cash,
+        "source": args.source,
+        "interval": args.interval,
         "codes": CODES,
         "start": START,
         "end": END,
@@ -305,7 +310,15 @@ def main():
 
     (OUT / "STATE.json").write_text(json.dumps(state, indent=2, default=str))
 
-    lines = ["# v41 ensemble feedback leaderboard\n", f"- cash: ${cash:,.0f}\n", f"- period: {START} to {END}\n", f"- variants: {len(variants)}\n", ""]
+    lines = [
+        "# v41 ensemble feedback leaderboard\n",
+        f"- cash: ${cash:,.0f}\n",
+        f"- source: {args.source}\n",
+        f"- interval: {args.interval or 'default'}\n",
+        f"- period: {START} to {END}\n",
+        f"- variants: {len(variants)}\n",
+        ""
+    ]
     lines.append("| model | ret | dd | sharpe | n | wr | final | score |")
     lines.append("|---|---|---|---|---|---|---|---|")
     for r in ranked:

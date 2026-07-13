@@ -1,0 +1,15 @@
+{
+  "source": "yfinance",
+  "codes": ["TSLA.US", "MU.US", "SPY.US", "IONQ.US", "APLD.US", "XLP.US", "QQQ.US"],
+  "start_date": "2024-08-01",
+  "end_date": "2026-07-11",
+  "initial_cash": 1000000,
+  "commission": 0.001,
+  "engine": "daily",
+  "interval": "1H",
+  "strategy": {
+    "name": "v43_order_blocks",
+    "model_version": "v43_order_blocks",
+    "note": "v39d baseline + LuxAlgo Order Blocks mapping"
+  }
+}

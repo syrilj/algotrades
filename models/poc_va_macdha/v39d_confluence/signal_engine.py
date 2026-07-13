@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 from typing import Dict, Optional
 
@@ -646,6 +647,11 @@ class SignalEngine:
         self._meta_cfg = json.loads(meta_cfg_path.read_text(encoding="utf-8"))
         self._thr = float(self._meta_cfg.get("threshold", _GENOME["meta_p_skip"]))
         self._feat_cols = list(self._meta_cfg["feat_cols"])
+        if str(model_dir) not in sys.path:
+            sys.path.insert(0, str(model_dir))
+        import candidate_ledger
+
+        self._ledger = candidate_ledger.CandidateLedger(model_dir.parent, self._feat_cols)
         self._booster = XGBClassifier()
         self._booster.load_model(str(meta_booster_path))
         self._spy_htf: Optional[pd.Series] = None
@@ -856,6 +862,19 @@ class SignalEngine:
                     raw = meta_sz * feat_m * streak_mult if meta_sz > 0 else 0.0
                     sz=_risk_scale_size(raw, float(atr_pct.iloc[i]), med_atr_pct, kelly_fraction)
                     sz = float(np.clip(sz * self._risk_scale, 0.0, 1.0))
+                    self._ledger.record_entry(
+                        timestamp=data.index[i],
+                        code=code,
+                        entry_px=px,
+                        features=feats,
+                        meta_proba=proba,
+                        adj_proba=adj_proba,
+                        meta_sz=meta_sz,
+                        feat_m=feat_m,
+                        raw_size=raw,
+                        final_size=sz,
+                        passed=sz > 0,
+                    )
                     # No hard stand-aside floor — only soft size
                     if sz>0:
                         in_pos=True; entry_size=sz; signal.iloc[i]=sz
@@ -908,6 +927,10 @@ class SignalEngine:
                         )
                         self._live_streak = streak_mult
                         self._live_consec = consec
+                    reason = "soft_exit" if soft_exit else ("trail_stop" if trail_stop else "hard_stop")
+                    self._ledger.record_exit(
+                        timestamp=data.index[i], code=code, exit_px=px, reason=reason
+                    )
                     in_pos=False; signal.iloc[i]=0.0; entry_size=0.0
                     entry_px=peak_px=entry_atr=np.nan; entry_bar=-1
                 else:
@@ -920,6 +943,13 @@ class SignalEngine:
                     ):
                         entry_size = max(0.25, entry_size * 0.90)
                     signal.iloc[i]=entry_size; in_pos=True
+        if in_pos and np.isfinite(entry_px) and entry_px > 0:
+            self._ledger.record_exit(
+                timestamp=data.index[-1],
+                code=code,
+                exit_px=float(close.iloc[-1]),
+                reason="end_of_backtest",
+            )
         return signal.fillna(0.0)
 
     def _one(self, code, df, data_map: Dict[str, pd.DataFrame]):
@@ -964,4 +994,5 @@ class SignalEngine:
             g = macro_allow.reindex(days).ffill().fillna(False)
             g.index = sig.index
             out[code] = sig.where(g.astype(bool), 0.0).astype(float)
+        self._ledger.flush()
         return out

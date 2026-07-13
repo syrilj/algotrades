@@ -124,39 +124,72 @@ class LiveSignalEngine:
             (above_vwap or swing_up) and
             bullish_bar
         )
-        # Softer candidate for equity hedge (desk may still size small)
         soft_long = macd_pos and (above_vwap or swing_up) and vol_z >= 0.5
 
-        # Confidence: blend vol_z + structure (not vanity WR)
-        conf = 0.0
-        conf += min(0.45, max(0.0, vol_z / 4.0) * 0.45 / 0.5)  # vol_z primary
-        if macd_pos:
-            conf += 0.20
-        if above_vwap:
-            conf += 0.15
-        if swing_up:
-            conf += 0.10
-        if bullish_bar:
-            conf += 0.10
-        confidence = float(min(1.0, max(0.0, conf)))
+        go_short = (
+            vol_z >= self.params['vol_z_threshold'] and
+            (not macd_pos) and
+            (not above_vwap or not swing_up) and
+            (not bullish_bar)
+        )
+        soft_short = (not macd_pos) and (not above_vwap or not swing_up) and vol_z >= 0.5
 
-        # Position sizing multiplier for options leverage (live_plan maps via risk_manager)
+        # Confidence Long
+        conf_l = 0.0
+        conf_l += min(0.45, max(0.0, vol_z / 4.0) * 0.45 / 0.5)
+        if macd_pos:
+            conf_l += 0.20
+        if above_vwap:
+            conf_l += 0.15
+        if swing_up:
+            conf_l += 0.10
+        if bullish_bar:
+            conf_l += 0.10
+        confidence = float(min(1.0, max(0.0, conf_l)))
+
+        # Confidence Short
+        conf_s = 0.0
+        conf_s += min(0.45, max(0.0, vol_z / 4.0) * 0.45 / 0.5)
+        if not macd_pos:
+            conf_s += 0.20
+        if not above_vwap:
+            conf_s += 0.15
+        if not swing_up:
+            conf_s += 0.10
+        if not bullish_bar:
+            conf_s += 0.10
+        confidence_bear = float(min(1.0, max(0.0, conf_s)))
+
         signal_strength = 0.0
         if go_long:
             if vol_z >= 2.5:
-                signal_strength = 10.0  # Moonshot
+                signal_strength = 10.0
             elif vol_z >= 2.0:
-                signal_strength = 5.0   # High conviction
+                signal_strength = 5.0
             elif vol_z >= 1.5:
-                signal_strength = 3.0   # Standard
+                signal_strength = 3.0
         elif soft_long:
             signal_strength = 1.0
+
+        signal_strength_bear = 0.0
+        if go_short:
+            if vol_z >= 2.5:
+                signal_strength_bear = 10.0
+            elif vol_z >= 2.0:
+                signal_strength_bear = 5.0
+            elif vol_z >= 1.5:
+                signal_strength_bear = 3.0
+        elif soft_short:
+            signal_strength_bear = 1.0
 
         return {
             'symbol': symbol,
             'go_long': go_long,
             'soft_long': soft_long,
+            'go_short': go_short,
+            'soft_short': soft_short,
             'confidence': round(confidence, 2),
+            'confidence_bear': round(confidence_bear, 2),
             'vol_z': round(vol_z, 2),
             'atr_pct': round(atr_pct, 4),
             'above_vwap': above_vwap,
@@ -164,6 +197,7 @@ class LiveSignalEngine:
             'macd_positive': macd_pos,
             'price': round(float(df['Close'].iloc[-1]), 2),
             'signal_strength': signal_strength,
+            'signal_strength_bear': signal_strength_bear,
             'timestamp': df.index[-1].isoformat(),
         }
 

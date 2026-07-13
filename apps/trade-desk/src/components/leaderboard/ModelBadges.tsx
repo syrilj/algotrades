@@ -28,24 +28,24 @@ function Badge({
 }) {
   const styles: Record<typeof tone, CSSProperties> = {
     winner: {
-      background: "var(--td-badge-winner-bg, var(--td-brand-soft, #2F6F7A26))",
-      color: "var(--td-badge-winner-fg, var(--td-brand, #2F6F7A))",
+      background: "var(--td-badge-winner-bg, var(--td-brand-soft, #1c69d426))",
+      color: "var(--td-badge-winner-fg, var(--td-brand, #1c69d4))",
       border: "1px solid transparent",
     },
     default: {
       background: "transparent",
-      color: "var(--td-ink-200, #CBD5E1)",
-      border: "1px solid var(--td-badge-default-border, var(--td-ink-500, #64748B))",
+      color: "var(--td-ink-200, #ffffff)",
+      border: "1px solid var(--td-badge-default-border, var(--td-ink-500, #7e7e7e))",
     },
     engine: {
-      background: "var(--td-ink-800, #1A222C)",
-      color: "var(--td-badge-engine-fg, var(--td-ink-200, #CBD5E1))",
-      border: "1px solid var(--td-ink-600, #334155)",
+      background: "var(--td-ink-800, #1a1a1a)",
+      color: "var(--td-badge-engine-fg, var(--td-ink-200, #ffffff))",
+      border: "1px solid var(--td-ink-600, #2b2b2b)",
     },
     status: {
-      background: "var(--td-ink-800, #1A222C)",
-      color: "var(--td-ink-300, #94A3B8)",
-      border: "1px solid var(--td-ink-700, #243040)",
+      background: "var(--td-ink-800, #1a1a1a)",
+      color: "var(--td-ink-300, #e6e6e6)",
+      border: "1px solid var(--td-ink-700, #3c3c3c)",
     },
     fail: {
       background: "color-mix(in oklch, var(--td-action-avoid) 14%, transparent)",

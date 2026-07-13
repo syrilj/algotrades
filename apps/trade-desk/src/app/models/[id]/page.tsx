@@ -121,12 +121,12 @@ export default function ModelDetailPage() {
     <main
       className="min-h-screen px-4 py-6 sm:px-6 max-w-5xl"
       style={{
-        background: "var(--td-ink-950, #0B1014)",
-        color: "var(--td-ink-100, #E2E8F0)",
+        background: "var(--td-ink-950, #000000)",
+        color: "var(--td-ink-100, #ffffff)",
         fontFamily: "var(--td-font-body, IBM Plex Sans, ui-sans-serif, system-ui, sans-serif)",
       }}
     >
-      <nav className="mb-4 text-[13px]" style={{ color: "var(--td-ink-400, #64748B)" }}>
+      <nav className="mb-4 text-[13px]" style={{ color: "var(--td-ink-400, #bbbbbb)" }}>
         <Link href="/leaderboard" className="hover:underline">
           ← Leaderboard
         </Link>
@@ -137,7 +137,7 @@ export default function ModelDetailPage() {
       </nav>
 
       {loading ? (
-        <p className="text-[13px]" style={{ color: "var(--td-ink-400, #64748B)" }}>
+        <p className="text-[13px]" style={{ color: "var(--td-ink-400, #bbbbbb)" }}>
           Loading model…
         </p>
       ) : null}
@@ -145,7 +145,7 @@ export default function ModelDetailPage() {
       {error ? (
         <p
           className="text-[13px]"
-          style={{ color: "var(--td-action-avoid, #A34848)" }}
+          style={{ color: "var(--td-action-avoid, #e22718)" }}
           role="alert"
         >
           {error}
@@ -172,7 +172,7 @@ export default function ModelDetailPage() {
             </div>
             <p
               className="text-[13px] mt-2"
-              style={{ color: "var(--td-ink-400, #64748B)" }}
+              style={{ color: "var(--td-ink-400, #bbbbbb)" }}
             >
               Default engine and Winner may differ — see catalog / WINNER.json.
             </p>
@@ -182,8 +182,8 @@ export default function ModelDetailPage() {
             <section
               className="p-4 rounded-sm"
               style={{
-                background: "var(--td-ink-900, #12181F)",
-                border: "1px solid var(--td-ink-700, #243040)",
+                background: "var(--td-ink-900, #0d0d0d)",
+                border: "1px solid var(--td-ink-700, #3c3c3c)",
               }}
             >
               <h2 className="text-[16px] mb-3">Metrics</h2>
@@ -191,7 +191,7 @@ export default function ModelDetailPage() {
                 <div className="mb-3">
                   <p
                     className="text-[12px] mb-1"
-                    style={{ color: "var(--td-ink-400, #64748B)" }}
+                    style={{ color: "var(--td-ink-400, #bbbbbb)" }}
                   >
                     Score
                   </p>
@@ -221,7 +221,7 @@ export default function ModelDetailPage() {
                   <div key={label}>
                     <dt
                       className="text-[11px]"
-                      style={{ color: "var(--td-ink-400, #64748B)" }}
+                      style={{ color: "var(--td-ink-400, #bbbbbb)" }}
                     >
                       {label}
                     </dt>
@@ -242,14 +242,14 @@ export default function ModelDetailPage() {
             <section
               className="p-4 rounded-sm flex flex-col gap-3"
               style={{
-                background: "var(--td-ink-900, #12181F)",
-                border: "1px solid var(--td-ink-700, #243040)",
+                background: "var(--td-ink-900, #0d0d0d)",
+                border: "1px solid var(--td-ink-700, #3c3c3c)",
               }}
             >
               <h2 className="text-[16px]">Routing</h2>
               <p
                 className="text-[13px]"
-                style={{ color: "var(--td-ink-300, #94A3B8)" }}
+                style={{ color: "var(--td-ink-300, #e6e6e6)" }}
               >
                 Use this engine explicitly, or leave Analyze on{" "}
                 <code className="text-[12px]">auto</code> to pick by symbol rank.
@@ -259,8 +259,9 @@ export default function ModelDetailPage() {
                   href={analyzeHref({ model: detail.id })}
                   className="text-center text-[13px] py-2 rounded-sm"
                   style={{
-                    background: "var(--td-brand, #2F6F7A)",
-                    color: "var(--td-ink-100, #E2E8F0)",
+                    background: "var(--td-canvas)",
+                    border: "1px solid var(--td-ink)",
+                    color: "var(--td-ink)",
                   }}
                 >
                   Analyze with this model
@@ -269,8 +270,8 @@ export default function ModelDetailPage() {
                   href="/leaderboard"
                   className="text-center text-[13px] py-2 rounded-sm"
                   style={{
-                    border: "1px solid var(--td-ink-600, #334155)",
-                    color: "var(--td-ink-200, #CBD5E1)",
+                    border: "1px solid var(--td-ink)",
+                    color: "var(--td-ink)",
                   }}
                 >
                   Back to Leaderboard
@@ -282,8 +283,8 @@ export default function ModelDetailPage() {
           <section
             className="p-4 rounded-sm mb-6"
             style={{
-              background: "var(--td-ink-900, #12181F)",
-              border: "1px solid var(--td-ink-700, #243040)",
+              background: "var(--td-ink-900, #0d0d0d)",
+              border: "1px solid var(--td-ink-700, #3c3c3c)",
             }}
           >
             <ModelFlow model={detail.id} />
@@ -292,8 +293,8 @@ export default function ModelDetailPage() {
           <section
             className="p-4 rounded-sm mb-6"
             style={{
-              background: "var(--td-ink-900, #12181F)",
-              border: "1px solid var(--td-ink-700, #243040)",
+              background: "var(--td-ink-900, #0d0d0d)",
+              border: "1px solid var(--td-ink-700, #3c3c3c)",
             }}
           >
             <ModelTuningView id={detail.id} metaConfig={detail.meta_config} />
@@ -302,8 +303,8 @@ export default function ModelDetailPage() {
           <section
             className="p-4 rounded-sm"
             style={{
-              background: "var(--td-ink-900, #12181F)",
-              border: "1px solid var(--td-ink-700, #243040)",
+              background: "var(--td-ink-900, #0d0d0d)",
+              border: "1px solid var(--td-ink-700, #3c3c3c)",
             }}
           >
             <h2 className="text-[16px] mb-3">MODEL.md</h2>
@@ -311,7 +312,7 @@ export default function ModelDetailPage() {
               <pre
                 className="whitespace-pre-wrap text-[13px] leading-relaxed max-h-[28rem] overflow-y-auto"
                 style={{
-                  color: "var(--td-ink-200, #CBD5E1)",
+                  color: "var(--td-ink-200, #ffffff)",
                   fontFamily:
                     "var(--td-font-mono, ui-monospace, Menlo, monospace)",
                 }}
@@ -321,7 +322,7 @@ export default function ModelDetailPage() {
             ) : (
               <p
                 className="text-[13px]"
-                style={{ color: "var(--td-ink-400, #64748B)" }}
+                style={{ color: "var(--td-ink-400, #bbbbbb)" }}
               >
                 No MODEL.md / HYPOTHESIS.md found for this version.
               </p>

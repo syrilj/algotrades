@@ -1696,6 +1696,7 @@ def main(argv: list[str] | None = None) -> int:
             top=max(1, int(args.top or 12)),
             deep_n=max(8, int(getattr(args, "deep", 0) or 24)),
             fast_only=bool(getattr(args, "fast", False)),
+            quiet=args.json,
         )
         if args.json:
             print(_safe_json(payload, indent=2))

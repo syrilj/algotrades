@@ -38,6 +38,24 @@ from backtest.engines.global_equity import GlobalEquityEngine
 # proper slippage_us / commission handling.
 _original_create_market_engine = _runner._create_market_engine
 
+# Local data cache holds yfinance-style US equity bars; use yfinance calendar
+# for annualization so source="local" 1H/1D runs get the same Sharpe factor as
+# source="yfinance". The runner re-imports calc_bars_per_year on each call, so
+# mutating the metrics module globals is sufficient.
+import backtest.metrics as _metrics  # noqa: E402
+
+
+def _patch_metrics_for_local() -> None:
+    if "local" in _metrics._TRADING_DAYS:
+        return
+    _metrics._TRADING_DAYS["local"] = _metrics._TRADING_DAYS.get("yfinance", 252)
+    for interval, by_source in _metrics._BARS_PER_DAY.items():
+        if "yfinance" in by_source:
+            by_source["local"] = by_source["yfinance"]
+
+
+_patch_metrics_for_local()
+
 
 def _create_market_engine_for_local(source: str, config: dict, codes: list[str]):
     if source == "local" and codes:
@@ -252,6 +270,7 @@ def _copy_model_code(model: dict[str, Any], run_code: Path) -> None:
     # core
     for name in (
         "signal_engine.py",
+        "candidate_ledger.py",
         "_base_engine.py",  # train-loop genome wrapper dependency
         "GENOME.json",
         "hunt_config.json",

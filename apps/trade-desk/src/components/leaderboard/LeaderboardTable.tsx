@@ -38,10 +38,10 @@ const COLUMNS: { key: SortKey; label: string; align?: "left" | "right" }[] = [
 ];
 
 function medalColor(rank: number): string {
-  if (rank === 1) return "var(--td-rank-gold, #C9A227)";
-  if (rank === 2) return "var(--td-rank-silver, #94A3B8)";
-  if (rank === 3) return "var(--td-rank-bronze, #A67C52)";
-  return "var(--td-rank-plain, var(--td-ink-400, #64748B))";
+  if (rank === 1) return "var(--td-rank-gold, #f4b400)";
+  if (rank === 2) return "var(--td-rank-silver, #e6e6e6)";
+  if (rank === 3) return "var(--td-rank-bronze, #b87336)";
+  return "var(--td-rank-plain, var(--td-ink-400, #bbbbbb))";
 }
 
 function fmtPct(n: number | undefined, digits = 1): string {
@@ -135,7 +135,7 @@ export function LeaderboardTable({
     return (
       <div
         className="p-8 text-center text-[13px]"
-        style={{ color: "var(--td-ink-400, #64748B)" }}
+        style={{ color: "var(--td-ink-400, #bbbbbb)" }}
       >
         No ranked models for this view.
       </div>
@@ -148,8 +148,8 @@ export function LeaderboardTable({
         <thead>
           <tr
             style={{
-              borderBottom: "1px solid var(--td-ink-700, #243040)",
-              color: "var(--td-ink-400, #64748B)",
+              borderBottom: "1px solid var(--td-ink-700, #3c3c3c)",
+              color: "var(--td-ink-400, #bbbbbb)",
             }}
           >
             {COLUMNS.map((col) => (
@@ -196,16 +196,16 @@ export function LeaderboardTable({
                 aria-pressed={selected}
                 className="cursor-pointer transition-colors"
                 style={{
-                  borderBottom: "1px solid var(--td-ink-800, #1A222C)",
+                  borderBottom: "1px solid var(--td-ink-800, #1a1a1a)",
                   background: selected
-                    ? "var(--td-brand-soft, #2F6F7A26)"
+                    ? "var(--td-brand-soft, #1c69d426)"
                     : row.isWinner
-                      ? "var(--td-brand-soft, #2F6F7A14)"
+                      ? "var(--td-brand-soft, #1c69d414)"
                       : "transparent",
                   boxShadow: row.isWinner
-                    ? "inset 2px 0 0 var(--td-brand, #2F6F7A)"
+                    ? "inset 2px 0 0 var(--td-brand, #1c69d4)"
                     : undefined,
-                  color: "var(--td-ink-200, #CBD5E1)",
+                  color: "var(--td-ink-200, #ffffff)",
                 }}
               >
                 <td className="py-2.5 px-2 text-right tabular-nums">
@@ -227,7 +227,7 @@ export function LeaderboardTable({
                   style={{
                     fontFamily:
                       "var(--td-font-mono, ui-monospace, Menlo, monospace)",
-                    color: "var(--td-ink-100, #E2E8F0)",
+                    color: "var(--td-ink-100, #ffffff)",
                   }}
                 >
                   {row.model}

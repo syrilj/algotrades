@@ -113,13 +113,13 @@ export function PicksList({
     return (
       <div className="flex flex-col items-center justify-center gap-2 px-4 py-16 text-center">
         <ListFilter
-          className="size-8 text-[var(--td-ink-500,#475569)]"
+          className="size-8 text-[var(--td-ink-500,#7e7e7e)]"
           strokeWidth={1.75}
         />
-        <p className="font-[family-name:var(--td-font-display,ui-serif,Georgia,serif)] text-xl text-[var(--td-ink-100,#E2E8F0)]">
+        <p className="font-[family-name:var(--td-font-display,Inter,ui-sans-serif,system-ui,sans-serif)] text-xl text-[var(--td-ink-100,#ffffff)]">
           No picks
         </p>
-        <p className="max-w-sm text-[13px] text-[var(--td-ink-400,#64748B)]">
+        <p className="max-w-sm text-[13px] text-[var(--td-ink-400,#bbbbbb)]">
           {emptyHint}
         </p>
       </div>
@@ -164,7 +164,7 @@ export function PicksList({
   return (
     <div className="flex flex-col gap-4 p-3">
       {loading && !rows.length ? (
-        <p className="text-[13px] text-[var(--td-ink-400,#64748B)]">Scanning…</p>
+        <p className="text-[13px] text-[var(--td-ink-400,#bbbbbb)]">Scanning…</p>
       ) : null}
 
       {[...displayTitles, ...extras].map((title) => {
@@ -175,11 +175,11 @@ export function PicksList({
 
         return (
           <section key={title} className="flex flex-col gap-1.5">
-            <h2 className="text-[12px] font-semibold uppercase tracking-wide text-[var(--td-ink-300,#94A3B8)]">
+            <h2 className="text-[12px] font-semibold uppercase tracking-wide text-[var(--td-ink-300,#e6e6e6)]">
               {title}
             </h2>
             {list.length === 0 ? (
-              <p className="px-1 text-[12px] text-[var(--td-ink-500,#475569)]">
+              <p className="px-1 text-[12px] text-[var(--td-ink-500,#7e7e7e)]">
                 None live
               </p>
             ) : (
@@ -189,21 +189,21 @@ export function PicksList({
                     <button
                       type="button"
                       onClick={() => select(row.symbol)}
-                      className="flex w-full items-center gap-3 rounded-[4px] border border-transparent bg-[var(--td-ink-900,#12181F)] px-3 py-2 text-left transition-colors hover:border-[var(--td-ink-600,#334155)] hover:bg-[var(--td-brand-soft,#2F6F7A26)]"
+                      className="flex w-full items-center gap-3 rounded-sm border border-transparent bg-[var(--td-ink-900,#0d0d0d)] px-3 py-2 text-left transition-colors hover:border-[var(--td-ink-600,#2b2b2b)] hover:bg-[var(--td-brand-soft,#1c69d426)]"
                       style={{
                         boxShadow: `inset 3px 0 0 ${actionRailColor(row.action)}`,
                       }}
                     >
-                      <span className="w-14 shrink-0 font-[family-name:var(--td-font-mono,ui-monospace,Menlo,monospace)] font-medium tabular-nums text-[var(--td-ink-100,#E2E8F0)]">
+                      <span className="w-14 shrink-0 font-[family-name:var(--td-font-mono,ui-monospace,Menlo,monospace)] font-medium tabular-nums text-[var(--td-ink-100,#ffffff)]">
                         {row.symbol}
                       </span>
                       <ActionChip action={row.action} />
                       {row.setupKind ? (
-                        <span className="hidden text-[11px] uppercase text-[var(--td-ink-400,#64748B)] sm:inline">
+                        <span className="hidden text-[11px] uppercase text-[var(--td-ink-400,#bbbbbb)] sm:inline">
                           {row.setupKind}
                         </span>
                       ) : null}
-                      <span className="ml-auto flex flex-wrap items-center gap-x-3 gap-y-0.5 font-[family-name:var(--td-font-mono,ui-monospace,Menlo,monospace)] text-[12px] tabular-nums text-[var(--td-ink-300,#94A3B8)]">
+                      <span className="ml-auto flex flex-wrap items-center gap-x-3 gap-y-0.5 font-[family-name:var(--td-font-mono,ui-monospace,Menlo,monospace)] text-[12px] tabular-nums text-[var(--td-ink-300,#e6e6e6)]">
                         <span>{fmtPrice(row.price)}</span>
                         <span>conf {fmtPct(row.confidence)}</span>
                         {row.dollarRisk != null ? (
@@ -211,7 +211,7 @@ export function PicksList({
                         ) : null}
                       </span>
                       {row.doNext ? (
-                        <span className="hidden max-w-[220px] truncate text-[12px] text-[var(--td-ink-400,#64748B)] lg:inline">
+                        <span className="hidden max-w-[220px] truncate text-[12px] text-[var(--td-ink-400,#bbbbbb)] lg:inline">
                           → {row.doNext}
                         </span>
                       ) : null}

@@ -1,0 +1,13 @@
+{
+  "variant_id": "v39b_live_adapt_tight_stop_all",
+  "parent": "v39b_live_adapt",
+  "mutations": [
+    {
+      "op": "set_routing_param",
+      "symbol": "__all__",
+      "key": "stop_atr",
+      "old": null,
+      "new": 1.0
+    }
+  ]
+}

@@ -184,10 +184,10 @@ function AnalyzePageInner() {
       {commandCenterIdle ? (
         <section className="td-panel p-4" aria-labelledby="command-center-title">
           <p className="td-eyebrow">Command center · ready</p>
-          <h2 id="command-center-title" className="mt-1 text-lg font-semibold text-slate-50">
+          <h2 id="command-center-title" className="mt-1 text-lg font-semibold text-foreground">
             Route the next decision from one ticker.
           </h2>
-          <p className="mt-1 max-w-2xl text-sm text-slate-400">
+          <p className="mt-1 max-w-2xl text-sm text-body">
             Start with a symbol to build an operator ticket, then use the research desk to validate the
             setup. No signal is shown until analysis has actually run.
           </p>

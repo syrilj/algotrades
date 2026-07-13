@@ -19,12 +19,24 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+
+
+def _sanitize_nan(obj: Any) -> Any:
+    """Replace NaN/±Infinity with None so downstream JSON.parse is safe."""
+    if isinstance(obj, float) and not math.isfinite(obj):
+        return None
+    if isinstance(obj, dict):
+        return {k: _sanitize_nan(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_sanitize_nan(v) for v in obj]
+    return obj
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
@@ -273,13 +285,17 @@ def run_open_scan(
     deep_n: int = 24,
     fast_only: bool = False,
     workers: int = 6,
+    quiet: bool = False,
 ) -> dict[str, Any]:
     t0 = time.time()
     uni = build_universe(mode=universe)
     symbols = uni["symbols"]
-    print(f"Open scan universe: {len(symbols)} names  hot sectors: {uni.get('hot_sectors')}", flush=True)
+    if not quiet:
+        hot_sectors = ", ".join(uni.get("hot_sectors") or []) or "—"
+        print(f"Open scan universe: {len(symbols)} names  hot sectors: {hot_sectors}", flush=True)
 
-    print("Phase 1 — VPA screen…", flush=True)
+    if not quiet:
+        print("Phase 1 — VPA screen…", flush=True)
     vpa_rows = _vpa_screen(symbols, workers=workers)
     # Keep CALL-leaning + flat high vol for deep; drop hard PUTs
     candidates = [
@@ -291,11 +307,13 @@ def run_open_scan(
     else:
         candidates = candidates[:deep_n]
     cand_syms = [r["symbol"] for r in candidates]
-    print(f"  VPA advanced {len(cand_syms)} → deep: {', '.join(cand_syms[:15])}{'…' if len(cand_syms)>15 else ''}", flush=True)
+    if not quiet:
+        print(f"  VPA advanced {len(cand_syms)} → deep: {', '.join(cand_syms[:15])}{'…' if len(cand_syms)>15 else ''}", flush=True)
 
     deep_rows: list[dict[str, Any]] = []
     if not fast_only:
-        print(f"Phase 2 — deep analyze (model={model}, live 5m)…", flush=True)
+        if not quiet:
+            print(f"Phase 2 — deep analyze (model={model}, live 5m)…", flush=True)
         deep_rows = _deep_analyze(cand_syms, account, risk_pct, model, workers=min(4, workers))
         # merge VPA tags onto deep rows
         vpa_by = {r["symbol"]: r for r in vpa_rows if r.get("ok")}
@@ -330,28 +348,30 @@ def run_open_scan(
     )[:18]
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    payload = {
-        "ok": True,
-        "asof": _utc(),
-        "elapsed_sec": round(time.time() - t0, 1),
-        "account": account,
-        "risk_pct": risk_pct,
-        "model": model,
-        "universe": universe,
-        "hot_sectors": uni.get("hot_sectors"),
-        "scanned": len(symbols),
-        "vpa_candidates": len(candidates),
-        "deep_n": len(deep_rows),
-        "top_plays": top_plays,
-        "all_deep": deep_rows,
-        "vpa_top": vpa_rows[:20],
-        "watchlist": watch_syms,
-        "operator": {
-            "use": "Load watchlist into /watch or: trade_desk.py watch " + ",".join(watch_syms[:12]),
-            "model": "auto → v39b_live_adapt WINNER",
-            "note": "Long-biased desk DNA; PUT bias names listed in vpa_top for stand-aside / hedge only",
-        },
-    }
+    payload = _sanitize_nan(
+        {
+            "ok": True,
+            "asof": _utc(),
+            "elapsed_sec": round(time.time() - t0, 1),
+            "account": account,
+            "risk_pct": risk_pct,
+            "model": model,
+            "universe": universe,
+            "hot_sectors": uni.get("hot_sectors"),
+            "scanned": len(symbols),
+            "vpa_candidates": len(candidates),
+            "deep_n": len(deep_rows),
+            "top_plays": top_plays,
+            "all_deep": deep_rows,
+            "vpa_top": vpa_rows[:20],
+            "watchlist": watch_syms,
+            "operator": {
+                "use": "Load watchlist into /watch or: trade_desk.py watch " + ",".join(watch_syms[:12]),
+                "model": "auto → v39b_live_adapt WINNER",
+                "note": "Long-biased desk DNA; PUT bias names listed in vpa_top for stand-aside / hedge only",
+            },
+        }
+    )
     tmp = SCAN_PATH.with_suffix(".tmp")
     tmp.write_text(json.dumps(payload, indent=2, default=str), encoding="utf-8")
     tmp.replace(SCAN_PATH)
@@ -417,6 +437,7 @@ def main(argv: list[str] | None = None) -> int:
         deep_n=ns.deep,
         fast_only=ns.fast,
         workers=ns.workers,
+        quiet=ns.json,
     )
     if ns.json:
         print(json.dumps(payload, indent=2, default=str))

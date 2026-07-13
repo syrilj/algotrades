@@ -6,7 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { LiveDesk } from "@/components/live/LiveDesk";
 import { OptionsDesk } from "@/components/options/OptionsDesk";
 import { PageHeader } from "@/components/shell/PageHeader";
-import { liveHref, optionsHref } from "@/lib/routes";
+import { gammaHref, liveHref, optionsHref } from "@/lib/routes";
 
 type LiveMode = "risk" | "options";
 
@@ -34,28 +34,37 @@ function LiveOptionsHub() {
           ) : null
         }
         actions={
-          <nav
-            className="flex flex-wrap gap-1 border-b border-[var(--td-ink-700)]"
-            role="tablist"
-            aria-label="Live desk"
-          >
-            {TABS.map((t) => {
-              const active = mode === t.key;
-              const href = t.key === "risk" ? liveHref(symbol) : optionsHref(symbol);
-              return (
-                <Link
-                  key={t.key}
-                  href={href}
-                  role="tab"
-                  aria-selected={active}
-                  aria-controls={`live-panel-${t.key}`}
-                  className={`td-btn ${active ? "td-btn-primary" : "td-btn-ghost"}`}
-                >
-                  {t.label}
-                </Link>
-              );
-            })}
-          </nav>
+          <div className="flex flex-wrap items-center gap-1">
+            <nav
+              className="flex flex-wrap gap-1 border-b border-[var(--td-ink-700)]"
+              role="tablist"
+              aria-label="Live desk"
+            >
+              {TABS.map((t) => {
+                const active = mode === t.key;
+                const href = t.key === "risk" ? liveHref(symbol) : optionsHref(symbol);
+                return (
+                  <Link
+                    key={t.key}
+                    href={href}
+                    role="tab"
+                    aria-selected={active}
+                    aria-controls={`live-panel-${t.key}`}
+                    className={`td-btn ${active ? "td-btn-primary" : "td-btn-ghost"}`}
+                  >
+                    {t.label}
+                  </Link>
+                );
+              })}
+            </nav>
+            <Link
+              href={gammaHref(symbol)}
+              className="td-btn td-btn-ghost"
+              aria-label="Gamma exposure"
+            >
+              Gamma
+            </Link>
+          </div>
         }
       />
 

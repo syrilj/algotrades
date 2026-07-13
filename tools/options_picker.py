@@ -64,6 +64,7 @@ def propose(
     min_dte: int = 14,
     max_dte: int = 45,
     prefer_spread: bool = True,
+    side: str = "long",
 ) -> dict:
     sym = symbol.upper().replace(".US", "")
     max_risk = account * max_risk_pct
@@ -84,54 +85,60 @@ def propose(
         return {"error": f"no expiry in {min_dte}-{max_dte} DTE", "spot": spot, "expiries": expiries[:8]}
 
     chain = t.option_chain(exp)
-    calls = chain.calls.copy()
-    if calls.empty:
-        return {"error": "empty calls", "expiry": exp}
+    is_call = (side == "long")
+    opts = chain.calls.copy() if is_call else chain.puts.copy()
+    if opts.empty:
+        return {"error": f"empty {'calls' if is_call else 'puts'}", "expiry": exp}
 
     now = pd.Timestamp.utcnow().tz_localize(None)
     dte = max((pd.Timestamp(exp) - now).days, 1)
     T = dte / 365.25
 
     # Choose long strike nearest target delta (use IV from chain when present)
-    calls["mid"] = [_mid(r.bid, r.ask, r.lastPrice) for r in calls.itertuples()]
-    calls["iv"] = calls["impliedVolatility"].astype(float)
-    calls = calls[(calls["mid"] > 0) & (calls["iv"] > 0.01)].copy()
-    if calls.empty:
-        return {"error": "no priced calls", "expiry": exp}
+    opts["mid"] = [_mid(r.bid, r.ask, r.lastPrice) for r in opts.itertuples()]
+    opts["iv"] = opts["impliedVolatility"].astype(float)
+    opts = opts[(opts["mid"] > 0) & (opts["iv"] > 0.01)].copy()
+    if opts.empty:
+        return {"error": f"no priced {'calls' if is_call else 'puts'}", "expiry": exp}
 
     # Prefer OTM / slight ITM around target delta
-    if "delta" in [c.lower() for c in calls.columns]:
+    if "delta" in [c.lower() for c in opts.columns]:
         # yfinance rarely has delta; compute BS delta from IV
         pass
     deltas = []
-    for r in calls.itertuples():
-        deltas.append(bs_delta(spot, float(r.strike), T, 0.0, float(r.iv), True))
-    calls["delta_bs"] = deltas
-    calls["abs_dd"] = (calls["delta_bs"] - target_delta).abs()
+    for r in opts.itertuples():
+        deltas.append(bs_delta(spot, float(r.strike), T, 0.0, float(r.iv), is_call))
+    opts["delta_bs"] = deltas
+    opts["abs_dd"] = (opts["delta_bs"].abs() - target_delta).abs()
     # liquidity: prefer tighter spreads
-    calls["spread_pct"] = (calls["ask"].astype(float) - calls["bid"].astype(float)) / calls["mid"].clip(lower=1e-6)
-    calls = calls[calls["spread_pct"] < 0.35]
-    if calls.empty:
+    opts["spread_pct"] = (opts["ask"].astype(float) - opts["bid"].astype(float)) / opts["mid"].clip(lower=1e-6)
+    opts = opts[opts["spread_pct"] < 0.35]
+    if opts.empty:
         return {"error": "all quotes too wide", "expiry": exp}
 
-    long_row = calls.sort_values(["abs_dd", "spread_pct"]).iloc[0]
+    long_row = opts.sort_values(["abs_dd", "spread_pct"]).iloc[0]
     long_k = float(long_row.strike)
     long_mid = float(long_row.mid)
     long_iv = float(long_row.iv)
     long_delta = float(long_row.delta_bs)
 
-    # Short leg for debit spread: higher strike ~ width
+    # Short leg for debit spread: higher strike for calls, lower strike for puts
     width = max(round_strike(spot, spot * spread_width_pct), 0.5 if spot < 25 else 1.0)
-    short_k = round_strike(spot, long_k + width)
-    short_cands = calls[calls["strike"] >= short_k - 1e-9].sort_values("strike")
+    if is_call:
+        short_k = round_strike(spot, long_k + width)
+        short_cands = opts[opts["strike"] >= short_k - 1e-9].sort_values("strike")
+    else:
+        short_k = round_strike(spot, long_k - width)
+        short_cands = opts[opts["strike"] <= short_k + 1e-9].sort_values("strike", ascending=False)
+
     if short_cands.empty:
-        structure = "long_call"
+        structure = "long_call" if is_call else "long_put"
         short_k = None
         short_mid = 0.0
         short_delta = None
         debit = long_mid
         max_loss = debit * 100.0
-        note = "no short leg in chain — naked long call"
+        note = f"no short leg in chain — naked long {'call' if is_call else 'put'}"
     else:
         short_row = short_cands.iloc[0]
         short_k = float(short_row.strike)
@@ -139,21 +146,20 @@ def propose(
         short_delta = float(short_row.delta_bs)
         debit = max(long_mid - short_mid, 0.01)
         max_loss = debit * 100.0
-        structure = "bull_call_debit_spread"
-        note = "OIC bull call spread — defined risk"
+        structure = "bull_call_debit_spread" if is_call else "bear_put_debit_spread"
+        note = f"OIC {'bull call' if is_call else 'bear put'} spread — defined risk"
 
-    # If naked call too expensive or user prefers spread but spread still over budget, skip
-    if prefer_spread and structure == "long_call" and max_loss > max_risk:
+    # If naked contract too expensive or user prefers spread but spread still over budget, skip
+    if prefer_spread and structure in ("long_call", "long_put") and max_loss > max_risk:
         return {
             "symbol": sym,
             "action": "skip",
-            "reason": f"naked call max_loss ${max_loss:.0f} > budget ${max_risk:.0f}",
+            "reason": f"naked contract max_loss ${max_loss:.0f} > budget ${max_risk:.0f}",
             "spot": spot,
             "expiry": exp,
         }
 
-    if max_loss > max_risk and structure == "bull_call_debit_spread":
-        # try tighter width
+    if max_loss > max_risk and structure in ("bull_call_debit_spread", "bear_put_debit_spread"):
         return {
             "symbol": sym,
             "action": "skip",
@@ -165,15 +171,15 @@ def propose(
             "short_strike": short_k,
         }
 
-    if structure == "long_call" and max_loss > max_risk:
+    if structure in ("long_call", "long_put") and max_loss > max_risk:
         return {
             "symbol": sym,
             "action": "skip",
-            "reason": f"call debit ${max_loss:.0f} > budget ${max_risk:.0f}",
+            "reason": f"option debit ${max_loss:.0f} > budget ${max_risk:.0f}",
             "spot": spot,
         }
 
-    g = bs_greeks(spot, long_k, T, 0.0, long_iv, True)
+    g = bs_greeks(spot, long_k, T, 0.0, long_iv, is_call)
     out = {
         "symbol": sym,
         "action": "buy",
@@ -207,11 +213,12 @@ def propose(
         out["warnings"].append("short DTE — theta/gamma risk high")
     if long_iv > 0.9:
         out["warnings"].append("very high IV — prefer spread; watch earnings crush")
-    if long_delta < 0.30:
+    if abs(long_delta) < 0.30:
         out["warnings"].append("long leg fairly OTM — needs bigger swing")
-    if long_delta > 0.65:
+    if abs(long_delta) > 0.65:
         out["warnings"].append("long leg deep — expensive / stock-like")
     return out
+
 
 
 def main():
@@ -223,6 +230,7 @@ def main():
     ap.add_argument("--min-dte", type=int, default=14)
     ap.add_argument("--max-dte", type=int, default=45)
     ap.add_argument("--long-call", action="store_true", help="Allow/prefer naked call if cheap")
+    ap.add_argument("--side", type=str, default="long", choices=["long", "short"], help="Position side")
     ap.add_argument("--json", action="store_true")
     args = ap.parse_args()
     out = propose(
@@ -233,6 +241,7 @@ def main():
         min_dte=args.min_dte,
         max_dte=args.max_dte,
         prefer_spread=not args.long_call,
+        side=args.side,
     )
     path = OUT / f"options_pick_{args.symbol.upper().replace('.US','')}.json"
     path.write_text(json.dumps(out, indent=2))

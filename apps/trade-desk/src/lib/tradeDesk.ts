@@ -4,6 +4,7 @@ import fs from "fs/promises";
 import os from "os";
 import path from "path";
 import {
+  gammaExposureScript,
   livePlanScript,
   modelsRoot,
   optionsPickerScript,
@@ -203,6 +204,14 @@ export async function runOptionsPicker(
   timeoutMs = 60_000,
 ): Promise<unknown> {
   return runPythonScript(optionsPickerScript(), args, "options_picker", timeoutMs);
+}
+
+/** Gamma exposure snapshot (LSE spot + yfinance options). */
+export async function runGammaExposure(
+  args: string[],
+  timeoutMs = 60_000,
+): Promise<unknown> {
+  return runPythonScript(gammaExposureScript(), args, "gamma_exposure", timeoutMs);
 }
 
 export async function runRiskManager(

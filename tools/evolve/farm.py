@@ -10,8 +10,15 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "tools"))
 
 import dynamic_model_rank as dmr  # noqa: E402
-from evolve.cache import cache_key, read_cached_metrics, write_cached_metrics  # noqa: E402
+from evolve.cache import (  # noqa: E402
+    cache_key,
+    data_bundle_hash,
+    env_versions,
+    read_cached_metrics,
+    write_cached_metrics,
+)
 from evolve.data_contracts import DataTrack, infer_track  # noqa: E402
+from evolve.experiment_tracking import log_run_from_row  # noqa: E402
 from evolve.gates import apply_gates, claim_min_trades, dd_hard_from_bar  # noqa: E402
 from evolve.scoring import enrich_scores  # noqa: E402
 
@@ -117,6 +124,8 @@ def run_one_cached(
     reuse: bool = True,
     use_content_cache: bool = True,
     force_1d: bool | None = None,
+    source: str = "yfinance",
+    mlflow_enabled: bool = True,
 ) -> dict[str, Any]:
     """Run or reuse one backtest; always attach track/claim/utility."""
     if force_1d is None:
@@ -141,6 +150,7 @@ def run_one_cached(
         end=end,
         cash=cash,
         interval=interval_label,
+        source=source,
         extra={"tag": tag, "commission": commission, "force_1d": force_1d},
     )
 
@@ -165,11 +175,18 @@ def run_one_cached(
                 "from_cache": True,
                 "cache_key": key,
                 "path": str(dmr.OUT / "runs" / model["id"] / f"{tag}__{mode}"),
+                "source": source,
+                "interval": interval_label,
+                "data_hash": data_bundle_hash(source, interval_label, codes, start, end),
+                "env_versions": env_versions(),
             }
             if hit.get("error"):
                 out["error"] = hit["error"]
             out = dmr.enrich_money(out, cash)
-            return _finalize(out)
+            out = _finalize(out)
+            if mlflow_enabled:
+                log_run_from_row(model, out)
+            return out
 
     # Delegate to dynamic_model_rank runner (disk reuse inside OUT/runs)
     row = dmr.run_one(
@@ -182,9 +199,15 @@ def run_one_cached(
         force_1d=force_1d,
         reuse=reuse,
         cash=cash,
+        source=source,
+        interval=interval_label,
     )
     row["cache_key"] = key
     row["data_track"] = infer_track(mode, model["id"]).value
+    row["source"] = source
+    row["interval"] = interval_label
+    row["data_hash"] = data_bundle_hash(source, interval_label, codes, start, end)
+    row["env_versions"] = env_versions()
     if use_content_cache and not row.get("error"):
         write_cached_metrics(
             key,
@@ -216,7 +239,10 @@ def run_one_cached(
                 "final": 0,
             },
         )
-    return _finalize(row)
+    row = _finalize(row)
+    if mlflow_enabled:
+        log_run_from_row(model, row)
+    return row
 
 
 def run_batch(
@@ -232,11 +258,15 @@ def run_batch(
     workers: int = 1,
     budget: int | None = None,
     on_each: Callable[[dict], None] | None = None,
+    source: str = "yfinance",
 ) -> list[dict[str, Any]]:
     """Run models (optionally parallel). Stops after ``budget`` new non-cache runs if set."""
     todo = list(models)
     if budget is not None:
         todo = todo[: max(0, budget)]
+
+    def _interval_label(m: dict[str, Any], mode: str) -> str:
+        return "1D" if prefer_force_1d(m, mode) else str(m.get("interval") or "1D")
 
     def _one(m: dict[str, Any]) -> dict[str, Any]:
         mode = pick_mode(m, track)
@@ -250,6 +280,8 @@ def run_batch(
             cash=cash,
             reuse=reuse,
             force_1d=prefer_force_1d(m, mode),
+            source=source,
+            mlflow_enabled=False,
         )
         if on_each:
             on_each(r)
@@ -258,32 +290,41 @@ def run_batch(
     rows: list[dict[str, Any]] = []
     if workers <= 1:
         for m in todo:
-            rows.append(_one(m))
+            mode = pick_mode(m, track)
+            r = _one(m)
+            log_run_from_row(m, r)
+            rows.append(r)
         return rows
 
     with ThreadPoolExecutor(max_workers=workers) as ex:
-        futs = {ex.submit(_one, m): m["id"] for m in todo}
+        futs = {ex.submit(_one, m): m for m in todo}
         for fut in as_completed(futs):
+            m = futs[fut]
             try:
-                rows.append(fut.result())
+                r = fut.result()
+                log_run_from_row(m, r)
+                rows.append(r)
             except Exception as e:  # noqa: BLE001
-                mid = futs[fut]
-                rows.append(
-                    _finalize(
-                        {
-                            "id": mid,
-                            "mode": "daily",
-                            "tag": tag,
-                            "error": str(e)[:200],
-                            "ret": -9,
-                            "dd": -1,
-                            "sharpe": 0,
-                            "n": 0,
-                            "wr": 0,
-                            "cash": cash,
-                        }
-                    )
+                interval_label = _interval_label(m, pick_mode(m, track))
+                err_row = _finalize(
+                    {
+                        "id": m["id"],
+                        "mode": pick_mode(m, track),
+                        "tag": tag,
+                        "error": str(e)[:200],
+                        "ret": -9,
+                        "dd": -1,
+                        "sharpe": 0,
+                        "n": 0,
+                        "wr": 0,
+                        "cash": cash,
+                        "source": source,
+                        "interval": interval_label,
+                        "cache_key": "",
+                    }
                 )
+                log_run_from_row(m, err_row)
+                rows.append(err_row)
     # stable order by original model list
     by_id = {r["id"]: r for r in rows}
     return [by_id[m["id"]] for m in todo if m["id"] in by_id] + [

@@ -61,7 +61,7 @@ function ClaimChip({ level }: { level?: string }) {
   const s = claimStyle(level);
   return (
     <span
-      className="inline-flex items-center rounded-[2px] px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+      className="inline-flex items-center rounded-sm px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
       style={{ background: s.bg, color: s.fg }}
     >
       {level || "—"}
@@ -87,7 +87,7 @@ function PhaseStrip() {
           style={{ color: "var(--td-ink-300)" }}
         >
           <span
-            className="inline-flex h-5 min-w-5 items-center justify-center rounded-[2px] px-1 font-mono text-[10px] font-semibold"
+            className="inline-flex h-5 min-w-5 items-center justify-center rounded-sm px-1 font-mono text-[10px] font-semibold"
             style={{
               background: "var(--td-brand-soft)",
               color: "var(--td-brand)",
@@ -652,11 +652,11 @@ export function EvolveDesk() {
                       </td>
                       <td className="px-2 py-1.5" style={{ minWidth: 72 }}>
                         <div
-                          className="h-1.5 w-full overflow-hidden rounded-[1px]"
+                          className="h-1.5 w-full overflow-hidden rounded-sm"
                           style={{ background: "var(--td-score-track)" }}
                         >
                           <div
-                            className="h-full rounded-[1px]"
+                            className="h-full rounded-sm"
                             style={{
                               width: `${barW}%`,
                               background:

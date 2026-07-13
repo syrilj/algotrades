@@ -97,7 +97,7 @@ export function ModelsCatalogView({ showHeader = true }: { showHeader?: boolean 
       </label>
       <div
         className="inline-flex overflow-hidden rounded-[var(--td-radius-sm)]"
-        style={{ border: "1px solid var(--td-ink-600)" }}
+        style={{ border: "1px solid var(--td-hairline)" }}
         role="group"
         aria-label="View mode"
       >
@@ -110,8 +110,8 @@ export function ModelsCatalogView({ showHeader = true }: { showHeader?: boolean 
               onClick={() => setView(v)}
               className="px-3 py-1.5 text-[13px] capitalize"
               style={{
-                background: active ? "var(--td-brand)" : "var(--td-ink-800)",
-                color: active ? "var(--td-ink-50)" : "var(--td-ink-300)",
+                background: active ? "var(--td-canvas)" : "var(--td-surface-card)",
+                color: active ? "var(--td-ink)" : "var(--td-body)",
               }}
               aria-pressed={active}
             >

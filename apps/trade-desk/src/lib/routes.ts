@@ -28,6 +28,12 @@ export function optionsHref(symbol?: string): string {
   return `/live?mode=options&symbol=${encodeURIComponent(s)}`;
 }
 
+export function gammaHref(symbol?: string): string {
+  const s = symbol?.trim().toUpperCase();
+  if (!s) return "/gamma";
+  return `/gamma?symbol=${encodeURIComponent(s)}`;
+}
+
 export function leaderboardHref(symbol?: string): string {
   const s = symbol?.trim().toUpperCase();
   if (!s) return "/leaderboard";
