@@ -11,11 +11,14 @@ export function EmptyState({
   icon: Icon,
   title,
   hint,
+  code,
   steps,
 }: {
   icon: LucideIcon;
   title: string;
   hint?: string;
+  /** A literal command/snippet, rendered in a distinct monospace block. */
+  code?: string;
   steps?: string[];
 }) {
   return (
@@ -31,6 +34,11 @@ export function EmptyState({
         <p className="max-w-sm text-[13px] text-[var(--td-ink-400,#bbbbbb)]">
           {hint}
         </p>
+      ) : null}
+      {code ? (
+        <pre className="mt-1 max-w-sm overflow-x-auto text-[11px] text-[var(--td-ink-400,#bbbbbb)]">
+          {code}
+        </pre>
       ) : null}
       {steps?.length ? (
         <ol

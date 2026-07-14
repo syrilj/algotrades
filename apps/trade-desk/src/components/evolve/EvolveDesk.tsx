@@ -517,7 +517,8 @@ export function EvolveDesk() {
             <EmptyState
               icon={BarChart3}
               title="No ranking rows"
-              hint="Run quick rank, or generate via CLI: .venv/bin/python tools/evolve_pipeline.py rank --track equity --cash 10000"
+              hint="Run quick rank, or generate via CLI:"
+              code=".venv/bin/python tools/evolve_pipeline.py rank --track equity --cash 10000"
             />
           ) : (
             <table className="w-full border-collapse text-left text-[12px]">
