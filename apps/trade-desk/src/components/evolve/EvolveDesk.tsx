@@ -321,6 +321,7 @@ export function EvolveDesk() {
           <p
             className="mt-1 flex items-center gap-1 text-[11px] tabular-nums"
             style={{ color: "var(--td-ink-500)" }}
+            aria-label={`${board?.brain?.accepted ?? 0} accepted, ${board?.brain?.rejected ?? 0} rejected`}
           >
             <Check size={12} aria-hidden />
             {board?.brain?.accepted ?? 0} / <X size={12} aria-hidden />
