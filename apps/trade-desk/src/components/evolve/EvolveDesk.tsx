@@ -13,6 +13,8 @@ import type { ApiEnvelope } from "@/lib/types";
 import { modelHref } from "@/lib/routes";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { formatNum, formatPct } from "@/lib/format";
+import { Chip } from "@/components/ui/Chip";
+import { colorVarFor } from "@/lib/actionColors";
 
 type BoardPayload = {
   run: EvolveRunSummary | null;
@@ -32,32 +34,8 @@ async function fetchBoard(run?: string): Promise<BoardPayload> {
   return body.data as BoardPayload;
 }
 
-function claimStyle(level?: string): { bg: string; fg: string } {
-  switch (level) {
-    case "CLAIM":
-      return { bg: "var(--td-badge-winner-bg)", fg: "var(--td-action-buy-now)" };
-    case "RESEARCH":
-      return { bg: "var(--td-ink-800)", fg: "var(--td-action-breakout-watch)" };
-    case "THIN":
-      return { bg: "var(--td-ink-800)", fg: "var(--td-ink-400)" };
-    case "ERROR":
-    case "BLOCKED_DATA":
-      return { bg: "var(--td-ink-800)", fg: "var(--td-action-avoid)" };
-    default:
-      return { bg: "var(--td-ink-800)", fg: "var(--td-ink-300)" };
-  }
-}
-
 function ClaimChip({ level }: { level?: string }) {
-  const s = claimStyle(level);
-  return (
-    <span
-      className="inline-flex items-center rounded-sm px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
-      style={{ background: s.bg, color: s.fg }}
-    >
-      {level || "—"}
-    </span>
-  );
+  return <Chip label={level || "—"} colorVar={colorVarFor("claim", level)} />;
 }
 
 function PhaseStrip() {

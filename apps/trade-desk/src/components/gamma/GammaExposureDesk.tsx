@@ -15,6 +15,8 @@ import { ActionChip, actionStyle } from "@/components/ui/ActionChip";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { GammaScene } from "@/components/gamma/GammaScene";
 import { analyzeHref, liveHref, optionsHref } from "@/lib/routes";
+import { Chip } from "@/components/ui/Chip";
+import { colorVarFor } from "@/lib/actionColors";
 
 function Stat({ label, value, emphasize }: { label: string; value: React.ReactNode; emphasize?: boolean }) {
   return (
@@ -35,40 +37,18 @@ function Stat({ label, value, emphasize }: { label: string; value: React.ReactNo
 function RegimeChip({ regime }: { regime: string }) {
   const isPin = regime === "positive_gex_pin";
   const isAmplify = regime === "negative_gex_amplify";
-  const color = isPin ? "var(--td-brand)" : isAmplify ? "var(--td-action-avoid)" : "var(--td-action-wait)";
-  const bg = `color-mix(in oklch, ${color} 18%, transparent)`;
   const label = isPin ? "PIN" : isAmplify ? "AMPLIFY" : "FLAT";
-  return (
-    <span
-      className="td-action-chip td-action-chip--md"
-      style={{ color, background: bg, border: `1px solid ${color}` }}
-    >
-      {label}
-    </span>
-  );
+  return <Chip label={label} colorVar={colorVarFor("regime", regime)} />;
 }
 
 function SqueezeChip({ label }: { label: string | undefined }) {
-  const style =
-    label === "bullish_squeeze"
-      ? actionStyle("BUY NOW")
-      : label === "bearish_squeeze"
-        ? actionStyle("AVOID")
-        : actionStyle("WAIT");
   const text =
     label === "bullish_squeeze"
       ? "BULL SQUEEZE"
       : label === "bearish_squeeze"
         ? "BEAR SQUEEZE"
         : "NEUTRAL";
-  return (
-    <span
-      className="td-action-chip td-action-chip--md"
-      style={{ color: style.color, background: style.soft, border: `1px solid ${style.color}` }}
-    >
-      {text}
-    </span>
-  );
+  return <Chip label={text} colorVar={colorVarFor("regime", label)} />;
 }
 
 function SqueezeGauge({ score }: { score: number | undefined }) {

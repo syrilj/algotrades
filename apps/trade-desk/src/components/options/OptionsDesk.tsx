@@ -7,31 +7,8 @@ import type { ApiEnvelope, OptionsPlanResponse } from "@/lib/types";
 import { formatNum, formatUsd } from "@/lib/format";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { analyzeHref, liveHref } from "@/lib/routes";
-
-function modeColor(mode: string | undefined): string {
-  const m = (mode ?? "").toUpperCase();
-  if (m.includes("OPTIONS")) return "var(--td-action-buy-now)";
-  if (m.includes("EQUITY")) return "var(--td-action-buy-breakout)";
-  if (m.includes("FLATTEN") || m.includes("HALT")) return "var(--td-action-avoid)";
-  return "var(--td-action-wait)";
-}
-
-function ModeBadge({ mode }: { mode?: string }) {
-  const c = modeColor(mode);
-  return (
-    <span
-      className="inline-flex items-center px-2 py-1 text-[12px] font-semibold tracking-wide"
-      style={{
-        color: c,
-        background: `${c}22`,
-        border: `1px solid ${c}`,
-        borderRadius: "var(--td-radius-sm)",
-      }}
-    >
-      {mode ?? "—"}
-    </span>
-  );
-}
+import { Chip } from "@/components/ui/Chip";
+import { colorVarFor } from "@/lib/actionColors";
 
 function OptionsDeskInner({ showHeader = true }: { showHeader?: boolean }) {
   const searchParams = useSearchParams();
@@ -185,7 +162,7 @@ function OptionsDeskInner({ showHeader = true }: { showHeader?: boolean }) {
         <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
           <section
             className="td-panel flex flex-col gap-4 p-5"
-            style={{ borderLeft: `3px solid ${modeColor(plan.mode)}` }}
+            style={{ borderLeft: `3px solid ${colorVarFor("mode", plan.mode)}` }}
           >
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
@@ -205,7 +182,7 @@ function OptionsDeskInner({ showHeader = true }: { showHeader?: boolean }) {
                   </span>
                 </div>
               </div>
-              <ModeBadge mode={plan.mode} />
+              <Chip label={plan.mode ?? "—"} colorVar={colorVarFor("mode", plan.mode)} />
             </div>
 
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

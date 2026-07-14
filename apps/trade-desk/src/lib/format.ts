@@ -1,5 +1,7 @@
 /** Display helpers + action CSS-var mapping for Trade Desk UI. */
 
+import { actionColorVarName } from "./actionColors";
+
 export function formatPct(
   value: number | null | undefined,
   digits = 1,
@@ -52,16 +54,13 @@ export function formatNum(
   }).format(value);
 }
 
-/** Maps plan.action → CSS custom property name (e.g. --td-action-buy-now). */
+/**
+ * Maps plan.action → CSS custom property name (e.g. --td-action-buy-now).
+ * Kept here for backward compat with existing imports; the canonical
+ * mapping now lives in `./actionColors`.
+ */
 export function actionColorVar(action: string | null | undefined): string {
-  const a = (action ?? "").toUpperCase();
-  if (a.includes("BUY NOW")) return "--td-action-buy-now";
-  if (a.includes("BUY BREAKOUT")) return "--td-action-buy-breakout";
-  if (a.includes("BREAKOUT WATCH")) return "--td-action-breakout-watch";
-  if (a.includes("PULLBACK")) return "--td-action-pullback";
-  if (a.includes("AVOID")) return "--td-action-avoid";
-  if (a.includes("WAIT")) return "--td-action-wait";
-  return "--td-action-wait";
+  return actionColorVarName(action);
 }
 
 /** Class string using the action CSS variable for color. */

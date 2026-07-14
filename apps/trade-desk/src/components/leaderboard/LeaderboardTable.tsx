@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { ModelBadges } from "./ModelBadges";
 import { ScoreBar } from "./ScoreBar";
 import type { LeaderboardRow } from "./ModelSidePanel";
+import { rankColorVar } from "@/lib/actionColors";
 
 export type SortKey =
   | "rank"
@@ -36,13 +37,6 @@ const COLUMNS: { key: SortKey; label: string; align?: "left" | "right" }[] = [
   { key: "total_return", label: "Ret" },
   { key: "trade_count", label: "Trades" },
 ];
-
-function medalColor(rank: number): string {
-  if (rank === 1) return "var(--td-rank-gold, #f4b400)";
-  if (rank === 2) return "var(--td-rank-silver, #e6e6e6)";
-  if (rank === 3) return "var(--td-rank-bronze, #b87336)";
-  return "var(--td-rank-plain, var(--td-ink-400, #bbbbbb))";
-}
 
 function fmtPct(n: number | undefined, digits = 1): string {
   if (n == null || Number.isNaN(n)) return "—";
@@ -212,7 +206,7 @@ export function LeaderboardTable({
                   <span
                     className="inline-flex items-center justify-center min-w-[1.5rem] font-medium"
                     style={{
-                      color: medalColor(row.rank),
+                      color: rankColorVar(row.rank),
                       fontFamily:
                         "var(--td-font-mono, ui-monospace, Menlo, monospace)",
                     }}
