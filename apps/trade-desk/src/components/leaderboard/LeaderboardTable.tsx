@@ -5,7 +5,9 @@ import { Circle, Trophy } from "lucide-react";
 import { ModelBadges } from "./ModelBadges";
 import { ScoreBar } from "./ScoreBar";
 import type { LeaderboardRow } from "./ModelSidePanel";
-import { rankColorVar } from "@/lib/actionColors";
+import { colorVarFor, rankColorVar } from "@/lib/actionColors";
+import { formatPct } from "@/lib/format";
+import { Chip } from "@/components/ui/Chip";
 import { EmptyState } from "@/components/ui/EmptyState";
 
 export type SortKey =
@@ -17,7 +19,10 @@ export type SortKey =
   | "profit_factor"
   | "max_drawdown"
   | "total_return"
-  | "trade_count";
+  | "trade_count"
+  | "live_wr"
+  | "live_n"
+  | "live_avg_R";
 
 type LeaderboardTableProps = {
   rows: LeaderboardRow[];
@@ -38,7 +43,15 @@ const COLUMNS: { key: SortKey; label: string; align?: "left" | "right" }[] = [
   { key: "max_drawdown", label: "DD" },
   { key: "total_return", label: "Ret" },
   { key: "trade_count", label: "Trades" },
+  { key: "live_wr", label: "Live WR" },
+  { key: "live_n", label: "Live n" },
+  { key: "live_avg_R", label: "Avg R" },
 ];
+
+/** Live paper-trading evidence gate: mirrors model_registry.py's _live_factor threshold. */
+function isLiveProvisional(row: LeaderboardRow): boolean {
+  return row.live_n == null || row.live_n < 10;
+}
 
 function fmtPct(n: number | undefined, digits = 1): string {
   if (n == null || Number.isNaN(n)) return "—";
@@ -70,6 +83,12 @@ function cellValue(row: LeaderboardRow, key: SortKey): number | string {
       return row.total_return ?? Number.NEGATIVE_INFINITY;
     case "trade_count":
       return row.trade_count ?? Number.NEGATIVE_INFINITY;
+    case "live_wr":
+      return row.live_wr ?? Number.NEGATIVE_INFINITY;
+    case "live_n":
+      return row.live_n ?? Number.NEGATIVE_INFINITY;
+    case "live_avg_R":
+      return row.live_avg_R ?? Number.NEGATIVE_INFINITY;
     default: {
       const _exhaustive: never = key;
       return _exhaustive;
@@ -169,6 +188,9 @@ export function LeaderboardTable({
               </th>
             ))}
             <th scope="col" className="py-2 px-2 text-left font-medium">
+              Live status
+            </th>
+            <th scope="col" className="py-2 px-2 text-left font-medium">
               Badges
             </th>
           </tr>
@@ -176,6 +198,7 @@ export function LeaderboardTable({
         <tbody>
           {sorted.map((row) => {
             const selected = selectedModel === row.model;
+            const liveProvisional = isLiveProvisional(row);
             return (
               <tr
                 key={row.model}
@@ -291,6 +314,60 @@ export function LeaderboardTable({
                   }}
                 >
                   {row.trade_count != null ? row.trade_count : "—"}
+                </td>
+                <td
+                  className="py-2.5 px-2 text-right tabular-nums"
+                  style={{
+                    fontFamily:
+                      "var(--td-font-mono, ui-monospace, Menlo, monospace)",
+                    color: liveProvisional
+                      ? "var(--td-ink-400, #bbbbbb)"
+                      : undefined,
+                  }}
+                  title={liveProvisional ? "provisional" : undefined}
+                >
+                  {formatPct(row.live_wr)}
+                </td>
+                <td
+                  className="py-2.5 px-2 text-right tabular-nums"
+                  style={{
+                    fontFamily:
+                      "var(--td-font-mono, ui-monospace, Menlo, monospace)",
+                    color: liveProvisional
+                      ? "var(--td-ink-400, #bbbbbb)"
+                      : undefined,
+                  }}
+                  title={liveProvisional ? "provisional" : undefined}
+                >
+                  {row.live_n != null ? row.live_n : "—"}
+                </td>
+                <td
+                  className="py-2.5 px-2 text-right tabular-nums"
+                  style={{
+                    fontFamily:
+                      "var(--td-font-mono, ui-monospace, Menlo, monospace)",
+                    color: liveProvisional
+                      ? "var(--td-ink-400, #bbbbbb)"
+                      : undefined,
+                  }}
+                  title={liveProvisional ? "provisional" : undefined}
+                >
+                  {formatPct(row.live_avg_R)}
+                </td>
+                <td
+                  className="py-2.5 px-2"
+                  title={liveProvisional ? "provisional" : undefined}
+                >
+                  {row.live_status && row.live_status !== "none" ? (
+                    <Chip
+                      label={row.live_status}
+                      colorVar={colorVarFor("live_status", row.live_status)}
+                    />
+                  ) : (
+                    <span style={{ color: "var(--td-ink-400, #bbbbbb)" }}>
+                      —
+                    </span>
+                  )}
                 </td>
                 <td className="py-2.5 px-2">
                   <ModelBadges

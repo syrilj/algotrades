@@ -13,7 +13,7 @@
  * color VALUES — those come in later tasks.
  */
 
-export type ColorKind = "action" | "mode" | "gate" | "claim" | "regime";
+export type ColorKind = "action" | "mode" | "gate" | "claim" | "regime" | "live_status";
 
 /**
  * Ordered action-verdict matcher (bare CSS var name, no `var()` wrapper,
@@ -84,6 +84,15 @@ function regimeColorVarName(value: string | null | undefined): string {
   return "--td-action-wait"; // flat / neutral / unrecognized
 }
 
+/** Leaderboard live paper-trading status (Task 11) → color. */
+function liveStatusColorVarName(value: string | null | undefined): string {
+  const v = (value ?? "").toLowerCase();
+  if (v === "confirming") return "--td-action-buy-now";
+  if (v === "degrading") return "--td-action-avoid";
+  if (v === "provisional") return "--td-action-wait";
+  return "--td-action-wait"; // "none" / unrecognized
+}
+
 /**
  * Resolve a status string to a wrapped CSS var reference, e.g.
  * `"var(--td-action-buy-now)"`. This is the primary entry point for the
@@ -101,6 +110,8 @@ export function colorVarFor(kind: ColorKind, value: string | null | undefined): 
       return `var(${claimColorVarName(value)})`;
     case "regime":
       return `var(${regimeColorVarName(value)})`;
+    case "live_status":
+      return `var(${liveStatusColorVarName(value)})`;
     default: {
       const _exhaustive: never = kind;
       return _exhaustive;
