@@ -30,11 +30,6 @@ function fmtUsd(n: number | null | undefined): string {
   });
 }
 
-function fmtPct(n: number | null | undefined): string {
-  if (n == null || !Number.isFinite(n)) return "—";
-  return `${(n * 100).toFixed(0)}%`;
-}
-
 function buildOperatorSteps(
   state: AnalyzeState,
   plan: PlainPlan,
@@ -231,7 +226,7 @@ export function VerdictPanel({
             ) : null}
           </div>
           <div className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
-            <Stat label="Hit chance" value={fmtPct(state.hit_probability)} />
+            <Stat label="Hit chance" value={formatPct(state.hit_probability, 0)} />
             <Stat label="Trail arm" value={fmt(state.trail_arm)} />
             <Stat label="Risk / sh" value={fmt(state.risk_per_share)} />
             {size ? (

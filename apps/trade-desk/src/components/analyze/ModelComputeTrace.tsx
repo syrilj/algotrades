@@ -7,6 +7,7 @@ import type {
   PlainPlan,
   PositionSize,
 } from "@/lib/types";
+import { formatPct } from "@/lib/format";
 
 function fmt(n: number | null | undefined, digits = 2): string {
   if (n == null || !Number.isFinite(n)) return "—";
@@ -14,11 +15,6 @@ function fmt(n: number | null | undefined, digits = 2): string {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   });
-}
-
-function fmtPct(n: number | null | undefined): string {
-  if (n == null || !Number.isFinite(n)) return "—";
-  return `${(n * 100).toFixed(0)}%`;
 }
 
 type Stage = {
@@ -95,7 +91,7 @@ function buildStages(
         state.sleeve_fraction != null && (state.confidence ?? 0) > 0
           ? true
           : null,
-      value: `sleeve ${fmtPct(state.sleeve_fraction)} · conf ${fmtPct(state.confidence)}`,
+      value: `sleeve ${formatPct(state.sleeve_fraction, 0)} · conf ${formatPct(state.confidence, 0)}`,
       meter: state.confidence ?? 0,
       meterMax: 1,
     },
@@ -103,7 +99,7 @@ function buildStages(
       id: "meta",
       label: "Meta",
       status: state.hit_probability != null ? true : null,
-      value: `hit ${fmtPct(state.hit_probability)}`,
+      value: `hit ${formatPct(state.hit_probability, 0)}`,
       meter: state.hit_probability ?? 0,
       meterMax: 1,
     },
