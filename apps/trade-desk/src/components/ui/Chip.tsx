@@ -6,14 +6,25 @@
  * when `colorVar` is a `var(...)` reference. See OptionsDesk's old
  * `ModeBadge` for the bug this replaces.
  */
-export function Chip({ label, colorVar, title }: { label: string; colorVar: string; title?: string }) {
+export function Chip({
+  label,
+  colorVar,
+  title,
+  background,
+}: {
+  label: string;
+  colorVar: string;
+  title?: string;
+  /** Override the default color-mix tint (e.g. a dedicated highlight token). */
+  background?: string;
+}) {
   return (
     <span
       title={title}
       className="inline-flex items-center px-2 py-1 text-[12px] font-semibold tracking-wide"
       style={{
         color: colorVar,
-        background: `color-mix(in srgb, ${colorVar} 22%, transparent)`,
+        background: background ?? `color-mix(in srgb, ${colorVar} 22%, transparent)`,
         border: `1px solid ${colorVar}`,
         borderRadius: "var(--td-radius-sm)",
       }}

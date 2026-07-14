@@ -35,7 +35,13 @@ async function fetchBoard(run?: string): Promise<BoardPayload> {
 }
 
 function ClaimChip({ level }: { level?: string }) {
-  return <Chip label={level || "—"} colorVar={colorVarFor("claim", level)} />;
+  return (
+    <Chip
+      label={level || "—"}
+      colorVar={colorVarFor("claim", level)}
+      background={level === "CLAIM" ? "var(--td-badge-winner-bg)" : undefined}
+    />
+  );
 }
 
 function PhaseStrip() {
