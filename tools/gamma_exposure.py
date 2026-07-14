@@ -138,20 +138,30 @@ def _zero_gamma_flip(net_by_strike, spot: float):
     """Strike where cumulative net GEX crosses zero, nearest to spot (linear interp).
 
     Replaces cum.abs().idxmin(), which picked the near-zero low-strike tail
-    (e.g. APLD flip=10 with spot 31.15).
+    (e.g. APLD flip=10 with spot 31.15). A crossing is only counted where the
+    series demonstrably flips sign between two nonzero values -- an isolated
+    cum==0.0 touch flanked by the SAME sign on both sides (e.g. a leading run
+    of zero-contribution strikes with no OI/volume) is not a genuine flip.
     """
     cum = net_by_strike.sort_index().cumsum()
     strikes = cum.index.to_numpy(dtype=float)
     vals = cum.to_numpy(dtype=float)
+
+    nonzero = [(i, 1.0 if v > 0 else -1.0) for i, v in enumerate(vals) if v != 0.0]
+
     crossings: list[float] = []
-    for i in range(len(vals) - 1):
-        a, b = vals[i], vals[i + 1]
-        if a == 0.0:
-            crossings.append(float(strikes[i]))
-        elif a * b < 0:
-            crossings.append(float(strikes[i] + (strikes[i + 1] - strikes[i]) * (0.0 - a) / (b - a)))
-    if len(vals) and vals[-1] == 0.0:
-        crossings.append(float(strikes[-1]))
+    for (i_a, s_a), (i_b, s_b) in zip(nonzero, nonzero[1:]):
+        if s_a == s_b:
+            continue
+        if i_b == i_a + 1:
+            a, b = vals[i_a], vals[i_b]
+            crossing = strikes[i_a] + (strikes[i_b] - strikes[i_a]) * (0.0 - a) / (b - a)
+        else:
+            # One or more exact-zero strikes sit between i_a and i_b; the
+            # cumulative sum is genuinely zero starting at the first of them.
+            crossing = strikes[i_a + 1]
+        crossings.append(float(crossing))
+
     if not crossings:
         return None
     return float(min(crossings, key=lambda k: abs(k - spot)))

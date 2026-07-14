@@ -25,3 +25,21 @@ def test_flip_picks_crossing_nearest_spot():
 def test_no_crossing_returns_none():
     net = pd.Series([1.0, 1.0, 1.0], index=[10.0, 20.0, 30.0])
     assert gamma_exposure._zero_gamma_flip(net, spot=20.0) is None
+
+
+def test_leading_zero_run_is_not_a_false_crossing():
+    # cum = [0, 0, 5, 7, 9, 12]: never goes negative -- no real crossing.
+    # Buggy code flagged any exact-zero cumulative value as an automatic
+    # "crossing" even with no sign change, returning strike=10.0 (WRONG).
+    net = pd.Series(
+        [0.0, 0.0, 5.0, 2.0, 2.0, 3.0],
+        index=[10.0, 20.0, 30.0, 40.0, 50.0, 60.0],
+    )
+    assert gamma_exposure._zero_gamma_flip(net, spot=15.0) is None
+
+
+def test_interior_zero_touch_same_sign_is_not_a_crossing():
+    # cum = [5, 0, 5]: touches zero at strike 20 but returns to the SAME
+    # sign on both sides -- not a genuine flip.
+    net = pd.Series([5.0, -5.0, 5.0], index=[10.0, 20.0, 30.0])
+    assert gamma_exposure._zero_gamma_flip(net, spot=20.0) is None
