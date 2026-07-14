@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { AlertTriangle, ListFilter } from "lucide-react";
 import { ActionChip, actionRailColor } from "@/components/ui/ActionChip";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { analyzeHref } from "@/lib/routes";
 import { formatPct, formatUsd } from "@/lib/format";
 
@@ -97,20 +98,7 @@ export function PicksList({
   }
 
   if (!rows.length && !loading) {
-    return (
-      <div className="flex flex-col items-center justify-center gap-2 px-4 py-16 text-center">
-        <ListFilter
-          className="size-8 text-[var(--td-ink-500,#7e7e7e)]"
-          strokeWidth={1.75}
-        />
-        <p className="font-[family-name:var(--td-font-display,Georgia,serif)] text-xl text-[var(--td-ink-100,#ffffff)]">
-          No picks
-        </p>
-        <p className="max-w-sm text-[13px] text-[var(--td-ink-400,#bbbbbb)]">
-          {emptyHint}
-        </p>
-      </div>
-    );
+    return <EmptyState icon={ListFilter} title="No picks" hint={emptyHint} />;
   }
 
   const buckets = new Map<string, PickRow[]>();

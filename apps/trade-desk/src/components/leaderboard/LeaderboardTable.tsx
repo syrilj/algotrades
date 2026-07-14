@@ -1,11 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Circle } from "lucide-react";
+import { Circle, Trophy } from "lucide-react";
 import { ModelBadges } from "./ModelBadges";
 import { ScoreBar } from "./ScoreBar";
 import type { LeaderboardRow } from "./ModelSidePanel";
 import { rankColorVar } from "@/lib/actionColors";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 export type SortKey =
   | "rank"
@@ -128,12 +129,11 @@ export function LeaderboardTable({
 
   if (!rows.length) {
     return (
-      <div
-        className="p-8 text-center text-[13px]"
-        style={{ color: "var(--td-ink-400, #bbbbbb)" }}
-      >
-        No ranked models for this view.
-      </div>
+      <EmptyState
+        icon={Trophy}
+        title="No ranked models"
+        hint="No ranked models for this view."
+      />
     );
   }
 

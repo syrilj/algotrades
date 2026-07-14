@@ -3,11 +3,14 @@
 import Link from "next/link";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { ListChecks } from "lucide-react";
 import type { ApiEnvelope, OptionsPlanResponse } from "@/lib/types";
 import { formatNum, formatUsd } from "@/lib/format";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { analyzeHref, liveHref } from "@/lib/routes";
 import { Chip } from "@/components/ui/Chip";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { Stat } from "@/components/ui/Stat";
 import { colorVarFor } from "@/lib/actionColors";
 
 function OptionsDeskInner({ showHeader = true }: { showHeader?: boolean }) {
@@ -144,17 +147,15 @@ function OptionsDeskInner({ showHeader = true }: { showHeader?: boolean }) {
 
       {!plan && !loading && !error ? (
         <section className="td-panel p-5">
-          <p
-            className="text-[15px] font-medium"
-            style={{ color: "var(--td-ink-100)", fontFamily: "var(--td-font-display)" }}
-          >
-            No structure yet
-          </p>
-          <ol className="mt-2 flex flex-col gap-1 text-[13px]" style={{ color: "var(--td-ink-300)" }}>
-            <li>1. Enter symbol (start with APLD or IONQ)</li>
-            <li>2. Plan options → read mode + do next</li>
-            <li>3. Only size when mode is OPTIONS_ATTACK and structure is buy</li>
-          </ol>
+          <EmptyState
+            icon={ListChecks}
+            title="No structure yet"
+            steps={[
+              "Enter symbol (start with APLD or IONQ)",
+              "Plan options → read mode + do next",
+              "Only size when mode is OPTIONS_ATTACK and structure is buy",
+            ]}
+          />
         </section>
       ) : null}
 
@@ -398,16 +399,5 @@ export function OptionsDesk({ showHeader = true }: { showHeader?: boolean }) {
     >
       <OptionsDeskInner showHeader={showHeader} />
     </Suspense>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex flex-col gap-0.5">
-      <span className="td-label">{label}</span>
-      <span className="text-[14px]" style={{ color: "var(--td-ink-100)" }}>
-        {value}
-      </span>
-    </div>
   );
 }

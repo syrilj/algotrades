@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Check, X } from "lucide-react";
+import { BarChart3, Check, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type {
@@ -15,6 +15,7 @@ import { modelHref } from "@/lib/routes";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { formatNum, formatPct } from "@/lib/format";
 import { Chip } from "@/components/ui/Chip";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { colorVarFor } from "@/lib/actionColors";
 
 type BoardPayload = {
@@ -513,12 +514,11 @@ export function EvolveDesk() {
               Loading evolve board…
             </div>
           ) : !ranking.length ? (
-            <div className="p-8 text-[13px]" style={{ color: "var(--td-ink-400)" }}>
-              No ranking rows. Run quick rank or generate via CLI:
-              <pre className="mt-2 overflow-x-auto text-[11px]" style={{ color: "var(--td-ink-300)" }}>
-                {`.venv/bin/python tools/evolve_pipeline.py rank --track equity --cash 10000`}
-              </pre>
-            </div>
+            <EmptyState
+              icon={BarChart3}
+              title="No ranking rows"
+              hint="Run quick rank, or generate via CLI: .venv/bin/python tools/evolve_pipeline.py rank --track equity --cash 10000"
+            />
           ) : (
             <table className="w-full border-collapse text-left text-[12px]">
               <thead>
