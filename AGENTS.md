@@ -30,6 +30,13 @@
 - `v42` was integrated into the `v41_ensemble_feedback` sweep; every tested combination with `v42` underperforms the `v39b+v39d` baseline.
 - Conclusion: `v42_trend_breakout` is not selected for the current ensemble; keep it as a research artifact for future signal decomposition.
 
+## v44 Absorption (OrderFlow / Delta / Wick)
+- `models/poc_va_macdha/v44_absorption/` adds an OHLCV-safe `order_flow_state` sensor (candle-delta proxy, wick absorption, volume/delta clusters, CVD bias, composite flow score) to `v39d_confluence`.
+- Usage: `.venv/bin/python tools/train_v44_meta.py --seed --retrain`.
+- Final backtest on `EQUITY_WINNER_BAG` ($1,000, source=local, 1H): +262.7% return, -17.8% max drawdown, Sharpe 2.24, 158 trades, final $3,627.
+- This underperforms both `v39b_live_adapt` (+309.7% / -13.1% / Sharpe 2.70) and `v39d_confluence` (+357.5% / -13.4% / Sharpe 2.82).
+- Conclusion: `v44_absorption` is not promoted; keep as a research artifact. The OHLCV approximation is too noisy and the retrained XGB does not match the original v39d model's selection quality.
+
 ## v41 Ensemble Feedback
 - `tools/feedback_loop_v41.py` automates a grid search over `v41_ensemble_feedback` `perf_weighted` variants (now also covers `v42_trend_breakout` combinations and SGD/risk-adjusted metrics).
 - Usage: `.venv/bin/python tools/feedback_loop_v41.py --cash 1000 --quick` or `--focused` for a 144-variant sweep.
