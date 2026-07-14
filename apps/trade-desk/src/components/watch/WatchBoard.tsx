@@ -75,7 +75,7 @@ export function WatchBoard({
           className="size-8 text-[var(--td-ink-500,#7e7e7e)]"
           strokeWidth={1.75}
         />
-        <p className="font-[family-name:var(--td-font-display,Inter,ui-sans-serif,system-ui,sans-serif)] text-xl text-[var(--td-ink-100,#ffffff)]">
+        <p className="font-[family-name:var(--td-font-display,Georgia,serif)] text-xl text-[var(--td-ink-100,#ffffff)]">
           No ticks yet
         </p>
         <p className="max-w-sm text-[13px] text-[var(--td-ink-400,#bbbbbb)]">
@@ -89,8 +89,8 @@ export function WatchBoard({
     <div className="flex flex-col">
       <div className="overflow-x-auto">
         <table className="w-full min-w-[720px] border-collapse text-left text-[13px]">
-          <thead className="sticky top-0 z-10 bg-[var(--td-ink-700,#3c3c3c)]">
-            <tr className="border-b border-[var(--td-ink-600,#2b2b2b)] text-[11px] font-medium uppercase tracking-wide text-[var(--td-ink-300,#e6e6e6)]">
+          <thead className="sticky top-0 z-10 bg-[var(--td-canvas,#000000)]">
+            <tr className="border-b border-[var(--td-border,#3c3c3c)] text-[11px] font-medium uppercase tracking-wide text-[var(--td-ink-300,#e6e6e6)]">
               <th className="px-3 py-2">Sym</th>
               <th className="px-3 py-2">Action</th>
               <th className="px-3 py-2 text-right">Price</th>

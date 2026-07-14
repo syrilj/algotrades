@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { Check, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type {
@@ -317,8 +318,13 @@ export function EvolveDesk() {
                 : "—"}
             </strong>
           </p>
-          <p className="mt-1 text-[11px] tabular-nums" style={{ color: "var(--td-ink-500)" }}>
-            ✓{board?.brain?.accepted ?? 0} / ✗{board?.brain?.rejected ?? 0}
+          <p
+            className="mt-1 flex items-center gap-1 text-[11px] tabular-nums"
+            style={{ color: "var(--td-ink-500)" }}
+          >
+            <Check size={12} aria-hidden />
+            {board?.brain?.accepted ?? 0} / <X size={12} aria-hidden />
+            {board?.brain?.rejected ?? 0}
           </p>
           {board?.brain?.lessons?.length ? (
             <p className="mt-2 text-[11px] leading-snug" style={{ color: "var(--td-ink-400)" }}>

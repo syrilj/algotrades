@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { Circle } from "lucide-react";
 import { ModelBadges } from "./ModelBadges";
 import { ScoreBar } from "./ScoreBar";
 import type { LeaderboardRow } from "./ModelSidePanel";
@@ -204,7 +205,7 @@ export function LeaderboardTable({
               >
                 <td className="py-2.5 px-2 text-right tabular-nums">
                   <span
-                    className="inline-flex items-center justify-center min-w-[1.5rem] font-medium"
+                    className="inline-flex items-center justify-center gap-0.5 min-w-[1.5rem] font-medium"
                     style={{
                       color: rankColorVar(row.rank),
                       fontFamily:
@@ -212,7 +213,11 @@ export function LeaderboardTable({
                     }}
                     aria-label={`Rank ${row.rank}`}
                   >
-                    {row.rank <= 3 ? "●" : "#"}
+                    {row.rank <= 3 ? (
+                      <Circle size={8} fill="currentColor" aria-hidden />
+                    ) : (
+                      "#"
+                    )}
                     {row.rank}
                   </span>
                 </td>

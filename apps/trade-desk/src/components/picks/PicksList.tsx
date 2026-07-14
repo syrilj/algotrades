@@ -103,7 +103,7 @@ export function PicksList({
           className="size-8 text-[var(--td-ink-500,#7e7e7e)]"
           strokeWidth={1.75}
         />
-        <p className="font-[family-name:var(--td-font-display,Inter,ui-sans-serif,system-ui,sans-serif)] text-xl text-[var(--td-ink-100,#ffffff)]">
+        <p className="font-[family-name:var(--td-font-display,Georgia,serif)] text-xl text-[var(--td-ink-100,#ffffff)]">
           No picks
         </p>
         <p className="max-w-sm text-[13px] text-[var(--td-ink-400,#bbbbbb)]">
