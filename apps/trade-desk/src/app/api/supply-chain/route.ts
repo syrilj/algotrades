@@ -56,10 +56,14 @@ export async function POST(req: Request) {
   const riskPctRaw = body.riskPct ?? body.risk_pct;
   if (riskPctRaw != null && riskPctRaw !== "") {
     const riskPct = Number(riskPctRaw);
-    if (!Number.isFinite(riskPct) || riskPct <= 0 || riskPct > 100) {
-      return envelope({ ok: false, command: "supply_chain", error: "Invalid riskPct" }, 400);
+    if (!Number.isFinite(riskPct) || riskPct <= 0 || riskPct > 5) {
+      return envelope(
+        { ok: false, command: "supply_chain", error: "Invalid riskPct (percent points, 0–5]" },
+        400,
+      );
     }
-    args.push("--risk-pct", String(riskPct));
+    // UI speaks percent points; Python --risk-pct is a fraction.
+    args.push("--risk-pct", String(riskPct / 100));
   }
 
   if (typeof body.model === "string" && body.model.trim()) {

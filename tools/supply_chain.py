@@ -3,7 +3,7 @@
 
 Usage:
     python3 tools/supply_chain.py NVDA --json
-    python3 tools/supply_chain.py NVDA --account 100000 --risk-pct 1.0 --model auto --json
+    python3 tools/supply_chain.py NVDA --account 100000 --risk-pct 0.01 --model auto --json
 """
 from __future__ import annotations
 
@@ -741,7 +741,8 @@ def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description="Supply-chain screener")
     p.add_argument("symbol", type=str, help="Anchor ticker")
     p.add_argument("--account", type=float, default=100_000)
-    p.add_argument("--risk-pct", type=float, default=1.0)
+    # Fraction (0.01 = 1% of account), matching run_supply_chain / trade_desk.
+    p.add_argument("--risk-pct", type=float, default=0.01)
     p.add_argument("--model", type=str, default="auto")
     p.add_argument("--no-web", action="store_true", help="Use seed data only (no web search)")
     p.add_argument("--json", action="store_true", help="Output JSON")
