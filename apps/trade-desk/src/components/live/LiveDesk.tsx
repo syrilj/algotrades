@@ -12,30 +12,8 @@ import type {
 import { formatUsd, formatPct, formatNum } from "@/lib/format";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { analyzeHref, optionsHref } from "@/lib/routes";
-
-function modeColor(mode: string | undefined): string {
-  const m = (mode ?? "").toUpperCase();
-  if (m.includes("OPTIONS")) return "var(--td-action-buy-now)";
-  if (m.includes("EQUITY")) return "var(--td-action-buy-breakout)";
-  if (m.includes("FLATTEN") || m.includes("HALT")) return "var(--td-action-avoid)";
-  return "var(--td-action-wait)";
-}
-
-function ModeBadge({ mode }: { mode?: string }) {
-  const c = modeColor(mode);
-  return (
-    <span
-      className="td-action-chip td-action-chip--md"
-      style={{
-        color: c,
-        background: `color-mix(in oklch, ${c} 16%, transparent)`,
-        border: `1px solid ${c}`,
-      }}
-    >
-      {mode ?? "—"}
-    </span>
-  );
-}
+import { Chip } from "@/components/ui/Chip";
+import { colorVarFor } from "@/lib/actionColors";
 
 function LiveDeskInner({ showHeader = true }: { showHeader?: boolean }) {
   const searchParams = useSearchParams();
@@ -236,7 +214,7 @@ function LiveDeskInner({ showHeader = true }: { showHeader?: boolean }) {
         <div className="grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
           <section
             className="td-panel flex flex-col gap-3 p-4"
-            style={{ borderLeft: `3px solid ${modeColor(ticket.mode)}` }}
+            style={{ borderLeft: `3px solid ${colorVarFor("mode", ticket.mode)}` }}
           >
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-baseline gap-3">
@@ -254,7 +232,7 @@ function LiveDeskInner({ showHeader = true }: { showHeader?: boolean }) {
                   {formatUsd(live?.price)}
                 </span>
               </div>
-              <ModeBadge mode={ticket.mode} />
+              <Chip label={ticket.mode ?? "—"} colorVar={colorVarFor("mode", ticket.mode)} />
             </div>
 
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -441,7 +419,7 @@ function LiveDeskInner({ showHeader = true }: { showHeader?: boolean }) {
                     {r.symbol}
                   </td>
                   <td className="px-2 py-2">
-                    <span style={{ color: modeColor(r.mode) }}>{r.mode}</span>
+                    <span style={{ color: colorVarFor("mode", r.mode) }}>{r.mode}</span>
                   </td>
                   <td className="px-2 py-2" style={{ color: "var(--td-ink-300)" }}>
                     {r.vehicle}

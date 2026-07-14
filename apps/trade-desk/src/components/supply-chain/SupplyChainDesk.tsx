@@ -311,7 +311,7 @@ function SupplyChainDeskInner() {
                         {s.product || s.industry || "—"}
                       </div>
                     </td>
-                    <td className="tabular" style={{ color: `var(${scoreRankClass(s.score ?? 0)})` }}>
+                    <td className="tabular" style={{ color: `var(--${scoreRankClass(s.score ?? 0)})` }}>
                       {(s.score ?? 0).toFixed(2)}
                     </td>
                     <td>
