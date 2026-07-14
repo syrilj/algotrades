@@ -38,6 +38,7 @@
   --td-m-blue-light: #0066b1;
   --td-m-blue-dark: #1c69d4;
   --td-m-red: #e22718;
+  --td-m-violet: #5b5fc7;
   --td-bmw-blue: #1c69d4;
   --td-electric-blue: #0653b6;
 
@@ -53,9 +54,9 @@
   --td-danger: var(--td-m-red);
 
   --td-action-buy-now: var(--td-success);
-  --td-action-buy-breakout: var(--td-m-blue-dark);
+  --td-action-buy-breakout: #4f8ff0;
   --td-action-breakout-watch: var(--td-warning);
-  --td-action-pullback: var(--td-m-blue-light);
+  --td-action-pullback: var(--td-m-violet);
   --td-action-avoid: var(--td-m-red);
   --td-action-wait: var(--td-muted);
 

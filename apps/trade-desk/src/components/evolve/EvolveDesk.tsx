@@ -73,7 +73,7 @@ function PhaseStrip() {
           </span>
           <span>{p.label}</span>
           {i < phases.length - 1 ? (
-            <span style={{ color: "var(--td-ink-600)" }} aria-hidden>
+            <span style={{ color: "var(--td-ink-400)" }} aria-hidden>
               →
             </span>
           ) : null}
