@@ -10,8 +10,7 @@ Computes dealer gamma exposure (GEX), call/put walls, flip strike, expected
 move, max pain, and a bullish/bearish/neutral squeeze score.
 
 Sign convention (dealer = long calls / short puts, SpotGamma-style):
-  CallGEX = +Γ * weight * 100 * S² * 0.01
-  PutGEX  = -Γ * weight * 100 * S² * 0.01
+  GEX = Γ · OI · 100 · S² · 0.01, calls +, puts −
   NetGEX  = sum(calls) + sum(puts)
   +GEX  → pinning / mean-reversion
   -GEX  → amplification / trend continuation
@@ -133,6 +132,29 @@ def _as_df(obj) -> pd.DataFrame:
     if isinstance(obj, pd.DataFrame):
         return obj
     return pd.DataFrame(obj)
+
+
+def _zero_gamma_flip(net_by_strike, spot: float):
+    """Strike where cumulative net GEX crosses zero, nearest to spot (linear interp).
+
+    Replaces cum.abs().idxmin(), which picked the near-zero low-strike tail
+    (e.g. APLD flip=10 with spot 31.15).
+    """
+    cum = net_by_strike.sort_index().cumsum()
+    strikes = cum.index.to_numpy(dtype=float)
+    vals = cum.to_numpy(dtype=float)
+    crossings: list[float] = []
+    for i in range(len(vals) - 1):
+        a, b = vals[i], vals[i + 1]
+        if a == 0.0:
+            crossings.append(float(strikes[i]))
+        elif a * b < 0:
+            crossings.append(float(strikes[i] + (strikes[i + 1] - strikes[i]) * (0.0 - a) / (b - a)))
+    if len(vals) and vals[-1] == 0.0:
+        crossings.append(float(strikes[-1]))
+    if not crossings:
+        return None
+    return float(min(crossings, key=lambda k: abs(k - spot)))
 
 
 def _compute_squeeze_score(
@@ -379,11 +401,7 @@ def compute_gamma_exposure_oi(
     else:
         regime = "flat"
 
-    flip = None
-    if len(net_by_strike):
-        cum = net_by_strike.cumsum()
-        if (cum > 0).any() and (cum < 0).any():
-            flip = float(cum.abs().idxmin())
+    flip = _zero_gamma_flip(net_by_strike, spot) if len(net_by_strike) else None
 
     by_strike = [
         {
@@ -553,11 +571,7 @@ def compute_gamma_exposure_lse(
     else:
         regime = "flat"
 
-    flip = None
-    if len(net_by_strike):
-        cum = net_by_strike.cumsum()
-        if (cum > 0).any() and (cum < 0).any():
-            flip = float(cum.abs().idxmin())
+    flip = _zero_gamma_flip(net_by_strike, spot) if len(net_by_strike) else None
 
     by_strike = [
         {
@@ -598,6 +612,11 @@ def compute_gamma_exposure_lse(
     otm_call_oi = 0.0
     otm_put_oi = 0.0
     total_weight = float(weight.sum())
+    # Concentration numerators must use the SAME series as total_weight (volume_today
+    # or, when it's all zero, premium_today) — otherwise the ratio mixes units when
+    # the weight series has fallen back to premium.
+    otm_call_weight = float(otm_calls["weight"].sum())
+    otm_put_weight = float(otm_puts["weight"].sum())
 
     squeeze = _compute_squeeze_score(
         spot=spot,
@@ -606,8 +625,8 @@ def compute_gamma_exposure_lse(
         flip=flip,
         near_net=near_net,
         net_dealer=net_dealer,
-        otm_call_weight=otm_call_volume,
-        otm_put_weight=otm_put_volume,
+        otm_call_weight=otm_call_weight,
+        otm_put_weight=otm_put_weight,
         total_weight=total_weight,
         by_strike=by_strike,
         expected_move_pct=expected_move_pct,

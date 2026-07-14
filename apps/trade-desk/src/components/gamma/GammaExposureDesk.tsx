@@ -445,7 +445,7 @@ export function GammaExposureDesk() {
           </button>
         </div>
         <p className="text-[11px]" style={{ color: "var(--td-ink-500)" }}>
-          Spot prefers LSE candles; options chain from {source === "lse" ? "LSE volume/premium" : "yfinance open interest"}. Dealer GEX = -Γ·weight·100·S²·0.01.
+          Spot prefers LSE candles; options chain from {source === "lse" ? "LSE volume/premium" : "yfinance open interest"}. GEX = Γ · OI · 100 · S² · 0.01, calls +, puts −.
         </p>
       </section>
 
