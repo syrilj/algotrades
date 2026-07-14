@@ -106,6 +106,15 @@ export interface ModelRankRow {
   source?: string;
   code?: string;
   specialist?: string | null;
+  /** Closed live paper-trading trade count backing live_wr/live_avg_R; <10 = not enough evidence. */
+  live_n?: number;
+  /** Fraction (0-1), not percent points — use formatPct, not formatPctPoints. */
+  live_wr?: number | null;
+  /** Fraction (avg R-multiple), not percent points — use formatPct, not formatPctPoints. */
+  live_avg_R?: number | null;
+  live_status?: "none" | "provisional" | "confirming" | "degrading";
+  /** Backtest score nudged by live outcomes (±15%, gated on live_n>=10); used for rank sort. */
+  blended_score?: number;
 }
 
 export interface AnalyzeResponse {
