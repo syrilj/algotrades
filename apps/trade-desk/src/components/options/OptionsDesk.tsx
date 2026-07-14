@@ -62,7 +62,7 @@ function OptionsDeskInner({ showHeader = true }: { showHeader?: boolean }) {
           body: JSON.stringify({
             symbol: sym,
             account,
-            risk_pct: riskPct / 100,
+            risk_pct: riskPct,
             peak: account,
           }),
         });

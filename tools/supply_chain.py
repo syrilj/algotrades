@@ -676,7 +676,7 @@ def _is_small_cap(market_cap: float | None) -> bool:
 def run_supply_chain(
     symbol: str,
     account: float = 100_000,
-    risk_pct: float = 1.0,
+    risk_pct: float = 0.01,
     model: str | None = "auto",
     use_web: bool = True,
     max_suppliers: int = 12,

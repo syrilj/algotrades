@@ -141,13 +141,14 @@ export async function POST(req: Request) {
   }
   if (body.riskPct != null && body.riskPct !== "") {
     const riskPct = Number(body.riskPct);
-    if (!Number.isFinite(riskPct) || riskPct <= 0) {
+    if (!Number.isFinite(riskPct) || riskPct <= 0 || riskPct > 5) {
       return envelope(
-        { ok: false, command: "open-scan", error: "Invalid riskPct" },
+        { ok: false, command: "open-scan", error: "Invalid riskPct (percent points, 0–5]" },
         400,
       );
     }
-    args.push("--risk-pct", String(riskPct));
+    // UI speaks percent points; Python --risk-pct is a fraction.
+    args.push("--risk-pct", String(riskPct / 100));
   }
   if (body.top != null) args.push("--top", String(Number(body.top) || 12));
   if (body.deep != null) args.push("--deep", String(Number(body.deep) || 24));

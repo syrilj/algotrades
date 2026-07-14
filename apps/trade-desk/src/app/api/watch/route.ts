@@ -121,13 +121,14 @@ export async function POST(req: Request) {
 
   if (body.riskPct != null && body.riskPct !== "") {
     const riskPct = Number(body.riskPct);
-    if (!Number.isFinite(riskPct) || riskPct <= 0 || riskPct > 100) {
+    if (!Number.isFinite(riskPct) || riskPct <= 0 || riskPct > 5) {
       return envelope(
-        { ok: false, command: "watch", error: "Invalid riskPct" },
+        { ok: false, command: "watch", error: "Invalid riskPct (percent points, 0–5]" },
         400,
       );
     }
-    shared.push("--risk-pct", String(riskPct));
+    // UI speaks percent points; Python --risk-pct is a fraction.
+    shared.push("--risk-pct", String(riskPct / 100));
   }
 
   // interval accepted for API compatibility; analyze uses period/defaults.

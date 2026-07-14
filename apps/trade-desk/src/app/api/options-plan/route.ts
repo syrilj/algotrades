@@ -79,8 +79,8 @@ export async function POST(req: Request) {
   const riskPct =
     body.risk_pct != null && body.risk_pct !== ""
       ? Number(body.risk_pct)
-      : 0.18;
-  const riskOk = Number.isFinite(riskPct) && riskPct > 0 && riskPct <= 1;
+      : 18;
+  const riskOk = Number.isFinite(riskPct) && riskPct > 0 && riskPct <= 100;
 
   const planArgs: string[] = ["--symbol", symbol, "--account", String(account)];
   if (body.peak != null && body.peak !== "") {
@@ -110,7 +110,8 @@ export async function POST(req: Request) {
         symbol,
         "--account",
         String(account),
-        ...(riskOk ? ["--risk-pct", String(riskPct)] : []),
+        // UI/route speak percent points; Python --risk-pct is a fraction.
+        ...(riskOk ? ["--risk-pct", String(riskPct / 100)] : []),
       ],
       60_000,
     )) as Record<string, unknown>;
