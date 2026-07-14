@@ -5,7 +5,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import type { ApiEnvelope, GammaResponse, LivePlanResponse } from "@/lib/types";
-import { formatNum, formatPct } from "@/lib/format";
+import {
+  formatNum,
+  formatPct,
+  formatPctPoints,
+  formatPctPointsUnsigned,
+} from "@/lib/format";
 import { ActionChip, actionStyle } from "@/components/ui/ActionChip";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { GammaScene } from "@/components/gamma/GammaScene";
@@ -211,7 +216,7 @@ function buildNotes(gamma: GammaResponse): string[] {
   if (gamma.call_wall != null) {
     const d = gamma.dist_call_wall_pct;
     if (d != null && d > 0) {
-      notes.push(`Call wall at ${formatNum(gamma.call_wall)} is ${formatPct(d)} above spot — reclaim to squeeze.`);
+      notes.push(`Call wall at ${formatNum(gamma.call_wall)} is ${formatPctPoints(d)} above spot — reclaim to squeeze.`);
     } else {
       notes.push(`Call wall at ${formatNum(gamma.call_wall)} is near or inside spot.`);
     }
@@ -219,14 +224,14 @@ function buildNotes(gamma: GammaResponse): string[] {
   if (gamma.put_wall != null) {
     const d = gamma.dist_put_wall_pct;
     if (d != null && d < 0) {
-      notes.push(`Put wall at ${formatNum(gamma.put_wall)} is ${formatPct(d)} below spot — lose to open downside.`);
+      notes.push(`Put wall at ${formatNum(gamma.put_wall)} is ${formatPctPoints(d)} below spot — lose to open downside.`);
     } else {
       notes.push(`Put wall at ${formatNum(gamma.put_wall)} is near or inside spot.`);
     }
   }
   if (gamma.expected_move_pct != null) {
     notes.push(
-      `Expected move ±${formatPct(gamma.expected_move_pct)} (${formatNum(gamma.expected_move_low)} - ${formatNum(gamma.expected_move_high)}).`,
+      `Expected move ±${formatPctPointsUnsigned(gamma.expected_move_pct)} (${formatNum(gamma.expected_move_low)} - ${formatNum(gamma.expected_move_high)}).`,
     );
   }
   if (gamma.max_pain != null) {
@@ -592,7 +597,7 @@ export function GammaExposureDesk() {
                   <Stat label="Put wall" value={gamma.put_wall != null ? formatNum(gamma.put_wall) : "—"} />
                   <Stat
                     label="Expected move"
-                    value={gamma.expected_move_pct != null ? `±${formatPct(gamma.expected_move_pct)}` : "—"}
+                    value={gamma.expected_move_pct != null ? `±${formatPctPointsUnsigned(gamma.expected_move_pct)}` : "—"}
                   />
                   <Stat label="Max pain" value={gamma.max_pain != null ? formatNum(gamma.max_pain) : "—"} />
                   <Stat label="Flip" value={gamma.approx_flip_strike != null ? formatNum(gamma.approx_flip_strike) : "—"} />

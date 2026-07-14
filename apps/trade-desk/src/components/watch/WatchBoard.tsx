@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { AlertTriangle, Radio } from "lucide-react";
 import { ActionChip, actionRailColor } from "@/components/ui/ActionChip";
 import { analyzeHref } from "@/lib/routes";
+import { formatNum, formatPct } from "@/lib/format";
 
 export type WatchBoardRow = {
   symbol: string;
@@ -27,20 +28,6 @@ type WatchBoardProps = {
   emptyHint?: string;
   onSelectSymbol?: (sym: string) => void;
 };
-
-function fmtPrice(n: number | undefined): string {
-  if (n == null || Number.isNaN(n)) return "—";
-  return n.toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
-
-function fmtPct(n: number | undefined): string {
-  if (n == null || Number.isNaN(n)) return "—";
-  const v = n <= 1 ? n * 100 : n;
-  return `${Math.round(v)}%`;
-}
 
 function fmtRvol(row: WatchBoardRow): string {
   if (row.volDry) return "dry";
@@ -139,16 +126,16 @@ export function WatchBoard({
                     <ActionChip action={row.action} />
                   </td>
                   <td className="px-3 py-2 text-right font-[family-name:var(--td-font-mono,ui-monospace,Menlo,monospace)] tabular-nums text-[var(--td-ink-200,#ffffff)]">
-                    {fmtPrice(row.price)}
+                    {formatNum(row.price, 2)}
                   </td>
                   <td className="px-3 py-2 text-right font-[family-name:var(--td-font-mono,ui-monospace,Menlo,monospace)] tabular-nums text-[var(--td-ink-200,#ffffff)]">
-                    {fmtPct(row.confidence)}
+                    {formatPct(row.confidence, 0)}
                   </td>
                   <td className="px-3 py-2 text-right font-[family-name:var(--td-font-mono,ui-monospace,Menlo,monospace)] tabular-nums text-[var(--td-ink-200,#ffffff)]">
-                    {fmtPct(row.hitProbability)}
+                    {formatPct(row.hitProbability, 0)}
                   </td>
                   <td className="px-3 py-2 text-right font-[family-name:var(--td-font-mono,ui-monospace,Menlo,monospace)] tabular-nums text-[var(--td-ink-200,#ffffff)]">
-                    {fmtPrice(row.stop)}
+                    {formatNum(row.stop, 2)}
                   </td>
                   <td className="px-3 py-2 text-right font-[family-name:var(--td-font-mono,ui-monospace,Menlo,monospace)] tabular-nums text-[var(--td-ink-200,#ffffff)]">
                     {fmtRvol(row)}

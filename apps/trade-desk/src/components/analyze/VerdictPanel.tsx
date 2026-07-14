@@ -11,6 +11,7 @@ import { ActionChip, actionStyle } from "@/components/ui/ActionChip";
 import { ConfidenceMeter } from "@/components/ui/ConfidenceMeter";
 import { TradeButton } from "@/components/analyze/TradeButton";
 import { gammaHref, liveHref, optionsHref } from "@/lib/routes";
+import { formatPct } from "@/lib/format";
 
 function fmt(n: number | null | undefined, digits = 2): string {
   if (n == null || !Number.isFinite(n)) return "—";
@@ -61,7 +62,7 @@ function buildOperatorSteps(
     }
     if (size && size.shares > 0) {
       steps.push(
-        `Pre-size: ${size.shares} sh · risk ${fmtUsd(size.dollar_risk)} (${fmt(size.risk_pct, 2)}%).`,
+        `Pre-size: ${size.shares} sh · risk ${fmtUsd(size.dollar_risk)} (${formatPct(size.risk_pct, 2)}).`,
       );
     }
     return steps;
@@ -236,7 +237,7 @@ export function VerdictPanel({
             {size ? (
               <>
                 <Stat label="Notional" value={fmtUsd(size.notional)} />
-                <Stat label="Risk %" value={`${fmt(size.risk_pct, 2)}%`} />
+                <Stat label="Risk %" value={formatPct(size.risk_pct, 2)} />
                 <Stat label="Account" value={fmtUsd(size.account)} />
               </>
             ) : null}

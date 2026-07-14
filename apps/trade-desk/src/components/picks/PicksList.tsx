@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { AlertTriangle, ListFilter } from "lucide-react";
 import { ActionChip, actionRailColor } from "@/components/ui/ActionChip";
 import { analyzeHref } from "@/lib/routes";
+import { formatPct, formatUsd } from "@/lib/format";
 
 export type PickRow = {
   symbol: string;
@@ -63,20 +64,6 @@ function groupTitle(key: string): string {
     return "OTHER HIGH-CONF WAIT";
   }
   return key;
-}
-
-function fmtPrice(n: number | undefined): string {
-  if (n == null || Number.isNaN(n)) return "—";
-  return `$${n.toLocaleString(undefined, {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  })}`;
-}
-
-function fmtPct(n: number | undefined): string {
-  if (n == null || Number.isNaN(n)) return "—";
-  const v = n <= 1 ? n * 100 : n;
-  return `${Math.round(v)}%`;
 }
 
 export function PicksList({
@@ -204,8 +191,8 @@ export function PicksList({
                         </span>
                       ) : null}
                       <span className="ml-auto flex flex-wrap items-center gap-x-3 gap-y-0.5 font-[family-name:var(--td-font-mono,ui-monospace,Menlo,monospace)] text-[12px] tabular-nums text-[var(--td-ink-300,#e6e6e6)]">
-                        <span>{fmtPrice(row.price)}</span>
-                        <span>conf {fmtPct(row.confidence)}</span>
+                        <span>{formatUsd(row.price)}</span>
+                        <span>conf {formatPct(row.confidence, 0)}</span>
                         {row.dollarRisk != null ? (
                           <span>risk ${Math.round(row.dollarRisk)}</span>
                         ) : null}

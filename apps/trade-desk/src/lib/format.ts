@@ -5,9 +5,27 @@ export function formatPct(
   digits = 1,
 ): string {
   if (value == null || Number.isNaN(value)) return "—";
-  const pct = Math.abs(value) <= 1 && Math.abs(value) > 0 ? value * 100 : value;
+  const pct = value * 100; // input is ALWAYS a fraction
   const sign = pct > 0 ? "+" : "";
   return `${sign}${pct.toFixed(digits)}%`;
+}
+
+/** Input already in percent points (e.g. gamma dist_*_pct fields). */
+export function formatPctPoints(
+  value: number | null | undefined,
+  digits = 1,
+): string {
+  if (value == null || Number.isNaN(value)) return "—";
+  const sign = value > 0 ? "+" : "";
+  return `${sign}${value.toFixed(digits)}%`;
+}
+
+export function formatPctPointsUnsigned(
+  value: number | null | undefined,
+  digits = 1,
+): string {
+  if (value == null || Number.isNaN(value)) return "—";
+  return `${Math.abs(value).toFixed(digits)}%`;
 }
 
 export function formatUsd(
@@ -49,8 +67,7 @@ export function actionColorVar(action: string | null | undefined): string {
 /** Class string using the action CSS variable for color. */
 export function actionColorClass(action: string | null | undefined): string {
   const v = actionColorVar(action);
-  const slug = v.replace(/^--td-action-/, "");
-  return `td-action-${slug} text-[color:var(${v})]`;
+  return `text-[color:var(${v})]`;
 }
 
 export function sanitizeSymbol(raw: unknown): string | null {

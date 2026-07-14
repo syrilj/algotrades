@@ -12,6 +12,7 @@ import type {
 import type { ApiEnvelope } from "@/lib/types";
 import { modelHref } from "@/lib/routes";
 import { PageHeader } from "@/components/shell/PageHeader";
+import { formatNum, formatPct } from "@/lib/format";
 
 type BoardPayload = {
   run: EvolveRunSummary | null;
@@ -45,16 +46,6 @@ function claimStyle(level?: string): { bg: string; fg: string } {
     default:
       return { bg: "var(--td-ink-800)", fg: "var(--td-ink-300)" };
   }
-}
-
-function fmtPct(n: number | undefined | null, digits = 1): string {
-  if (n == null || Number.isNaN(n)) return "—";
-  return `${(n * 100).toFixed(digits)}%`;
-}
-
-function fmtNum(n: number | undefined | null, digits = 2): string {
-  if (n == null || Number.isNaN(n)) return "—";
-  return n.toFixed(digits);
 }
 
 function ClaimChip({ level }: { level?: string }) {
@@ -369,7 +360,7 @@ export function EvolveDesk() {
               {finalize?.top_evolve || board?.run?.ranking?.[0]?.id || "—"}
             </span>
             {finalize?.top_utility != null
-              ? ` · util ${fmtNum(finalize.top_utility, 3)}`
+              ? ` · util ${formatNum(finalize.top_utility, 3)}`
               : null}
           </p>
           {finalize?.reasons?.length ? (
@@ -615,19 +606,19 @@ export function EvolveDesk() {
                           color: util < 0 ? "var(--td-action-avoid)" : "var(--td-ink-100)",
                         }}
                       >
-                        {fmtNum(util, 3)}
+                        {formatNum(util, 3)}
                       </td>
                       <td className="px-2 py-1.5 font-mono tabular-nums">
-                        {fmtPct(row.ret)}
+                        {formatPct(row.ret)}
                       </td>
                       <td className="px-2 py-1.5 font-mono tabular-nums">
-                        {fmtNum(row.sharpe)}
+                        {formatNum(row.sharpe)}
                       </td>
                       <td
                         className="px-2 py-1.5 font-mono tabular-nums"
                         style={{ color: "var(--td-action-avoid)" }}
                       >
-                        {fmtPct(row.dd)}
+                        {formatPct(row.dd)}
                       </td>
                       <td className="px-2 py-1.5 font-mono tabular-nums">
                         {row.n ?? "—"}
@@ -697,12 +688,12 @@ export function EvolveDesk() {
               </div>
               <dl className="mt-3 space-y-1.5 text-[12px]">
                 {[
-                  ["Utility", fmtNum(selected.utility, 3)],
-                  ["Return", fmtPct(selected.ret)],
-                  ["Sharpe", fmtNum(selected.sharpe)],
-                  ["Max DD", fmtPct(selected.dd)],
+                  ["Utility", formatNum(selected.utility, 3)],
+                  ["Return", formatPct(selected.ret)],
+                  ["Sharpe", formatNum(selected.sharpe)],
+                  ["Max DD", formatPct(selected.dd)],
                   ["Trades", String(selected.n ?? "—")],
-                  ["WR", fmtPct(selected.wr)],
+                  ["WR", formatPct(selected.wr)],
                   ["Track", selected.data_track || "—"],
                   ["Mode", selected.mode || "—"],
                   ["Multi-lock", selected.multi_lock || "—"],
