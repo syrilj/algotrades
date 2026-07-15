@@ -1,15 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { PageHeader } from "@/components/shell/PageHeader";
-
-const VARIANTS = [
-  { id: "v22_robust", label: "v22 robust (balanced)" },
-  { id: "v22_robust_conservative", label: "v22 robust conservative (live-safe)" },
-  { id: "v22_robust_trend_only", label: "v22 robust trend-only" },
-  { id: "v22_robust_vol_only", label: "v22 robust vol-only" },
-];
+import type { ApiEnvelope, ModelsCatalog } from "@/lib/types";
 
 type BacktestResult = {
   ok: boolean;
@@ -18,13 +12,52 @@ type BacktestResult = {
 };
 
 export function BacktestPanel({ showHeader = true }: { showHeader?: boolean }) {
-  const [variant, setVariant] = useState("v22_robust_conservative");
+  const [variants, setVariants] = useState<{ id: string; label: string }[]>([]);
+  const [variant, setVariant] = useState("");
   const [symbols, setSymbols] = useState("IONQ, AVGO, HOOD, MU");
   const [startDate, setStartDate] = useState("2024-08-01");
   const [endDate, setEndDate] = useState("2026-07-11");
   const [initialCash, setInitialCash] = useState(1000000);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<BacktestResult | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    const fetchModels = async () => {
+      try {
+        const res = await fetch("/api/models");
+        const json = (await res.json()) as ApiEnvelope<ModelsCatalog>;
+        if (json.ok && json.data && active) {
+          const list = (json.data.engines || []).map((e) => ({
+            id: e,
+            label: e === json.data?.winner ? `${e} (champion)` : e,
+          }));
+          if (list.length > 0) {
+            setVariants(list);
+            const defaultVar = json.data.winner || list[0].id;
+            setVariant(defaultVar);
+            return;
+          }
+        }
+      } catch (e) {
+        console.error("Failed to load models catalog", e);
+      }
+
+      if (active) {
+        setVariants([
+          { id: "v39d_confluence", label: "v39d_confluence (champion)" },
+          { id: "v50_high_win_rate", label: "v50_high_win_rate" },
+          { id: "v22_robust", label: "v22 robust (balanced)" },
+          { id: "v22_robust_conservative", label: "v22 robust conservative (live-safe)" },
+        ]);
+        setVariant("v39d_confluence");
+      }
+    };
+    void fetchModels();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const run = async () => {
     setLoading(true);
@@ -72,7 +105,7 @@ export function BacktestPanel({ showHeader = true }: { showHeader?: boolean }) {
             <label>
               <span className="text-[12px]" style={{ color: "var(--td-ink-300)" }}>Variant</span>
               <select className="td-input w-full" value={variant} onChange={(e) => setVariant(e.target.value)}>
-                {VARIANTS.map((v) => (
+                {variants.map((v) => (
                   <option key={v.id} value={v.id}>{v.label}</option>
                 ))}
               </select>

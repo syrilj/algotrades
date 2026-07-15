@@ -389,6 +389,70 @@ def cancel_trade(tid: str, reason: str = "cancel") -> dict[str, Any]:
     return replay_positions()[tid]
 
 
+def update_trade(
+    tid: str,
+    *,
+    shares: int | None = None,
+    entry: float | None = None,
+    stop: float | None = None,
+    trail_arm: float | None = None,
+    account: float | None = None,
+    risk_pct: float | None = None,
+    dollar_risk: float | None = None,
+    notes: str | None = None,
+) -> dict[str, Any]:
+    events = load_events()
+    found = False
+    for ev in events:
+        if ev.get("id") == tid and ev.get("event") == "open":
+            found = True
+            if shares is not None:
+                ev["shares"] = int(shares)
+            if entry is not None:
+                ev["entry"] = float(entry)
+            if stop is not None:
+                ev["stop"] = float(stop)
+            if trail_arm is not None:
+                ev["trail_arm"] = float(trail_arm)
+            if account is not None:
+                ev["account"] = float(account)
+            if risk_pct is not None:
+                ev["risk_pct"] = float(risk_pct)
+            if dollar_risk is not None:
+                ev["dollar_risk"] = float(dollar_risk)
+            elif (shares is not None or entry is not None or stop is not None):
+                e = ev.get("entry", 0.0)
+                s = ev.get("stop", 0.0)
+                sh = ev.get("shares", 0)
+                ev["dollar_risk"] = abs(e - s) * sh
+            if notes is not None:
+                ev["notes"] = notes
+            break
+    
+    if not found:
+        raise ValueError(f"open trade with id {tid} not found")
+        
+    LEDGER_DIR.mkdir(parents=True, exist_ok=True)
+    with LEDGER_PATH.open("w") as f:
+        for ev in events:
+            f.write(json.dumps(ev, separators=(",", ":")) + "\n")
+            
+    return replay_positions()[tid]
+
+
+def delete_trade(tid: str) -> None:
+    events = load_events()
+    new_events = [ev for ev in events if ev.get("id") != tid]
+    if len(new_events) == len(events):
+        raise ValueError(f"trade with id {tid} not found")
+    
+    LEDGER_DIR.mkdir(parents=True, exist_ok=True)
+    with LEDGER_PATH.open("w") as f:
+        for ev in new_events:
+            f.write(json.dumps(ev, separators=(",", ":")) + "\n")
+
+
+
 def compute_stats(
     symbol: str | None = None,
     model: str | None = None,
@@ -538,6 +602,39 @@ def cmd_cancel(ns: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_update(ns: argparse.Namespace) -> int:
+    try:
+        pos = update_trade(
+            ns.id,
+            shares=ns.shares,
+            entry=ns.entry,
+            stop=ns.stop,
+            trail_arm=ns.trail_arm,
+            account=ns.account,
+            risk_pct=ns.risk_pct,
+            dollar_risk=ns.dollar_risk,
+            notes=ns.notes,
+        )
+    except Exception as e:  # noqa: BLE001
+        return _err(str(e))
+    if ns.json:
+        return _print_json({"ok": True, "position": pos})
+    print(pos["id"], pos["symbol"], pos["shares"])
+    return 0
+
+
+def cmd_delete(ns: argparse.Namespace) -> int:
+    try:
+        delete_trade(ns.id)
+    except Exception as e:  # noqa: BLE001
+        return _err(str(e))
+    if ns.json:
+        return _print_json({"ok": True})
+    print(f"deleted {ns.id}")
+    return 0
+
+
+
 def cmd_stats(ns: argparse.Namespace) -> int:
     out = compute_stats(symbol=ns.symbol, model=ns.model)
     if ns.json:
@@ -595,10 +692,27 @@ def main(argv: list[str] | None = None) -> int:
     k.add_argument("--reason", default="cancel")
     k.set_defaults(func=cmd_cancel)
 
+    u = sub.add_parser("update")
+    u.add_argument("--id", required=True)
+    u.add_argument("--shares", type=int, default=None)
+    u.add_argument("--entry", type=float, default=None)
+    u.add_argument("--stop", type=float, default=None)
+    u.add_argument("--trail-arm", type=float, default=None)
+    u.add_argument("--account", type=float, default=None)
+    u.add_argument("--risk-pct", type=float, default=None)
+    u.add_argument("--dollar-risk", type=float, default=None)
+    u.add_argument("--notes", default=None)
+    u.set_defaults(func=cmd_update)
+
+    d = sub.add_parser("delete")
+    d.add_argument("--id", required=True)
+    d.set_defaults(func=cmd_delete)
+
     s = sub.add_parser("stats")
     s.add_argument("--symbol", default=None)
     s.add_argument("--model", default=None)
     s.set_defaults(func=cmd_stats)
+
 
     ns = ap.parse_args(raw)
     ns.json = bool(want_json or ns.json)

@@ -92,11 +92,27 @@ export function derivePlan(state: AnalyzeResponse["state"]): PlainPlan {
         doNext = "Wait for price to re-enter the value area before buying.";
       }
     }
-  } else if (kind === "avoid" || state.vol_dry) {
+  } else if (
+    kind === "avoid" ||
+    state.flags?.not_red_flag === false
+  ) {
+    // Hard AVOID only for explicit avoid kind or red-flag trap.
+    // Dry volume alone is WAIT with levels (mirrors trade_desk._plain_plan).
     action = "AVOID";
-    why = "Weak tape: price push on drying volume — classic trap. Volume is the veto.";
+    why = "Weak tape: price push on dying volume — classic trap. Volume is the veto.";
     doNext =
       "Stand aside until volume confirms (rvol > 1) or price resets into value / 22 EMA.";
+  } else if (state.vol_dry) {
+    action = "WAIT";
+    const rvolS = rvol != null ? `${rvol.toFixed(1)}x` : "quiet";
+    why = `Volume quiet (${rvolS}) · structure readiness ${(conf * 100).toFixed(0)}% — not a veto; wait for participation.`;
+    const dryBits: string[] = [];
+    if (e22 != null) dryBits.push(`dip zone 22 EMA $${e22.toFixed(2)}`);
+    if (val != null) dryBits.push(`demand/VAL $${val.toFixed(2)}`);
+    if (lvl != null) dryBits.push(`volume break $${lvl.toFixed(2)}`);
+    doNext = dryBits.length
+      ? `Watch: ${dryBits.slice(0, 3).join(" · ")}. Enter only when rvol expands.`
+      : "Stand aside until rvol > 1 or price resets into value / 22 EMA.";
   } else if (state.breakout_level != null && state.price != null) {
     action =
       state.price < state.breakout_level ? "BREAKOUT WATCH" : "PULLBACK ZONE";

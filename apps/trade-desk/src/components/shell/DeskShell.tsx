@@ -7,26 +7,28 @@ import {
   LayoutDashboard,
   Microscope,
   Radio,
-  ScanSearch,
   Search,
   WalletCards,
 } from "lucide-react";
+import { MarketPulse } from "./MarketPulse";
 import { NavLink } from "./NavLink";
 
 const NAV = [
   { href: "/", label: "Command", exact: true, icon: LayoutDashboard },
-  { href: "/scan", label: "Radar", icon: ScanSearch },
+  // Radar discovery (bias/picks/chain) + watch/decision/options/gamma
   { href: "/live", label: "Execution", icon: Radio },
   { href: "/positions", label: "Portfolio", icon: WalletCards },
   { href: "/research", label: "Lab", icon: Microscope },
 ] as const;
 
-/** Rare tools not already on primary hubs (Execution / Radar / Lab). */
+/** Rare tools not already on primary hubs (Execution / Lab). */
 const LEGACY_NAV = [
   { href: "/analysis-agent", label: "Analysis agent" },
-  { href: "/evolve", label: "Evolve (direct)" },
-  { href: "/robust", label: "Backtest (direct)" },
-  { href: "/leaderboard", label: "Leaderboard (direct)" },
+  { href: "/live?mode=bias", label: "Bias scan (Ops)" },
+  { href: "/live?mode=picks", label: "Picks (Ops)" },
+  { href: "/research?view=evolve", label: "Evolve (Lab)" },
+  { href: "/research?view=backtest", label: "Backtest (Lab)" },
+  { href: "/research?view=leaderboard", label: "Leaderboard (Lab)" },
 ] as const;
 
 function TickerSearch() {
@@ -96,8 +98,8 @@ export function DeskShell({ children }: { children: React.ReactNode }) {
               href={item.href}
               exact={"exact" in item && item.exact}
             >
-              <item.icon size={15} aria-hidden="true" />
-              <span>{item.label}</span>
+              <item.icon className="td-nav-link__icon" size={14} aria-hidden="true" />
+              <span className="td-nav-link__label">{item.label}</span>
             </NavLink>
           ))}
         </nav>
@@ -106,13 +108,15 @@ export function DeskShell({ children }: { children: React.ReactNode }) {
         <TickerSearch />
 
         <div className="td-topbar-status" aria-label="Desk and market status">
+          <MarketPulse />
+          <span className="td-status-divider" aria-hidden="true" />
           <span className="td-status-item">
             <span className="td-status-dot" aria-hidden="true" />
             <span className="td-status-label">Mode</span>
             <strong>Local</strong>
           </span>
-          <span className="td-status-divider" aria-hidden="true" />
-          <span className="td-status-item">
+          <span className="td-status-divider td-status-divider--desk" aria-hidden="true" />
+          <span className="td-status-item td-status-item--desk">
             <Activity size={13} aria-hidden="true" />
             <span className="td-status-label">Data</span>
             <strong>On request</strong>
@@ -143,8 +147,8 @@ export function DeskShell({ children }: { children: React.ReactNode }) {
               href={item.href}
               exact={"exact" in item && item.exact}
             >
-              <item.icon size={16} aria-hidden="true" />
-              <span>{item.label}</span>
+              <item.icon className="td-nav-link__icon" size={16} aria-hidden="true" />
+              <span className="td-nav-link__label">{item.label}</span>
             </NavLink>
           </div>
         ))}

@@ -1,0 +1,17 @@
+{
+  "portfolio": {
+    "total_return": 0.6424403127909357,
+    "max_drawdown": -0.10534323056196651,
+    "sharpe": 1.4751529310442522,
+    "profit_factor": 10.9328,
+    "trade_count": 16,
+    "win_rate": 0.875,
+    "final_value": 1642440.3127909356
+  },
+  "generated_utc": "",
+  "codes": [
+    "APLD.US"
+  ],
+  "start": "2024-08-01",
+  "end": "2026-07-11"
+}

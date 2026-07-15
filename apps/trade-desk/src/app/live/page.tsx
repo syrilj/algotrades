@@ -6,63 +6,39 @@ import { ExecutionDesk } from "@/components/live/ExecutionDesk";
 import { OptionsDesk } from "@/components/options/OptionsDesk";
 import { WatchDesk } from "@/components/watch/WatchDesk";
 import { GammaExposureDesk } from "@/components/gamma/GammaExposureDesk";
+import { PicksDesk } from "@/components/picks/PicksDesk";
+import { ScanDesk } from "@/components/scan/ScanDesk";
+import SupplyChainDesk from "@/components/supply-chain/SupplyChainDesk";
 import { HubTabs } from "@/components/shell/HubTabs";
 import { PageHeader } from "@/components/shell/PageHeader";
 import {
-  gammaHref,
-  liveHref,
-  optionsHref,
-  watchHref,
+  hubPanelId,
+  LIVE_MODE_DESCRIPTIONS,
+  liveHubTabs,
+  resolveLiveMode,
+  type LiveMode,
 } from "@/lib/routes";
 
-export type LiveMode = "ticket" | "watch" | "options" | "gamma";
+const DISCOVER_MODES = new Set<LiveMode>(["bias", "picks", "supply-chain"]);
 
-function resolveMode(raw: string | null): LiveMode {
-  if (raw === "watch") return "watch";
-  if (raw === "options") return "options";
-  if (raw === "gamma") return "gamma";
-  // legacy aliases
-  if (raw === "risk" || raw === "ticket" || !raw) return "ticket";
-  return "ticket";
-}
-
-function LiveOptionsHub() {
+function LiveOpsHub() {
   const searchParams = useSearchParams();
-  const mode = resolveMode(searchParams.get("mode"));
+  const mode = resolveLiveMode(searchParams.get("mode"));
   const symbol = searchParams.get("symbol")?.trim().toUpperCase() ?? "";
   const accountRaw = Number(searchParams.get("account") || "1000");
-  const account = Number.isFinite(accountRaw) && accountRaw > 0 ? accountRaw : 1000;
+  const account =
+    Number.isFinite(accountRaw) && accountRaw > 0 ? accountRaw : 1000;
 
-  const tabs = [
-    { key: "ticket", label: "Decision", href: liveHref(symbol || undefined, "ticket", account) },
-    { key: "watch", label: "Watch", href: watchHref(symbol || undefined, account) },
-    {
-      key: "options",
-      label: "Options",
-      href: optionsHref(symbol || undefined, account),
-    },
-    {
-      key: "gamma",
-      label: "Gamma",
-      href: gammaHref(symbol || undefined, account),
-    },
-  ] as const;
-
-  const descriptions: Record<LiveMode, string> = {
-    ticket:
-      "A guided live decision: verify the feed, understand the risk, then execute only when every gate passes.",
-    watch:
-      "Multi-symbol operator board. Market scan ranks plays; poll keeps levels fresh. Click a name for a ticket.",
-    options: "Options structure and attack paths for the selected symbol.",
-    gamma:
-      "Gamma-derived levels from current option flow, with open-interest fallback when available.",
-  };
+  const tabs = liveHubTabs(symbol || undefined, account);
+  const activeLabel = tabs.find((t) => t.key === mode)?.label ?? "Decision";
+  const phase = DISCOVER_MODES.has(mode) ? "Discover" : "Execute";
 
   return (
     <div className="td-page">
       <PageHeader
+        eyebrow={`Ops · ${phase}`}
         title="Execution"
-        description={descriptions[mode]}
+        description={LIVE_MODE_DESCRIPTIONS[mode as LiveMode]}
         meta={
           symbol ? (
             <span
@@ -72,24 +48,25 @@ function LiveOptionsHub() {
               {symbol}
             </span>
           ) : (
-            <span className="td-chip">decision · watch · options · gamma</span>
+            <span className="td-chip">bias · picks · watch · decision</span>
           )
         }
         actions={
-          <HubTabs
-            tabs={tabs}
-            active={mode}
-            aria-label="Execution workspace"
-          />
+          <HubTabs tabs={tabs} active={mode} aria-label="Ops workspace" />
         }
       />
 
       <div
-        id={`hub-panel-${mode}`}
+        id={hubPanelId(mode)}
         role="tabpanel"
         className="td-hub-panel flex flex-col gap-4"
-        aria-label={tabs.find((t) => t.key === mode)?.label}
+        aria-label={activeLabel}
       >
+        {mode === "bias" ? <ScanDesk /> : null}
+        {mode === "picks" ? <PicksDesk showHeader={false} /> : null}
+        {mode === "supply-chain" ? (
+          <SupplyChainDesk showHeader={false} />
+        ) : null}
         {mode === "ticket" ? <ExecutionDesk /> : null}
         {mode === "watch" ? <WatchDesk showHeader={false} /> : null}
         {mode === "options" ? <OptionsDesk showHeader={false} /> : null}
@@ -106,11 +83,11 @@ export default function LivePage() {
     <Suspense
       fallback={
         <div className="td-page">
-          <p className="td-muted">Loading execution desk…</p>
+          <p className="td-muted">Loading ops desk…</p>
         </div>
       }
     >
-      <LiveOptionsHub />
+      <LiveOpsHub />
     </Suspense>
   );
 }

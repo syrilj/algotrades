@@ -223,7 +223,34 @@ export function VerdictPanel({
         </Link>
       </div>
 
-      <ConfidenceMeter value={state.confidence ?? 0} />
+      <div className="flex flex-col gap-2">
+        <ConfidenceMeter
+          value={state.confidence ?? 0}
+          label="Structure readiness"
+        />
+        <div className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
+          <Stat
+            label="Hit chance"
+            value={formatPct(state.hit_probability, 0)}
+          />
+          <Stat
+            label="Setup"
+            value={state.setup_kind ?? (state.setup_ok ? "buy" : "wait")}
+          />
+          <Stat
+            label="RVOL"
+            value={
+              state.rvol != null
+                ? `${state.rvol.toFixed(1)}x${state.vol_dry ? " dry" : state.vol_surge ? " ↑" : ""}`
+                : "—"
+            }
+          />
+        </div>
+        <p className="text-[11px] leading-snug" style={{ color: "var(--td-ink-500)" }}>
+          Structure = share of desk gates true (not win probability). Hit = estimated chance from
+          structure + history. Low structure alone is not an AVOID — check setup + do-next.
+        </p>
+      </div>
 
       <details className="td-details">
         <summary className="td-details__summary">Why · levels · model</summary>
@@ -240,7 +267,6 @@ export function VerdictPanel({
             ) : null}
           </div>
           <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
-            <Stat label="Hit chance" value={formatPct(state.hit_probability, 0)} />
             <Stat label="Trail arm" value={fmt(state.trail_arm)} />
             <Stat label="Risk / sh" value={fmt(state.risk_per_share)} />
             {size ? (

@@ -451,19 +451,36 @@ def run_campaign(
     cash: float = 1_000_000,
     campaign_id: str = "evolve_campaign",
     menu: list[dict[str, Any]] | None = None,
+    memory_path: Path | None = None,
 ) -> list[dict[str, Any]]:
-    """Smoke campaign: 2 generations of direction + code variants."""
+    """Run fold-ranked generations with persistent failure-guided mutations."""
     from tools.evolve import mutations as mut
+    from tools.evolve.model_feedback import (
+        DEFAULT_MEMORY_PATH,
+        load_memory,
+        prioritize_mutation_menu,
+        rank_model_runs,
+        save_memory,
+        update_memory,
+    )
 
     base_model = _build_model(base_model_dir)
     _set_bridge("1h")
 
-    menu = menu or mut.COMBINED_MUTATION_MENU
-    variants = mut.spawn_direction_variants(base_model, menu=menu)
+    base_menu = menu or mut.COMBINED_MUTATION_MENU
+    feedback_path = memory_path or DEFAULT_MEMORY_PATH
+    memory = load_memory(feedback_path)
+    guided_menu = prioritize_mutation_menu(
+        base_menu,
+        [{"model_id": base_model["id"], "failures": []}],
+        memory,
+    )
+    variants = mut.spawn_direction_variants(base_model, menu=guided_menu)
     results: list[dict[str, Any]] = []
 
     for gen in range(generations):
-        gen_results = []
+        gen_results: list[dict[str, Any]] = []
+        failed_rows: list[dict[str, Any]] = []
         for variant in variants:
             variant_id = variant["id"]
             parent = variant.get("parent", base_model["id"])
@@ -482,15 +499,100 @@ def run_campaign(
                     mutations=variant.get("mutations", []),
                     extra_cfg=extra,
                 )
+                candidate["mutation_name"] = variant.get("mutation_name")
+                candidate["mutation_targets"] = variant.get("mutation_targets", [])
+                candidate["feedback_priority"] = variant.get("feedback_priority")
+                candidate["extra_cfg"] = extra
                 gen_results.append(candidate)
                 write_trial(candidate)
             except Exception as exc:
                 print(f"  FAIL {variant_id}: {exc}", flush=True)
+                failed_rows.append(
+                    {
+                        "id": variant_id,
+                        "tag": f"generation_{gen}",
+                        "error": str(exc)[:200],
+                        "n": 0,
+                        "ret": 0.0,
+                        "dd": 0.0,
+                        "sharpe": 0.0,
+                        "parent": parent,
+                        "mutation_name": variant.get("mutation_name"),
+                        "mutation_targets": variant.get("mutation_targets", []),
+                    }
+                )
 
         if not gen_results:
+            if failed_rows:
+                failed_rankings = rank_model_runs(
+                    {row["id"]: [row] for row in failed_rows},
+                    expected_runs=len(folds.FOLDS_1H),
+                )
+                memory = update_memory(memory, failed_rankings, generation=gen)
+                save_memory(memory, feedback_path)
             break
-        # Promote best by fitness
-        best = max(gen_results, key=lambda c: c["fitness"])
+
+        # Rank each candidate across identical OOS folds.  This adds explicit
+        # stability, confidence, and failure diagnostics to fold_fitness.
+        by_candidate = {candidate["id"]: candidate for candidate in gen_results}
+        fold_runs: dict[str, list[dict[str, Any]]] = {}
+        for candidate in gen_results:
+            fold_runs[candidate["id"]] = [
+                {
+                    **metrics,
+                    "id": candidate["id"],
+                    "tag": fold_name,
+                    "utility": folds.fold_utility(metrics),
+                }
+                for fold_name, metrics in candidate.get("fold_metrics", {}).items()
+            ]
+        for row in failed_rows:
+            fold_runs[row["id"]] = [row]
+        rankings = rank_model_runs(
+            fold_runs,
+            min_trades=40,
+            expected_runs=len(folds.FOLDS_1H),
+        )
+        for row in rankings:
+            candidate = by_candidate.get(row["id"])
+            if candidate is None:
+                failed = next((item for item in failed_rows if item["id"] == row["id"]), {})
+                row.update(
+                    {
+                        "parent": failed.get("parent"),
+                        "mutation_name": failed.get("mutation_name"),
+                        "mutation_targets": failed.get("mutation_targets", []),
+                    }
+                )
+                continue
+            candidate["rank"] = row["rank"]
+            candidate["rank_score"] = row["rank_score"]
+            candidate["rank_confidence"] = row["rank_confidence"]
+            candidate["failure_profile"] = row["failure_profile"]
+            row.update(
+                {
+                    "parent": candidate.get("parent"),
+                    "mutation_name": candidate.get("mutation_name"),
+                    "mutation_targets": candidate.get("mutation_targets", []),
+                }
+            )
+
+        control = next(
+            (row for row in rankings if row.get("mutation_name") == "base" and row["id"] in by_candidate),
+            None,
+        )
+        parent_scores = {base_model["id"]: float(control["rank_score"])} if control else {}
+        memory = update_memory(memory, rankings, generation=gen, parent_scores=parent_scores)
+        save_memory(memory, feedback_path)
+
+        best_row = next(row for row in rankings if row["id"] in by_candidate)
+        best = by_candidate[best_row["id"]]
+        print(
+            f"  RANK #{best_row['rank']} {best['id']} score={best_row['rank_score']:.3f} "
+            f"confidence={best_row['rank_confidence']:.0%} "
+            f"failures={best_row['failure_profile']['failure_tags']}",
+            flush=True,
+        )
         try:
             best_model = _build_model(Path(best["model_dir"]))
             run_lockbox_and_audit(best, best_model, extra_cfg=best.get("extra_cfg", {}))
@@ -498,7 +600,14 @@ def run_campaign(
         except Exception as exc:
             print(f"  LOCKBOX/audit fail for {best['id']}: {exc}", flush=True)
         results.extend(gen_results)
-        # Next generation parents from best
-        variants = mut.spawn_direction_variants(_build_model(Path(best["model_dir"])), menu=menu)
+        # Next generation targets recurring failures and mutations that have
+        # produced positive score deltas, while preserving exploration.
+        base_model = _build_model(Path(best["model_dir"]))
+        guided_menu = prioritize_mutation_menu(
+            base_menu,
+            [row.get("failure_profile") or {} for row in rankings],
+            memory,
+        )
+        variants = mut.spawn_direction_variants(base_model, menu=guided_menu)
 
     return results

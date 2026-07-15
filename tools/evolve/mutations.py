@@ -19,48 +19,56 @@ MUTATION_MENU: list[dict[str, Any]] = [
     {
         "name": "opts_risk_tight",
         "applies": "options",
+        "targets": ["hard_drawdown", "oos_degradation"],
         "hunt": {"risk_pct": 0.08, "halt_dd": 0.20, "flatten_dd": 0.30},
         "hypothesis": "Lower risk_pct + tighter DD halt to cut path risk.",
     },
     {
         "name": "opts_risk_wide",
         "applies": "options",
+        "targets": ["no_trades", "thin_sample"],
         "hunt": {"risk_pct": 0.25, "halt_dd": 0.35, "flatten_dd": 0.50},
         "hypothesis": "Higher risk_pct for $1k bag capacity; accept more DD.",
     },
     {
         "name": "opts_dte_14",
         "applies": "options",
+        "targets": ["negative_return", "weak_sharpe"],
         "hunt": {"dte_days": 14},
         "hypothesis": "Shorter DTE for faster theta/turn; fewer multi-week holds.",
     },
     {
         "name": "opts_dte_35",
         "applies": "options",
+        "targets": ["negative_return", "unstable_windows"],
         "hunt": {"dte_days": 35},
         "hypothesis": "Longer DTE reduces theta bleed on swing holds.",
     },
     {
         "name": "opts_atm_only",
         "applies": "options",
+        "targets": ["negative_return", "oos_degradation"],
         "hunt": {"otm_pct": 0.0},
         "hypothesis": "Force ATM strikes for cleaner delta vs OTM lottery.",
     },
     {
         "name": "opts_otm_3",
         "applies": "options",
+        "targets": ["negative_return"],
         "hunt": {"otm_pct": 0.03},
         "hypothesis": "Slight OTM for cheaper premium on high-beta names.",
     },
     {
         "name": "equity_note_volz",
         "applies": "equity",
+        "targets": ["weak_sharpe", "unstable_windows"],
         "strategy": {"mutate": "prefer_vol_z_meta", "vol_z_min": 1.0},
         "hypothesis": "Document vol_z meta preference (engines that read strategy note).",
     },
     {
         "name": "equity_commission_tight",
         "applies": "equity",
+        "targets": ["oos_degradation"],
         "config": {"commission": 0.0015},
         "strategy": {"mutate": "higher_cost_stress"},
         "hypothesis": "Stress edge under higher commission (1.5 bps → 15 bps).",
@@ -100,11 +108,14 @@ def spawn_mutations(
     spawned: list[dict[str, Any]] = []
     n = 0
 
-    for base in base_models:
-        is_opts = _is_options_model(base)
-        for spec in menu:
+    # Round-robin across parents.  The previous parent-first loop let the first
+    # elite consume the entire mutation budget, which reduced diversity and
+    # made later elites impossible to improve.
+    for spec in menu:
+        for base in base_models:
             if n >= max_mutations:
                 break
+            is_opts = _is_options_model(base)
             applies = spec.get("applies", "any")
             if applies == "options" and not is_opts:
                 continue
@@ -184,6 +195,8 @@ def spawn_mutations(
                         "id": mut_id,
                         "parent": base["id"],
                         "spec": spec,
+                        "feedback_priority": spec.get("feedback_priority"),
+                        "feedback_targets": spec.get("feedback_targets", spec.get("targets", [])),
                     },
                     indent=2,
                 )
@@ -201,6 +214,9 @@ def spawn_mutations(
                     "hunt_path": dest / "hunt_config.json" if (dest / "hunt_config.json").exists() else None,
                     "is_mutation": True,
                     "parent": base["id"],
+                    "mutation_name": spec["name"],
+                    "mutation_targets": spec.get("feedback_targets", spec.get("targets", [])),
+                    "feedback_priority": spec.get("feedback_priority"),
                 }
             )
             n += 1
@@ -236,30 +252,35 @@ DIRECTION_MUTATION_MENU: list[dict[str, Any]] = [
     },
     {
         "name": "add_arm",
+        "targets": ["no_trades", "thin_sample"],
         "codes": ["TSLA.US", "MU.US", "SPY.US", "IONQ.US", "APLD.US", "XLP.US", "QQQ.US", "ARM.US"],
         "extra_cfg": {},
         "hypothesis": "Add ARM back to the bag.",
     },
     {
         "name": "drop_xlp",
+        "targets": ["negative_return", "weak_sharpe", "unstable_windows"],
         "codes": ["TSLA.US", "MU.US", "SPY.US", "IONQ.US", "APLD.US", "QQQ.US"],
         "extra_cfg": {},
         "hypothesis": "Drop XLP (REGIME_FLAT) to concentrate capacity.",
     },
     {
         "name": "add_nvda_pltr",
+        "targets": ["negative_return", "thin_sample"],
         "codes": ["TSLA.US", "MU.US", "SPY.US", "IONQ.US", "APLD.US", "XLP.US", "QQQ.US", "NVDA.US", "PLTR.US"],
         "extra_cfg": {},
         "hypothesis": "Expand to high-momentum tech names.",
     },
     {
         "name": "add_mstr_coin",
+        "targets": ["negative_return", "thin_sample"],
         "codes": ["TSLA.US", "MU.US", "SPY.US", "IONQ.US", "APLD.US", "XLP.US", "QQQ.US", "MSTR.US", "COIN.US"],
         "extra_cfg": {},
         "hypothesis": "Add crypto-correlated high-beta exposure.",
     },
     {
         "name": "slip_stress_15",
+        "targets": ["oos_degradation"],
         "codes": None,
         "extra_cfg": {"slippage_us": 0.0015},
         "hypothesis": "Stress slippage to 15 bps per side.",
@@ -278,22 +299,26 @@ DIRECTION_MUTATION_MENU: list[dict[str, Any]] = [
 CODE_MUTATION_MENU: list[dict[str, Any]] = [
     {
         "name": "unblock_arm",
+        "targets": ["no_trades", "thin_sample"],
         "add_codes": ["ARM.US"],
         "code_mutation": {"op": "remove_from_set", "set_name": "TRADE_DROP", "symbol": "ARM.US"},
         "hypothesis": "Remove ARM from TRADE_DROP and let it trade.",
     },
     {
         "name": "allow_qqq",
+        "targets": ["no_trades", "thin_sample"],
         "code_mutation": {"op": "remove_from_set", "set_name": "REGIME_FLAT", "symbol": "QQQ.US"},
         "hypothesis": "Allow QQQ to trade by removing it from REGIME_FLAT.",
     },
     {
         "name": "vwap_uptrend_tsla",
+        "targets": ["negative_return", "weak_sharpe", "unstable_windows"],
         "code_mutation": {"op": "set_routing_flag", "symbol": "TSLA.US", "key": "require_vwap_uptrend", "value": True},
         "hypothesis": "Require VWAP uptrend for TSLA entries.",
     },
     {
         "name": "soft_confidence_tsla",
+        "targets": ["no_trades", "thin_sample"],
         "code_mutation": [
             {"op": "set_routing_flag", "symbol": "TSLA.US", "key": "soft_confidence", "value": True},
             {"op": "set_routing_param", "symbol": "TSLA.US", "key": "min_confidence", "value": 0.55},
@@ -302,16 +327,19 @@ CODE_MUTATION_MENU: list[dict[str, Any]] = [
     },
     {
         "name": "tight_stop_all",
+        "targets": ["hard_drawdown", "oos_degradation"],
         "code_mutation": {"op": "set_routing_param", "symbol": "__all__", "key": "stop_atr", "value": 1.0},
         "hypothesis": "Tighten hard stops to 1.0 ATR for all symbols.",
     },
     {
         "name": "risk_pct_down",
+        "targets": ["hard_drawdown"],
         "code_mutation": {"op": "set_genome", "key": "risk_pct", "value": 0.10},
         "hypothesis": "Lower risk_pct to reduce position sizing.",
     },
     {
         "name": "struct_good_up",
+        "targets": ["negative_return", "weak_sharpe"],
         "code_mutation": {"op": "set_genome", "key": "struct_good_mult", "value": 1.25},
         "hypothesis": "Boost struct_good multiplier for stronger structure.",
     },
@@ -529,7 +557,17 @@ def spawn_direction_variants(
                 "src_dir": src_dir,
                 "codes": list(codes),
                 "extra_cfg": dict(spec.get("extra_cfg", {})),
-                "mutations": [{"name": spec["name"], "hypothesis": spec.get("hypothesis", "")}],
+                "mutations": [
+                    {
+                        "name": spec["name"],
+                        "hypothesis": spec.get("hypothesis", ""),
+                        "targets": spec.get("feedback_targets", spec.get("targets", [])),
+                        "feedback_priority": spec.get("feedback_priority"),
+                    }
+                ],
+                "mutation_name": spec["name"],
+                "mutation_targets": spec.get("feedback_targets", spec.get("targets", [])),
+                "feedback_priority": spec.get("feedback_priority"),
                 "interval": "1H",
             }
         )

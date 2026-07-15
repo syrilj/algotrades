@@ -369,7 +369,7 @@ export function EvolveDesk() {
             {winners?.equity || "—"}
           </p>
           <Link
-            href={winners?.equity ? modelHref(winners.equity) : "/leaderboard"}
+            href={winners?.equity ? modelHref(winners.equity) : "/research?view=leaderboard"}
             className="mt-2 inline-block text-[12px] no-underline"
             style={{ color: "var(--td-ink-300)" }}
           >
@@ -724,7 +724,7 @@ export function EvolveDesk() {
                   Analyze with model
                 </Link>
                 <Link
-                  href="/leaderboard"
+                  href="/research?view=leaderboard"
                   className="td-btn td-btn-ghost no-underline text-center"
                 >
                   Registry leaderboard

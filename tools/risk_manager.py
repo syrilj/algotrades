@@ -403,9 +403,12 @@ def plan_entry(setup: SetupSnapshot, state: PortfolioState, pol: dict[str, Any] 
             gex_reasons.append("Negative GEX amplify regime -> options size boosted 15%")
 
     if attack_ok:
-        risk_pct = float(opt["attack_risk_pct"]) * fb * max(ddm, 0.35) * gex_size_mult
-        risk_pct = float(min(float(opt["max_risk_pct"]), max(float(opt["base_risk_pct"]), risk_pct)))
-        size_mult = float(min(1.25, max(0.5, conv * fb * max(ddm, 0.5) * gex_size_mult)))
+        # Feedback and drawdown are true throttles. A base-risk floor here used
+        # to erase both reductions (for example, a recent loss still received
+        # 12% options risk), contradicting the policy's hard safety controls.
+        risk_pct = float(opt["attack_risk_pct"]) * fb * ddm * gex_size_mult
+        risk_pct = float(min(float(opt["max_risk_pct"]), max(0.0, risk_pct)))
+        size_mult = float(min(1.25, max(0.0, conv * fb * ddm * gex_size_mult)))
         reasons = [
             f"OPTIONS_ATTACK: conviction {conv:.2f} ≥ attack {float(opt['attack_confidence']):.2f}",
             f"feedback×{fb:.2f} dd_mult×{ddm:.2f}",

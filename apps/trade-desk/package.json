@@ -6,7 +6,9 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "test": "sucrase-node src/lib/executionState.test.ts && sucrase-node src/lib/routes.test.ts && sucrase-node src/lib/format.test.ts && sucrase-node src/lib/marketPulse.test.ts && sucrase-node src/lib/actionColors.test.ts",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "framer-motion": "^11.18.2",

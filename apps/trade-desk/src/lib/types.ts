@@ -244,6 +244,22 @@ export interface LiveTicket {
   steps?: string[];
   confidence_state?: "ENTER" | "WATCH" | "ABSTAIN" | string;
   confidence_size_limit?: number;
+  proposed_risk_pct?: number;
+  proposed_max_loss_dollars?: number;
+  risk_pct_adapted?: number;
+  max_loss_adapted?: number;
+  execution_readiness?: string;
+  execution_blocked?: boolean;
+}
+
+export interface ExecutionReadiness {
+  schema_version?: string;
+  ready?: boolean;
+  status?: "READY_FOR_MANUAL_REVIEW" | "BLOCKED" | string;
+  checks?: Record<string, { passed?: boolean; detail?: string }>;
+  blockers?: string[];
+  human_approval_required?: boolean;
+  automatic_transmission_enabled?: boolean;
 }
 
 export interface LiveConfidence {
@@ -259,6 +275,8 @@ export interface LiveConfidence {
   model_version?: string;
   calibration_version?: string | null;
   calibration_available?: boolean;
+  /** True when using identity fallback (no model-matched artifact). */
+  uncalibrated?: boolean;
   data_freshness?: {
     available?: boolean;
     stale?: boolean;
@@ -321,11 +339,26 @@ export interface LivePlanResponse {
   confidence?: LiveConfidence;
   gex?: GammaResponse | null;
   decision_support_ready?: boolean;
+  execution_readiness?: ExecutionReadiness;
+  execution_risk?: {
+    proposal_risk_pct?: number;
+    adapt_mult?: number;
+    confidence_size_limit?: number;
+    uncapped_risk_pct?: number;
+    hard_cap_risk_pct?: number;
+    effective_risk_pct?: number;
+    effective_max_loss_dollars?: number;
+    capped?: boolean;
+  };
+  portfolio_state_verified?: boolean;
   shadow_event_id?: string | null;
   decision?: {
     mode?: RiskMode;
     vehicle?: string;
     action?: string;
+    analysis_action?: string;
+    confidence_state?: "ENTER" | "WATCH" | "ABSTAIN" | string;
+    execution_blocked?: boolean;
     size_mult?: number;
     risk_pct?: number;
     max_loss_dollars?: number;
@@ -362,15 +395,20 @@ export interface LiveScanRow {
   mode: RiskMode;
   vehicle: string;
   action: string;
+  /** Operator setup label (BUY NOW / BREAKOUT WATCH / WAIT / AVOID / …). */
+  analysis_action?: string;
   conviction?: number;
   risk_pct?: number;
   max_loss_dollars?: number;
   vol_z?: number;
   price?: number;
   go_long?: boolean;
+  soft_long?: boolean;
   blended_confidence?: number;
   confidence_state?: "ENTER" | "WATCH" | "ABSTAIN" | string;
   calibrated_probability?: number | null;
+  uncalibrated?: boolean;
+  do_next?: string | null;
 }
 
 /** Options desk: live mode + structure pick + playbook */
@@ -488,6 +526,7 @@ export interface LiveScanResponse {
   account?: number;
   macro?: LivePlanResponse["macro"];
   count?: number;
+  use_model?: boolean;
   rows?: LiveScanRow[];
   asof_utc?: string;
 }

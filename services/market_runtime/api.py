@@ -8,7 +8,7 @@ from typing import Any, Optional
 from fastapi import Body, FastAPI, HTTPException
 from fastapi.responses import JSONResponse
 
-from .contracts import Opportunity, RankedOpportunity
+from .contracts import CoverageMode, Opportunity, RankedOpportunity
 from .decision import rank_opportunities
 from .supervisor import StreamSupervisor
 
@@ -46,11 +46,14 @@ def create_app(supervisor: Optional[StreamSupervisor] = None) -> FastAPI:
     @app.get("/health")
     def health() -> dict[str, Any]:
         if app.state.supervisor is None:
-            return {"status": "ok", "supervisor": "not configured"}
+            return {"status": "degraded", "supervisor": "not configured"}
+        runtime = app.state.supervisor.runtime_status()
+        coverage = app.state.supervisor.coverage()
+        healthy = bool(runtime["running"] and coverage.mode != CoverageMode.STALE)
         return {
-            "status": "ok",
-            "running": app.state.supervisor.is_running(),
-            "coverage": app.state.supervisor.coverage().to_dict(),
+            "status": "ok" if healthy else "degraded",
+            **runtime,
+            "coverage": coverage.to_dict(),
         }
 
     @app.get("/coverage")
@@ -100,6 +103,15 @@ def create_app(supervisor: Optional[StreamSupervisor] = None) -> FastAPI:
     def plan(request: dict[str, Any] = Body(default_factory=dict)) -> dict[str, Any]:
         """Run live_plan from the streaming service."""
         live_plan = _get_live_plan()
+        supervisor = app.state.supervisor
+        if supervisor is None:
+            raise HTTPException(status_code=503, detail="supervisor not configured")
+        coverage = supervisor.coverage()
+        if not supervisor.is_running() or coverage.mode in {CoverageMode.WARMING, CoverageMode.STALE}:
+            raise HTTPException(
+                status_code=503,
+                detail=f"market stream not ready: {coverage.mode.value}",
+            )
 
         account = float(request.get("account", 1000.0))
         peak = request.get("peak")
@@ -122,6 +134,7 @@ def create_app(supervisor: Optional[StreamSupervisor] = None) -> FastAPI:
                 account=account,
                 peak=peak,
                 use_model=False,
+                lse_adapter=supervisor.adapter,
             )
 
         symbol = request.get("symbol")
@@ -135,6 +148,10 @@ def create_app(supervisor: Optional[StreamSupervisor] = None) -> FastAPI:
             history=history,
             model=model,
             use_model=use_model,
+            open_equity=int(request.get("open_equity", 0)),
+            open_options=int(request.get("open_options", 0)),
+            portfolio_state_verified=bool(request.get("portfolio_verified")),
+            lse_adapter=supervisor.adapter,
         )
 
     return app

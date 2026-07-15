@@ -55,6 +55,7 @@ class APITests(unittest.TestCase):
         body = res.json()
         self.assertEqual(body["status"], "ok")
         self.assertTrue(body["running"])
+        self.assertIsNone(body["last_error"])
 
     def test_coverage_endpoint_returns_mode_and_counts(self):
         res = self.client.get("/coverage")
@@ -87,3 +88,11 @@ class APITests(unittest.TestCase):
         res = self.client.get("/opportunities")
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.json()["opportunities"], [])
+
+    def test_plan_fails_closed_when_stream_is_stopped(self):
+        self.supervisor.stop()
+        res = self.client.post("/plan", json={"symbol": "A.L"})
+
+        self.assertEqual(res.status_code, 503)
+        self.assertIn("market stream not ready", res.json()["detail"])
+        self.assertEqual(self.client.get("/health").json()["status"], "degraded")

@@ -453,6 +453,7 @@ def is_desk_engine(model: str) -> bool:
 FEATURED_DESK_MODELS: tuple[str, ...] = (
     # Meta-router (picks best child per symbol)
     "v66_best_router",
+    "v70_self_evolving_router",
     # Universal family-DNA specialist (any symbol)
     "v67_universal_specialist",
     # Track B — standard bag champions

@@ -9,7 +9,12 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
-from confidence_runtime import assess_data_freshness, evaluate_confidence  # noqa: E402
+from confidence_runtime import (  # noqa: E402
+    assess_data_freshness,
+    assess_execution_readiness,
+    bounded_execution_risk,
+    evaluate_confidence,
+)
 from confidence_shadow import ShadowDecisionLedger  # noqa: E402
 from evolve.calibration import (  # noqa: E402
     build_calibration_artifact,
@@ -100,6 +105,61 @@ def test_runtime_enters_only_with_active_gated_calibrator():
     assert result["state"] == "ENTER"
     assert result["calibrated_probability"] == 0.85
     assert result["size_limit"] == 1.0
+    assert result.get("uncalibrated") is False
+
+
+def test_identity_fallback_is_flagged_uncalibrated():
+    freshness = assess_data_freshness("2026-07-14T15:00:00Z", now=pd.Timestamp("2026-07-14T15:30:00Z").to_pydatetime())
+    artifact = {
+        "available": True,
+        "path": "fallback_identity:auto",
+        "artifact": {
+            "status": "active",
+            "schema_version": "confidence-calibration-v1-fallback-mismatch",
+            "model": "auto",
+            "promotion": {"all_promotion_gates_pass": True},
+            "thresholds": {"watch": 0.50, "enter": 0.60},
+            "calibrator": {"x": [0.0, 1.0], "y": [0.0, 1.0]},
+        },
+    }
+    result = evaluate_confidence(
+        0.70,
+        model_ok=True,
+        setup_ok=True,
+        freshness=freshness,
+        model="auto",
+        calibrator=artifact,
+    )
+    assert result["state"] == "ENTER"
+    assert result["uncalibrated"] is True
+    assert "using_identity_calibration_fallback" in result["reasons"]
+
+
+def test_high_cal_without_setup_stays_watch():
+    freshness = assess_data_freshness("2026-07-14T15:00:00Z", now=pd.Timestamp("2026-07-14T15:30:00Z").to_pydatetime())
+    artifact = {
+        "available": True,
+        "path": "test",
+        "artifact": {
+            "status": "active",
+            "schema_version": "confidence-calibration-v1",
+            "model": "v39d_confluence",
+            "promotion": {"all_promotion_gates_pass": True},
+            "thresholds": {"watch": 0.50, "enter": 0.60},
+            "calibrator": {"x": [0.0, 1.0], "y": [0.0, 1.0]},
+        },
+    }
+    result = evaluate_confidence(
+        0.90,
+        model_ok=True,
+        setup_ok=False,
+        freshness=freshness,
+        model="v39d_confluence",
+        calibrator=artifact,
+    )
+    assert result["state"] == "WATCH"
+    assert result["size_limit"] == 0.0
+    assert "setup_not_ready" in result["reasons"]
 
 
 def test_completed_us_session_bar_remains_current_overnight():
@@ -123,6 +183,70 @@ def test_old_bar_fails_once_next_us_session_is_open():
 
     assert freshness["stale"] is True
     assert freshness["market_session"] == "open"
+
+
+def test_future_market_timestamp_fails_closed():
+    freshness = assess_data_freshness(
+        "2026-07-14T16:00:00Z",
+        now=pd.Timestamp("2026-07-14T15:30:00Z").to_pydatetime(),
+    )
+
+    assert freshness["stale"] is True
+    assert freshness["future_timestamp"] is True
+
+
+def test_execution_overlays_are_recapped_after_adaptation():
+    policy = {
+        "equity": {"max_risk_pct": 0.02},
+        "options": {"max_risk_pct": 0.25},
+    }
+    risk = bounded_execution_risk(
+        account=1000,
+        decision_risk_pct=0.22,
+        adapt_mult=1.45,
+        confidence_size_limit=1.0,
+        vehicle="options",
+        policy=policy,
+    )
+
+    assert risk["uncapped_risk_pct"] > 0.25
+    assert risk["effective_risk_pct"] == 0.25
+    assert risk["effective_max_loss_dollars"] == 250.0
+    assert risk["capped"] is True
+
+
+def test_live_readiness_requires_verified_portfolio_and_execution_feed():
+    risk = {
+        "effective_max_loss_dollars": 20.0,
+        "effective_risk_pct": 0.02,
+        "hard_cap_risk_pct": 0.02,
+    }
+    result = assess_execution_readiness(
+        live={
+            "source": "yfinance",
+            "price": 100.0,
+            "go_long": True,
+            "freshness": {"available": True, "stale": False, "asof_utc": "now"},
+        },
+        macro={"qqq_trend": "up", "xlp_spy_ratio_state": "risk_on"},
+        model={"ok": True, "entry": 100.0, "stop": 98.0},
+        confidence={
+            "state": "ENTER",
+            "raw_probability": 0.8,
+            "raw_probability_source": "test",
+            "calibration_available": True,
+            "calibration_version": "v1",
+        },
+        decision={"action": "enter", "vehicle": "equity"},
+        options_plan=None,
+        gex=None,
+        execution_risk=risk,
+        portfolio_state_verified=False,
+    )
+
+    assert result["ready"] is False
+    assert "portfolio_state_verified" in result["blockers"]
+    assert "trusted_execution_feed" in result["blockers"]
 
 
 def test_shadow_ledger_records_and_settles(tmp_path):

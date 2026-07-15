@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
+import { liveHref } from "@/lib/routes";
 
-/** Legacy `/picks` — picks live under Radar. */
+/** Legacy `/picks` — picks live under Ops (Execution) Discover. */
 export default function PicksCompatibilityPage() {
-  redirect("/scan?view=picks");
+  redirect(liveHref(undefined, "picks"));
 }

@@ -1,0 +1,17 @@
+{
+  "portfolio": {
+    "total_return": 0.092160751883537,
+    "max_drawdown": -0.16795667216633897,
+    "sharpe": 0.14550807715320557,
+    "profit_factor": 1.3122,
+    "trade_count": 69,
+    "win_rate": 0.4782608695652174,
+    "final_value": 1092160.751883537
+  },
+  "generated_utc": "",
+  "codes": [
+    "AVGO.US"
+  ],
+  "start": "2024-08-01",
+  "end": "2026-07-11"
+}

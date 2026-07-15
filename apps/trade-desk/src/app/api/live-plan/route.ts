@@ -24,10 +24,13 @@ type Body = {
   account?: number | string;
   peak?: number | string;
   history?: string;
+  openEquity?: number | string;
+  openOptions?: number | string;
   model?: string;
   noModel?: boolean;
   scan?: boolean;
   symbols?: string;
+  portfolioVerified?: boolean;
 };
 
 export async function POST(req: Request) {
@@ -60,11 +63,22 @@ export async function POST(req: Request) {
   if (typeof body.history === "string" && body.history.trim()) {
     args.push("--history", body.history.trim());
   }
+  for (const [flag, value] of [
+    ["--open-equity", body.openEquity],
+    ["--open-options", body.openOptions],
+  ] as const) {
+    if (value == null || value === "") continue;
+    const count = Number(value);
+    if (Number.isInteger(count) && count >= 0) args.push(flag, String(count));
+  }
   if (typeof body.model === "string" && body.model.trim()) {
     args.push("--model", body.model.trim());
   }
   if (body.noModel) {
     args.push("--no-model");
+  }
+  if (body.portfolioVerified) {
+    args.push("--portfolio-verified");
   }
 
   if (body.scan) {

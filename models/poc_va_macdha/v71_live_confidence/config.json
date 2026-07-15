@@ -1,0 +1,12 @@
+{
+  "source": "local",
+  "codes": ["TSLA.US", "MU.US", "SPY.US", "IONQ.US", "APLD.US", "XLP.US", "QQQ.US"],
+  "interval": "1H",
+  "commission": 0.001,
+  "engine": "daily",
+  "strategy": {
+    "name": "v71_live_confidence",
+    "model_version": "v71_live_confidence",
+    "note": "Live-ready high-WR: v45 Ultimate RSI + SMA(250) entry trend + soft quality floor + continuous confidence sizing (quality + RSI depth). Optional v39d agreement boost. Params frozen before OOS."
+  }
+}

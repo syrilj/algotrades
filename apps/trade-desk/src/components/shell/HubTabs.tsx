@@ -6,6 +6,8 @@ export type HubTab = {
   key: string;
   label: string;
   href: string;
+  /** Optional mono count / badge shown after the label. */
+  badge?: string | number;
 };
 
 type HubTabsProps = {
@@ -14,7 +16,7 @@ type HubTabsProps = {
   "aria-label": string;
 };
 
-/** Shared operator tab strip for Execution / Radar / Portfolio hubs. */
+/** Shared operator tab strip for Execution (Ops), Portfolio, and Lab hubs. */
 export function HubTabs({
   tabs,
   active,
@@ -34,7 +36,10 @@ export function HubTabs({
             className={`td-hub-tab${selected ? " td-hub-tab--active" : ""}`}
             prefetch
           >
-            {tab.label}
+            <span className="td-hub-tab__label">{tab.label}</span>
+            {tab.badge != null && tab.badge !== "" ? (
+              <span className="td-hub-tab__badge">{tab.badge}</span>
+            ) : null}
           </Link>
         );
       })}

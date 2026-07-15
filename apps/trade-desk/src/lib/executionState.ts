@@ -7,6 +7,7 @@ export type FreshnessLike = {
 
 type ExecutionPlanLike = {
   ok?: boolean;
+  live_ready?: boolean;
   symbol?: string;
   account?: number;
   decision_support_ready?: boolean;
@@ -20,8 +21,10 @@ type ExecutionPlanLike = {
   ticket?: {
     action?: string;
     mode?: string;
+    vehicle?: string;
     max_loss_dollars?: number;
   };
+  execution_readiness?: { ready?: boolean; blockers?: string[] };
   model?: {
     model?: string;
     entry?: number;
@@ -76,8 +79,11 @@ export function isExecutionActionable(plan: ExecutionPlanLike): boolean {
   return Boolean(
     plan.ok !== false &&
       plan.decision_support_ready &&
+      plan.live_ready === true &&
+      plan.execution_readiness?.ready === true &&
       plan.confidence?.state === "ENTER" &&
       plan.ticket?.action === "enter" &&
+      plan.ticket?.vehicle === "equity" &&
       freshness.canUse &&
       finitePositive(plan.live?.price) &&
       finitePositive(entry) &&
@@ -95,11 +101,27 @@ export function decisionPresentation(plan: ExecutionPlanLike): {
 } {
   const state = plan.confidence?.state ?? "ABSTAIN";
   const reasons = plan.confidence?.reasons ?? [];
-  if (state === "ENTER" && plan.ticket?.action === "enter") {
+  // "Ready" only when the same gates that unlock a paper order all pass.
+  // Never claim SETUP READY from confidence alone (false ready is unsafe).
+  if (isExecutionActionable(plan)) {
     return {
       eyebrow: "SETUP READY",
       title: "Ready to execute",
       detail: "The data, confidence, and risk gates passed. Review the order before logging it.",
+    };
+  }
+  if (state === "ENTER" && plan.execution_readiness?.ready === false) {
+    return {
+      eyebrow: "NO TRADE",
+      title: "Execution checks blocked this plan",
+      detail: "The signal passed, but the portfolio, data-source, risk, or concrete-order checks did not. Review the failed checks before proceeding.",
+    };
+  }
+  if (state === "ENTER" && plan.ticket?.action === "enter") {
+    return {
+      eyebrow: "NO TRADE",
+      title: "Execution checks blocked this plan",
+      detail: "Confidence said enter, but feed freshness, sizing, price consistency, or vehicle checks still block an order.",
     };
   }
   if (state === "WATCH") {
@@ -139,11 +161,18 @@ export function buildPaperOrder(plan: ExecutionPlanLike) {
     return null;
   }
   const riskPerShare = Math.abs(entry - stop);
-  const shares = Math.floor(maxLoss / riskPerShare);
+  const side = plan.live?.go_short ? ("short" as const) : ("long" as const);
+  if ((side === "long" && stop >= entry) || (side === "short" && stop <= entry)) {
+    return null;
+  }
+  if (!finitePositive(plan.account)) return null;
+  const riskShares = Math.floor(maxLoss / riskPerShare);
+  const buyingPowerShares = Math.floor(plan.account / entry);
+  const shares = Math.min(riskShares, buyingPowerShares);
   if (shares < 1) return null;
   return {
     symbol: String(plan.symbol ?? "").toUpperCase(),
-    side: plan.live?.go_short ? ("short" as const) : ("long" as const),
+    side,
     shares,
     entry,
     stop,

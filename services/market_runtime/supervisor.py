@@ -45,6 +45,8 @@ class StreamSupervisor:
         stale_window_seconds: float = 300.0,
         selector: Optional[Callable[[List[Instrument]], List[Instrument]]] = None,
         persistence: Optional[TickPersistence] = None,
+        reconnect_initial_seconds: float = 1.0,
+        reconnect_max_seconds: float = 30.0,
     ) -> None:
         self._adapter = adapter
         self._max_symbols = max(1, int(max_symbols))
@@ -53,6 +55,10 @@ class StreamSupervisor:
         self._stale_window_seconds = float(stale_window_seconds)
         self._selector = selector
         self._persistence = persistence
+        self._reconnect_initial_seconds = max(0.01, float(reconnect_initial_seconds))
+        self._reconnect_max_seconds = max(
+            self._reconnect_initial_seconds, float(reconnect_max_seconds)
+        )
 
         self._state = LatestTickState()
         self._aggregator = TickBarAggregator(("1m", "5m"))
@@ -105,20 +111,25 @@ class StreamSupervisor:
         self._thread.start()
 
     def _run(self) -> None:
-        try:
-            for tick in self._adapter.stream(self._symbols):
-                if self._stop_event.is_set():
+        backoff = self._reconnect_initial_seconds
+        while not self._stop_event.is_set():
+            try:
+                for tick in self._adapter.stream(self._symbols):
+                    if self._stop_event.is_set():
+                        break
+                    self._on_tick(tick)
+                    backoff = self._reconnect_initial_seconds
+                # Keep the supervisor alive until stop() is called. A real LSE
+                # stream does not end; finite injected streams are replay/tests.
+                if not self._stop_event.is_set():
+                    self._stop_event.wait()
+                break
+            except Exception as e:  # noqa: BLE001
+                self._last_error = str(e)
+                if self._stop_event.wait(backoff):
                     break
-                self._on_tick(tick)
-        except Exception as e:  # noqa: BLE001
-            self._last_error = str(e)
-            self._running = False
-            return
-        # Keep the supervisor alive until stop() is called. A real LSE stream
-        # never terminates; a finite injected stream (tests/replay) ends here
-        # and waits for the stop signal before the thread exits.
-        if not self._stop_event.is_set():
-            self._stop_event.wait()
+                backoff = min(self._reconnect_max_seconds, backoff * 2.0)
+        self._running = False
 
     def _on_tick(self, tick: Tick) -> None:
         self._state.update(tick)
@@ -140,6 +151,18 @@ class StreamSupervisor:
 
     def is_running(self) -> bool:
         return self._running and (self._thread is not None and self._thread.is_alive())
+
+    @property
+    def adapter(self) -> Any:
+        return self._adapter
+
+    def runtime_status(self) -> dict[str, Any]:
+        return {
+            "running": self.is_running(),
+            "started_at": self._started_at.isoformat() if self._started_at else None,
+            "last_tick_at": self._last_tick_at.isoformat() if self._last_tick_at else None,
+            "last_error": self._last_error,
+        }
 
     def latest(self, instrument_id: str) -> Optional[Tick]:
         return self._state.get(instrument_id)

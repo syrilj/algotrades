@@ -1,7 +1,15 @@
+import fs from "fs";
 import path from "path";
 
 /** Monorepo root: TradingAlgoWork (apps/trade-desk → ../..) */
 export function repoRoot(): string {
+  let current = process.cwd();
+  while (current !== path.dirname(current)) {
+    if (fs.existsSync(path.join(current, "requirements.txt")) || fs.existsSync(path.join(current, ".venv"))) {
+      return current;
+    }
+    current = path.dirname(current);
+  }
   return path.resolve(process.cwd(), "../..");
 }
 

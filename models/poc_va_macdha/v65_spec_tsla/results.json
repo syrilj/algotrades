@@ -1,0 +1,17 @@
+{
+  "portfolio": {
+    "total_return": 0.3375803552853147,
+    "max_drawdown": -0.06542571972938654,
+    "sharpe": 1.4408723076751133,
+    "profit_factor": 2.5389,
+    "trade_count": 34,
+    "win_rate": 0.6470588235294118,
+    "final_value": 1337580.3552853146
+  },
+  "generated_utc": "",
+  "codes": [
+    "TSLA.US"
+  ],
+  "start": "2024-08-01",
+  "end": "2026-07-11"
+}

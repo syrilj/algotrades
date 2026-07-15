@@ -19,14 +19,15 @@ type ActionStyle = {
 };
 
 function actionIconFor(action: string | undefined | null): LucideIcon | null {
-  const a = (action ?? "").toUpperCase();
-  if (a.includes("BUY NOW") || a.includes("RISK_OK")) return Rocket;
+  // Keep in lockstep with matchActionVarName (underscore → space).
+  const a = (action ?? "").toUpperCase().replace(/_/g, " ");
+  if (a.includes("BUY NOW") || a.includes("RISK OK")) return Rocket;
   if (a.includes("BUY BREAKOUT")) return Zap;
-  if (a.includes("BREAKOUT WATCH") || a.includes("SIZE_DOWN")) return Eye;
+  if (a.includes("BREAKOUT WATCH") || a.includes("SIZE DOWN")) return Eye;
   if (a.includes("PULLBACK")) return CornerDownLeft;
   if (a.includes("AVOID") || a.includes("FLATTEN") || a.includes("STAND ASIDE") || a.includes("ABSTAIN"))
     return ShieldAlert;
-  if (a.includes("WAIT") || a.includes("HALT_NEW") || a.includes("EQUITY_HEDGE") || a === "WATCH")
+  if (a.includes("WAIT") || a.includes("HALT NEW") || a.includes("EQUITY HEDGE") || a === "WATCH" || a.includes(" WATCH"))
     return Clock;
   return null;
 }
@@ -43,8 +44,8 @@ function softOf(token: string): string {
  * ink-400 fallback for a wholly unrecognized action string.
  */
 export function actionStyle(action: string | undefined | null): ActionStyle {
-  const a = (action ?? "").toUpperCase();
-  const varName = matchActionVarName(a) ?? "--td-ink-400";
+  const a = (action ?? "").toUpperCase().replace(/_/g, " ");
+  const varName = matchActionVarName(action) ?? "--td-ink-400";
   const color = `var(${varName})`;
   const dashed = varName === "--td-action-wait" && a.includes("ALMOST");
   return { color, soft: softOf(color), dashed };

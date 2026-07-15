@@ -52,6 +52,17 @@
 - Run: `dmr.run_one(dmr.discover_models(['v50_high_win_rate'])[0], mode='daily', codes=EQUITY_WINNER_BAG, start='2024-08-01', end='2026-07-11', tag='final', cash=1000, source='local', interval='1H')`.
 - `v41` was tested as an additional consensus gate but cut trade count to 16 and return to 5.6%; the final model uses `v45` alone.
 
+## v71_live_confidence (live high-WR + confidence sleeve)
+- `models/poc_va_macdha/v71_live_confidence/` wraps `v45_ultimate_rsi` with SMA(250) entry-only trend, soft quality floor (`min_score>=1`), and **confidence size-up** (quality + RSI depth → up to 1.55× base scale, cap 40%).
+- Frozen variant: `sizeup_q1`. Train/select on 2024-08-01→2025-08-01 only; holdout locked 2025-08-01→2026-07-11 (no retune).
+- Verified (`source=local`, `1H`, `$1,000`, `EQUITY_WINNER_BAG`):
+  - **Full**: +114.0% ret, −19.5% max DD, Sharpe 1.72, 50 trades, **86.0% WR**, final $2,140
+  - **Holdout**: +30.9% ret, −19.6% max DD, Sharpe 1.17, 26 trades, **76.9% WR**
+- Live: `SignalEngine.last_confidence[code]` exposes per-trade confidence for desk tickets.
+- Vs peers: slightly above `v50` full return (114% vs 109%) with explicit confidence; hard quality=2 (`v70`) hits ~91% WR but **fails** holdout n floor (n=11). **Does not** replace `v39d_confluence` for max return (357%).
+- Train/verify: `.venv/bin/python tools/train_v71_live_confidence.py --workers 4 --cash 1000`
+- Artifacts: `runs/v71_live_confidence/LEADERBOARD.md`, `models/poc_va_macdha/v71_live_confidence/results.json`.
+
 ## v60_microstructure (microstructure / institutional-flow research artifact)
 - `models/poc_va_macdha/v60_microstructure/` is a new standalone microstructure model implementing OHLCV-safe OFI, absorption, volume schedule-deviation, VPIN-style toxicity, VPA confirmation, and an XGB meta-classifier with triple-barrier labels.
 - Run with `mode="daily"`:

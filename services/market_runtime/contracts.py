@@ -107,6 +107,8 @@ class Tick(JsonContract):
             raise ValueError("size must be non-negative and finite")
         require_utc(self.market_asof, "market_asof")
         require_utc(self.received_at, "received_at")
+        if self.market_asof > self.received_at + timedelta(minutes=5):
+            raise ValueError("market_asof cannot be more than five minutes after received_at")
 
 
 @dataclass(frozen=True)

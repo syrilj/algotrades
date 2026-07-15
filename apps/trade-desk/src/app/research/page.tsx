@@ -8,45 +8,45 @@ import { BacktestPanel } from "@/components/backtest/BacktestPanel";
 import { EvolveDesk } from "@/components/evolve/EvolveDesk";
 import { HubTabs } from "@/components/shell/HubTabs";
 import { PageHeader } from "@/components/shell/PageHeader";
-
-type ResearchView = "leaderboard" | "models" | "evolve" | "backtest";
-
-const TABS: { key: ResearchView; label: string }[] = [
-  { key: "leaderboard", label: "Leaderboard" },
-  { key: "models", label: "Model Catalog" },
-  { key: "evolve", label: "Evolve Farm" },
-  { key: "backtest", label: "Backtest" },
-];
+import {
+  hubPanelId,
+  researchHubTabs,
+  resolveResearchView,
+  type ResearchView,
+} from "@/lib/routes";
 
 function ResearchHubInner() {
   const searchParams = useSearchParams();
-  const rawView = searchParams.get("view");
-  const view: ResearchView = TABS.some((t) => t.key === rawView)
-    ? (rawView as ResearchView)
-    : "leaderboard";
+  const symbol = searchParams.get("symbol")?.trim().toUpperCase() ?? "";
+  const view: ResearchView = resolveResearchView(searchParams.get("view"));
+  const tabs = researchHubTabs(symbol || undefined);
+  const activeLabel = tabs.find((t) => t.key === view)?.label ?? "Leaderboard";
 
   return (
     <div className="td-page">
       <PageHeader
-        title="Research"
+        eyebrow="Desk"
+        title="Lab"
         description="Leaderboard, model catalog, evolution farm, and backtest — all model research in one workspace."
-      />
-
-      <HubTabs
-        tabs={TABS.map((t) => ({
-          key: t.key,
-          label: t.label,
-          href: `/research?view=${t.key}`,
-        }))}
-        active={view}
-        aria-label="Research workspace"
+        meta={
+          symbol ? (
+            <span className="tabular" style={{ fontFamily: "var(--td-font-mono)" }}>
+              {symbol}
+            </span>
+          ) : (
+            <span className="td-chip">leaderboard · models · evolve · backtest</span>
+          )
+        }
+        actions={
+          <HubTabs tabs={tabs} active={view} aria-label="Lab workspace" />
+        }
       />
 
       <div
-        id={`hub-panel-${view}`}
+        id={hubPanelId(view)}
         role="tabpanel"
         className="td-hub-panel flex flex-col gap-4"
-        aria-label={TABS.find((t) => t.key === view)?.label}
+        aria-label={activeLabel}
       >
         {view === "leaderboard" ? (
           <LeaderboardView showHeader={false} />
@@ -67,7 +67,7 @@ export default function ResearchPage() {
     <Suspense
       fallback={
         <div className="td-page">
-          <p className="td-muted">Loading research workspace…</p>
+          <p className="td-muted">Loading lab workspace…</p>
         </div>
       }
     >

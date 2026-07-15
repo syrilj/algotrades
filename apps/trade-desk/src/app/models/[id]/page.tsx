@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { ApiEnvelope, ModelMetaConfig, ModelsCatalog } from "@/lib/types";
 import { ModelBadges } from "@/components/leaderboard/ModelBadges";
 import { ScoreBar } from "@/components/leaderboard/ScoreBar";
-import { ModelFlow } from "@/components/models/ModelFlow";
+import { ModelMathVisual } from "@/components/models/ModelMathVisual";
 import { ModelTuningView } from "@/components/models/ModelTuningView";
 import { analyzeHref } from "@/lib/routes";
 
@@ -127,7 +127,7 @@ export default function ModelDetailPage() {
       }}
     >
       <nav className="mb-4 text-[13px]" style={{ color: "var(--td-ink-400, #bbbbbb)" }}>
-        <Link href="/leaderboard" className="hover:underline">
+        <Link href="/research?view=leaderboard" className="hover:underline">
           ← Leaderboard
         </Link>
         <span className="mx-2">·</span>
@@ -267,7 +267,7 @@ export default function ModelDetailPage() {
                   Analyze with this model
                 </Link>
                 <Link
-                  href="/leaderboard"
+                  href="/research?view=leaderboard"
                   className="text-center text-[13px] py-2 rounded-sm"
                   style={{
                     border: "1px solid var(--td-ink)",
@@ -280,14 +280,8 @@ export default function ModelDetailPage() {
             </section>
           </div>
 
-          <section
-            className="p-4 rounded-sm mb-6"
-            style={{
-              background: "var(--td-ink-900, #0d0d0d)",
-              border: "1px solid var(--td-ink-700, #3c3c3c)",
-            }}
-          >
-            <ModelFlow model={detail.id} />
+          <section className="mb-6">
+            <ModelMathVisual modelId={detail.id} metaConfig={detail.meta_config} />
           </section>
 
           <section

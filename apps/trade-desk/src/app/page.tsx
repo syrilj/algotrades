@@ -142,6 +142,7 @@ function AnalyzePageInner() {
   return (
     <div className="td-page">
       <PageHeader
+        eyebrow="Desk"
         title="Command"
         description="A traceable route from market data to a risk-aware operator decision."
         meta={

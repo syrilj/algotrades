@@ -1,0 +1,17 @@
+{
+  "portfolio": {
+    "total_return": 0.32628906254892387,
+    "max_drawdown": -0.2631834122120377,
+    "sharpe": 0.3114526793920161,
+    "profit_factor": 1.6022,
+    "trade_count": 71,
+    "win_rate": 0.5352112676056338,
+    "final_value": 1326289.0625489238
+  },
+  "generated_utc": "",
+  "codes": [
+    "SMCI.US"
+  ],
+  "start": "2024-08-01",
+  "end": "2026-07-11"
+}

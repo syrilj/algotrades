@@ -1,0 +1,17 @@
+{
+  "portfolio": {
+    "total_return": -0.02558298177130447,
+    "max_drawdown": -0.12680444967287818,
+    "sharpe": -0.06731909438664627,
+    "profit_factor": 1.0341,
+    "trade_count": 63,
+    "win_rate": 0.49206349206349204,
+    "final_value": 974417.0182286955
+  },
+  "generated_utc": "",
+  "codes": [
+    "TSM.US"
+  ],
+  "start": "2024-08-01",
+  "end": "2026-07-11"
+}

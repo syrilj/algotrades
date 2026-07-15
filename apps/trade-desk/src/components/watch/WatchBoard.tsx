@@ -140,17 +140,31 @@ export function WatchBoard({
 }: WatchBoardProps) {
   const router = useRouter();
   const [open, setOpen] = useState<string | null>(null);
+  /** Default: hide pure AVOID so the board surfaces plays + levels first. */
+  const [hideAvoid, setHideAvoid] = useState(true);
 
   const sorted = useMemo(() => {
-    return [...rows].sort((a, b) => {
+    const filtered = hideAvoid
+      ? rows.filter((r) => {
+          const a = (r.action || "").toUpperCase();
+          // Keep structural AVOID visible only when expanded filter is off.
+          return !a.includes("AVOID");
+        })
+      : rows;
+    return [...filtered].sort((a, b) => {
       const ra = actionRank(a.action);
       const rb = actionRank(b.action);
       if (ra !== rb) return ra - rb;
-      const sa = a.score ?? a.confidence ?? 0;
-      const sb = b.score ?? b.confidence ?? 0;
+      const sa = a.score ?? a.hitProbability ?? a.confidence ?? 0;
+      const sb = b.score ?? b.hitProbability ?? b.confidence ?? 0;
       return sb - sa;
     });
-  }, [rows]);
+  }, [rows, hideAvoid]);
+
+  const avoidCount = useMemo(
+    () => rows.filter((r) => (r.action || "").toUpperCase().includes("AVOID")).length,
+    [rows],
+  );
 
   const select = (sym: string) => {
     if (onSelectSymbol) onSelectSymbol(sym);
@@ -177,6 +191,26 @@ export function WatchBoard({
     return <EmptyState icon={Radio} title="No ticks yet" hint={emptyHint} />;
   }
 
+  if (rows.length && !sorted.length && !loading) {
+    return (
+      <div className="flex flex-col gap-3">
+        <EmptyState
+          icon={Radio}
+          title="Only AVOID rows"
+          hint={`All ${avoidCount} symbols are AVOID (structure / red-flag). Uncheck Hide AVOID to inspect, or refresh when volume returns.`}
+        />
+        <label className="flex items-center gap-1.5 px-3 text-[12px] cursor-pointer" style={{ color: "var(--td-ink-300)" }}>
+          <input
+            type="checkbox"
+            checked={hideAvoid}
+            onChange={(e) => setHideAvoid(e.target.checked)}
+          />
+          Hide AVOID ({avoidCount})
+        </label>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col">
       <div className="overflow-x-auto">
@@ -190,8 +224,12 @@ export function WatchBoard({
               <th className="px-3 py-2 text-right">Trigger</th>
               <th className="px-3 py-2 text-right">Dist</th>
               <th className="px-3 py-2">Do next / waiting on</th>
-              <th className="px-3 py-2 text-right">Conf</th>
-              <th className="px-3 py-2 text-right">Hit%</th>
+              <th className="px-3 py-2 text-right" title="Structure readiness (gates true)">
+                Struct
+              </th>
+              <th className="px-3 py-2 text-right" title="Estimated hit probability">
+                Hit%
+              </th>
               <th className="px-3 py-2 text-right">RVOL</th>
               <th className="px-3 py-2">Model</th>
             </tr>
@@ -242,6 +280,22 @@ export function WatchBoard({
                 ? "…"
                 : "—"}
           </span>
+        </span>
+        <label className="flex items-center gap-1.5 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={hideAvoid}
+            onChange={(e) => setHideAvoid(e.target.checked)}
+          />
+          Hide AVOID
+          {avoidCount > 0 ? (
+            <span className="tabular-nums">({avoidCount})</span>
+          ) : null}
+        </label>
+        <span>
+          showing{" "}
+          <span className="tabular-nums text-[var(--td-ink-300)]">{sorted.length}</span>
+          /{rows.length}
         </span>
         {loading ? (
           <span className="text-[var(--td-brand,#1c69d4)]">refreshing</span>

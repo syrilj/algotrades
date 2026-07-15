@@ -23,6 +23,7 @@ import argparse
 import importlib.util
 import json
 import math
+import re
 import sys
 import time
 from datetime import datetime, timezone
@@ -588,6 +589,54 @@ def _to_code(symbol: str) -> str:
     return f"{s}.US"
 
 
+def _period_to_start(period: str) -> pd.Timestamp | None:
+    """Map a yfinance-style period string to a cutoff timestamp. None means all."""
+    if not period or period == "max":
+        return None
+    if period == "ytd":
+        now = pd.Timestamp.now()
+        return pd.Timestamp(now.year, 1, 1)
+    m = re.match(r"^(\d+)(d|mo|y)$", period)
+    if not m:
+        return None
+    n, unit = int(m.group(1)), m.group(2)
+    now = pd.Timestamp.now()
+    if unit == "d":
+        return now - pd.Timedelta(days=n)
+    if unit == "mo":
+        return now - pd.DateOffset(months=n)
+    if unit == "y":
+        return now - pd.DateOffset(years=n)
+    return None
+
+
+def _load_cache(symbol: str, period: str, interval: str) -> pd.DataFrame | None:
+    """Load OHLCV from repo data_cache as a fallback for yfinance."""
+    if interval not in ("1h", "1d"):
+        return None
+    sym = _to_yf(symbol).split(".", 1)[0].upper()
+    p = ROOT / "data_cache" / interval / f"{sym}.parquet"
+    if not p.exists():
+        return None
+    try:
+        df = pd.read_parquet(p).sort_index()
+    except Exception:
+        return None
+    df.index = pd.to_datetime(df.index)
+    if df.index.tz is not None:
+        df.index = df.index.tz_convert(None)
+    start = _period_to_start(period)
+    if start is not None:
+        df = df[df.index >= start]
+    need = ["open", "high", "low", "close", "volume"]
+    missing = [c for c in need if c not in df.columns]
+    if missing:
+        return None
+    df = df[need].copy()
+    df = df.dropna(subset=["close"])
+    return df if not df.empty else None
+
+
 def _fetch_ohlcv(symbol: str, period: str = "60d", interval: str = "1h") -> pd.DataFrame:
     ysym = _to_yf(symbol)
     # Yahoo caps: 1m ≤ 7d, 5m/15m ≤ 60d
@@ -597,6 +646,9 @@ def _fetch_ohlcv(symbol: str, period: str = "60d", interval: str = "1h") -> pd.D
         period = "10d"
     raw = yf.download(ysym, period=period, interval=interval, auto_adjust=True, progress=False)
     if raw is None or raw.empty:
+        cached = _load_cache(symbol, period, interval)
+        if cached is not None:
+            return cached
         raise ValueError(f"No data for {ysym}")
     if isinstance(raw.columns, pd.MultiIndex):
         raw.columns = [c[0].lower() if isinstance(c, tuple) else str(c).lower() for c in raw.columns]
@@ -605,12 +657,21 @@ def _fetch_ohlcv(symbol: str, period: str = "60d", interval: str = "1h") -> pd.D
     need = ["open", "high", "low", "close", "volume"]
     for c in need:
         if c not in raw.columns:
+            cached = _load_cache(symbol, period, interval)
+            if cached is not None:
+                return cached
             raise ValueError(f"Missing column {c} for {ysym}")
     df = raw[need].copy()
     df.index = pd.to_datetime(df.index)
     if getattr(df.index, "tz", None) is not None:
         df.index = df.index.tz_localize(None)
-    return df.dropna(subset=["close"])
+    df = df.dropna(subset=["close"])
+    if df.empty:
+        cached = _load_cache(symbol, period, interval)
+        if cached is not None:
+            return cached
+        raise ValueError(f"No data for {ysym}")
+    return df
 
 
 def _market_session() -> dict[str, Any]:
@@ -1486,10 +1547,31 @@ def _plain_plan(state: dict) -> dict[str, Any]:
                 )
             else:
                 do_next = _MISSING_DO["in_value_area"]
-    elif kind == "avoid" or not flags.get("not_red_flag", True) or state.get("vol_dry"):
+    elif kind == "avoid" or not flags.get("not_red_flag", True):
+        # Hard AVOID only for red-flag traps / explicit avoid kind.
+        # Dry volume alone is WAIT so the board still surfaces levels.
         action = "AVOID"
-        why = "Weak tape: price push on drying volume — classic trap. Volume is the veto."
+        why = "Weak tape: price push on dying volume — classic trap. Volume is the veto."
         do_next = "Stand aside until volume confirms (rvol > 1) or price resets into value / 22 EMA."
+    elif state.get("vol_dry"):
+        action = "WAIT"
+        rvol_s = f"{rvol:.1f}x" if rvol is not None else "quiet"
+        why = (
+            f"Volume quiet ({rvol_s}) · structure readiness {conf:.0%} — "
+            "not a veto; wait for participation before sizing."
+        )
+        bits = []
+        if e22:
+            bits.append(f"dip zone ~22 EMA ${e22:.2f}")
+        if val:
+            bits.append(f"demand/VAL ${val:.2f}")
+        if lvl:
+            bits.append(f"volume break ${lvl:.2f}")
+        do_next = (
+            ("Watch: " + " · ".join(bits[:3]) + ". Enter only when rvol expands.")
+            if bits
+            else "Stand aside until rvol > 1 or price resets into value / 22 EMA."
+        )
     elif "poc_hold" in missing:
         action = "WAIT"
         why = "Support (POC) is broken."

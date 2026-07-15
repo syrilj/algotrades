@@ -5,7 +5,17 @@
   "require_oil_down": true,
   "combine": "or",
   "high_beta_only": true,
-  "high_beta_codes": ["IONQ.US", "APLD.US", "TSLA.US", "MU.US", "ARM.US", "COIN.US", "MSTR.US", "PLTR.US", "NVDA.US"],
+  "high_beta_codes": [
+    "IONQ.US",
+    "APLD.US",
+    "TSLA.US",
+    "MU.US",
+    "ARM.US",
+    "COIN.US",
+    "MSTR.US",
+    "PLTR.US",
+    "NVDA.US"
+  ],
   "gate_mode": "hard",
   "soft_size": 0.25,
   "vix_path": "data_cache/1d/VIX.parquet",

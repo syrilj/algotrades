@@ -22,14 +22,25 @@ export type ColorKind = "action" | "mode" | "gate" | "claim" | "regime" | "live_
  * previously-resolved color still resolves to the same var.
  */
 export function matchActionVarName(value: string | null | undefined): string | null {
-  const a = (value ?? "").toUpperCase();
-  if (a.includes("BUY NOW") || a.includes("RISK_OK")) return "--td-action-buy-now";
+  // Normalize underscores so STAND_ASIDE / BUY_NOW match human labels.
+  const a = (value ?? "").toUpperCase().replace(/_/g, " ");
+  if (a.includes("BUY NOW") || a.includes("RISK OK")) return "--td-action-buy-now";
   if (a.includes("BUY BREAKOUT")) return "--td-action-buy-breakout";
-  if (a.includes("BREAKOUT WATCH") || a.includes("SIZE_DOWN")) return "--td-action-breakout-watch";
+  if (a.includes("BREAKOUT WATCH") || a.includes("SIZE DOWN")) return "--td-action-breakout-watch";
   if (a.includes("PULLBACK")) return "--td-action-pullback";
-  if (a.includes("AVOID") || a.includes("FLATTEN") || a.includes("STAND ASIDE") || a.includes("ABSTAIN"))
+  if (
+    a.includes("AVOID") ||
+    a.includes("FLATTEN") ||
+    a.includes("STAND ASIDE") ||
+    a.includes("ABSTAIN")
+  )
     return "--td-action-avoid";
-  if (a.includes("WAIT") || a.includes("HALT_NEW") || a.includes("EQUITY_HEDGE") || a.includes("WATCH"))
+  if (
+    a.includes("WAIT") ||
+    a.includes("HALT NEW") ||
+    a.includes("EQUITY HEDGE") ||
+    a.includes("WATCH")
+  )
     return "--td-action-wait";
   return null;
 }
@@ -42,11 +53,23 @@ export function actionColorVarName(value: string | null | undefined): string {
   return matchActionVarName(value) ?? "--td-action-wait";
 }
 
-/** OptionsDesk risk-mode → color (OPTIONS/EQUITY/FLATTEN/HALT/else wait). */
+/**
+ * Options / risk-mode → color.
+ *
+ * Order matters: EQUITY_HEDGE contains "EQUITY" but must not resolve to the
+ * long-equity accent. Prefer specific risk aliases (via matchActionVarName)
+ * before the bare OPTIONS / EQUITY vehicle labels.
+ */
 function modeColorVarName(mode: string | null | undefined): string {
   const m = (mode ?? "").toUpperCase();
+  // Risk-manager ticket modes (STAND_ASIDE, RISK_OK, SIZE_DOWN, EQUITY_HEDGE, …)
+  const actionMatch = matchActionVarName(mode);
+  if (actionMatch) return actionMatch;
   if (m.includes("OPTIONS")) return "--td-action-buy-now";
-  if (m.includes("EQUITY")) return "--td-action-buy-breakout";
+  // Bare equity vehicle only (not EQUITY_HEDGE — handled above as wait).
+  if (m === "EQUITY" || m.startsWith("EQUITY_") || m.endsWith("_EQUITY")) {
+    return "--td-action-buy-breakout";
+  }
   if (m.includes("FLATTEN") || m.includes("HALT")) return "--td-action-avoid";
   return "--td-action-wait";
 }

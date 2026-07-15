@@ -1,0 +1,17 @@
+{
+  "portfolio": {
+    "total_return": 0.6910655659952281,
+    "max_drawdown": -0.1408037128164773,
+    "sharpe": 0.5912969273640675,
+    "profit_factor": 2.7655,
+    "trade_count": 38,
+    "win_rate": 0.5526315789473685,
+    "final_value": 1691065.565995228
+  },
+  "generated_utc": "",
+  "codes": [
+    "SOFI.US"
+  ],
+  "start": "2024-08-01",
+  "end": "2026-07-11"
+}

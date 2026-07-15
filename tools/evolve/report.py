@@ -29,25 +29,41 @@ def write_leaderboard(path: Path, state: dict[str, Any]) -> None:
         "Claim levels: `THIN` (n&lt;12) · `RESEARCH` (cannot ship) · `CLAIM` (PASS_BAR + equity only).",
         "Options synthetic never auto-promotes. GEX is live-only.",
         "",
-        "## Ranking (utility = money + Sharpe − DD, × reliability(n))",
+        "## Ranking (robust score = mean utility − instability/OOS/lock/confidence penalties)",
         "",
-        "| # | Model | Mode | Claim | Track | Ret | Sharpe | DD | n | Utility | Cache |",
-        "|---|-------|------|-------|-------|-----|--------|----|---|---------|-------|",
+        "| # | Model | Claim | Ret | Sharpe | DD | n | Utility | Robust | Conf | Failures |",
+        "|---|-------|-------|-----|--------|----|---|---------|--------|------|----------|",
     ]
     ranking = state.get("ranking") or state.get("screen") or []
     for i, r in enumerate(ranking[:40], 1):
         if r.get("error"):
             lines.append(
-                f"| {i} | `{r.get('id')}` | {r.get('mode')} | ERROR | — | FAIL | — | — | 0 | -99 | — |"
+                f"| {i} | `{r.get('id')}` | ERROR | FAIL | — | — | 0 | -99 | -99 | 0% | runtime_error |"
             )
             continue
-        cache = "hit" if r.get("from_cache") or r.get("reused") else "miss"
+        profile = r.get("failure_profile") or {}
+        failures = ", ".join(profile.get("failure_tags") or []) or "—"
+        robust = float(r.get("rank_score", r.get("utility")) or 0)
+        confidence = float(r.get("rank_confidence", r.get("reliability")) or 0)
         lines.append(
-            f"| {i} | `{r.get('id')}` | {r.get('mode')} | {r.get('claim_level','?')} | "
-            f"{r.get('data_track','?')} | {100*float(r.get('ret') or 0):.1f}% | "
+            f"| {i} | `{r.get('id')}` | {r.get('claim_level','?')} | "
+            f"{100*float(r.get('ret') or 0):.1f}% | "
             f"{float(r.get('sharpe') or 0):.2f} | {100*float(r.get('dd') or 0):.1f}% | "
-            f"{int(r.get('n') or 0)} | {float(r.get('utility') or 0):.3f} | {cache} |"
+            f"{int(r.get('n') or 0)} | {float(r.get('utility') or 0):.3f} | {robust:.3f} | "
+            f"{100*confidence:.0f}% | {failures} |"
         )
+
+    diagnosed = [r for r in ranking if (r.get("failure_profile") or {}).get("failures")]
+    lines += ["", "## Failure analysis and next actions", ""]
+    if not diagnosed:
+        lines.append("_No failures detected in ranked evaluations._")
+    else:
+        for r in diagnosed[:15]:
+            profile = r["failure_profile"]
+            tags = ", ".join(f"`{tag}`" for tag in profile.get("failure_tags") or [])
+            lines.append(f"- **`{r.get('id')}`** — {tags}")
+            for action in (profile.get("actions") or [])[:3]:
+                lines.append(f"  - {action}")
 
     claimable = [r for r in ranking if r.get("may_auto_promote")]
     lines += ["", "## Promote-eligible (equity CLAIM + PASS_BAR)", ""]
@@ -72,6 +88,15 @@ def write_leaderboard(path: Path, state: dict[str, Any]) -> None:
                 f"- Gen {g.get('gen')}: best=`{g.get('best_id')}` "
                 f"utility={g.get('best_utility')} mutations={g.get('n_mutations', 0)}"
             )
+
+    if state.get("feedback_memory"):
+        lines += [
+            "",
+            "## Learning memory",
+            "",
+            f"- Persistent failure and mutation outcomes: `{state['feedback_memory']}`",
+            "- Mutation priorities combine failure-target fit, historical score delta, and exploration.",
+        ]
 
     if state.get("meta"):
         lines += ["", "## Meta MLP (phase 4)", ""]

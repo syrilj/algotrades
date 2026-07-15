@@ -26,7 +26,7 @@ import {
   gammaMethodology,
 } from "@/lib/executionState";
 import { formatNum, formatPct, formatPctPoints, formatUsd } from "@/lib/format";
-import { gammaHref, liveHref, optionsHref, positionsHref } from "@/lib/routes";
+import { gammaHref, liveHref, optionsHref, positionsHref, watchHref } from "@/lib/routes";
 import type {
   ApiEnvelope,
   LivePlanResponse,
@@ -45,6 +45,17 @@ function cleanReason(reason: string): string {
     calibration_gates_failed: "Live calibration has not passed its safety gates",
     setup_not_ready: "The entry setup is not ready",
     calibrated_probability_below_entry_threshold: "Confidence is below the entry threshold",
+    portfolio_state_verified: "Portfolio equity, drawdown, and open positions are not verified",
+    trusted_execution_feed: "Execution-grade LSE data is unavailable",
+    fresh_market_data: "Market data is stale or unavailable",
+    macro_data_complete: "Macro context is incomplete",
+    model_probability_available: "Model probability is unavailable",
+    active_calibration: "No active calibration has passed the safety gates",
+    confidence_enter: "The confidence gate has not authorized an entry",
+    risk_manager_enter: "The risk manager did not authorize an entry",
+    price_sources_consistent: "Market price sources conflict",
+    risk_within_hard_cap: "The executable risk budget failed its hard-cap check",
+    concrete_order_sized: "A valid order could not be sized",
   };
   return labels[reason] ?? reason.replaceAll("_", " ");
 }
@@ -244,7 +255,10 @@ export function ExecutionDesk() {
   const decision = useMemo(() => (plan ? decisionPresentation(plan) : null), [plan]);
   const order = useMemo(() => (plan ? buildPaperOrder(plan) : null), [plan]);
   const gammaRead = useMemo(() => gammaMethodology(plan?.gex), [plan?.gex]);
-  const reasons = plan?.confidence?.reasons ?? plan?.decision?.reasons ?? [];
+  const readinessBlockers = plan?.execution_readiness?.blockers ?? [];
+  const reasons = readinessBlockers.length
+    ? readinessBlockers
+    : plan?.confidence?.reasons ?? plan?.decision?.reasons ?? [];
 
   return (
     <div className="exec-workspace">
@@ -345,6 +359,21 @@ export function ExecutionDesk() {
             <p>
               The desk will verify the price source, market timestamp, model gate, risk budget,
               and options context before it unlocks a paper order.
+            </p>
+            <p className="td-muted" style={{ marginTop: "0.75rem" }}>
+              No name yet? Discover first:{" "}
+              <Link href={liveHref(undefined, "bias", account)} className="no-underline">
+                Bias
+              </Link>
+              {" · "}
+              <Link href={liveHref(undefined, "picks", account)} className="no-underline">
+                Picks
+              </Link>
+              {" · "}
+              <Link href={watchHref(undefined, account)} className="no-underline">
+                Watch
+              </Link>
+              , or run <strong>Scan market</strong> above for an execution-grade shortlist.
             </p>
           </div>
           <ol>

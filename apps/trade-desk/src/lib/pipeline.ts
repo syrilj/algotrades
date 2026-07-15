@@ -178,7 +178,11 @@ export function buildPipelineStages(
       label: "Risk/Kelly sizing",
       status: sizePresent ? "pass" : "neutral",
       detail: sizePresent
-        ? `${size!.shares} sh · risk ${size!.risk_pct}`
+        ? `${size!.shares} sh · risk ${
+            size!.risk_pct != null && Number.isFinite(size!.risk_pct)
+              ? `${(size!.risk_pct * 100).toFixed(2)}%`
+              : "—"
+          }`
         : "No size",
       values: size
         ? {
