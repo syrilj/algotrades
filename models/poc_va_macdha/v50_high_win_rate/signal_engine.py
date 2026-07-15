@@ -1,8 +1,10 @@
-"""v50_high_win_rate: gate v45 mean-reversion signals with trend + stop-loss.
+"""v50_high_win_rate: gate v45 mean-reversion signals with trend + sizing.
 
 - Entry only when v45 fires and the long-term trend filter is satisfied.
-- Hard stop-loss per trade; no re-entry while the same v45 episode is active.
+- Optional hard stop-loss per trade (set via stop_loss_pct in hunt_config).
+- No re-entry while the same v45 episode is active.
 - Supports 'entry' (filter only at entry) or 'continuous' trend mode.
+- Supports a signal_scale factor to cap position size per trade.
 """
 from __future__ import annotations
 
