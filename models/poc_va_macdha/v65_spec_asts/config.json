@@ -1,0 +1,35 @@
+{
+  "source": "yfinance",
+  "codes": [
+    "ASTS.US"
+  ],
+  "start_date": "2024-08-01",
+  "end_date": "2026-07-11",
+  "initial_cash": 1000000,
+  "commission": 0.001,
+  "engine": "daily",
+  "interval": "1H",
+  "strategy": {
+    "name": "v65_spec_asts",
+    "model_version": "v65_spec_asts",
+    "desk_specialist": true,
+    "desk_symbol": "ASTS.US",
+    "dna_donor": "dna_apld",
+    "engine_base": "v39d_confluence",
+    "bakeoff": {
+      "id": "_bake_asts_dna_apld",
+      "dna": "dna_apld",
+      "kind": "donor",
+      "ret": 0.24315656148918285,
+      "dd": -0.05141411535231453,
+      "sharpe": 1.3540477662187818,
+      "n": 13,
+      "wr": 0.7692307692307693,
+      "final": 1243.1565614891829,
+      "ok": true,
+      "source_data": "yfinance",
+      "symbol": "ASTS.US"
+    },
+    "note": "Proper specialist rebuilt from v39d + winning DNA bakeoff"
+  }
+}

@@ -16,7 +16,56 @@ ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_ACTIVE = ROOT / "runs" / "calibration" / "active" / "v39d_confluence.json"
 
 
-def assess_data_freshness(timestamp: Any, *, now: datetime | None = None, max_age_minutes: float = 180.0) -> dict[str, Any]:
+def _us_equity_session_context(now: Any) -> dict[str, Any]:
+    """Return a conservative weekday US-equity session window.
+
+    Holidays intentionally fail closed as regular weekdays: a holiday bar can
+    be marked stale during nominal market hours, but an old bar is never
+    treated as live while a session is expected to be open.
+    """
+    import pandas as pd
+
+    now_utc = pd.Timestamp(now)
+    if now_utc.tzinfo is None:
+        now_utc = now_utc.tz_localize("UTC")
+    now_utc = now_utc.tz_convert("UTC")
+    eastern = now_utc.tz_convert("America/New_York")
+    day = eastern.normalize()
+    session_open = day + pd.Timedelta(hours=9, minutes=30)
+    session_close = day + pd.Timedelta(hours=16)
+    is_weekday = day.weekday() < 5
+    is_open = bool(is_weekday and session_open <= eastern < session_close)
+
+    next_day = day
+    if not (is_weekday and eastern < session_open):
+        next_day += pd.Timedelta(days=1)
+    while next_day.weekday() >= 5:
+        next_day += pd.Timedelta(days=1)
+    next_open = next_day + pd.Timedelta(hours=9, minutes=30)
+
+    previous_day = day
+    if not (is_weekday and eastern >= session_close):
+        previous_day -= pd.Timedelta(days=1)
+    while previous_day.weekday() >= 5:
+        previous_day -= pd.Timedelta(days=1)
+    previous_close = previous_day + pd.Timedelta(hours=16)
+
+    return {
+        "market_session": "open" if is_open else "closed",
+        "next_open_utc": next_open.tz_convert("UTC").isoformat(),
+        "previous_close_utc": previous_close.tz_convert("UTC").isoformat(),
+        # Hourly feeds often timestamp the last regular bar at its start.
+        "completed_bar_cutoff_utc": (previous_close - pd.Timedelta(minutes=90)).tz_convert("UTC"),
+    }
+
+
+def assess_data_freshness(
+    timestamp: Any,
+    *,
+    now: datetime | None = None,
+    max_age_minutes: float = 180.0,
+    market: str | None = "US_EQUITY",
+) -> dict[str, Any]:
     now = now or datetime.now(timezone.utc)
     try:
         import pandas as pd
@@ -25,11 +74,42 @@ def assess_data_freshness(timestamp: Any, *, now: datetime | None = None, max_ag
         if observed.tzinfo is None:
             observed = observed.tz_localize("UTC")
         observed = observed.tz_convert("UTC")
-        age = max(0.0, (pd.Timestamp(now) - observed).total_seconds() / 60.0)
+        now_ts = pd.Timestamp(now)
+        if now_ts.tzinfo is None:
+            now_ts = now_ts.tz_localize("UTC")
+        now_ts = now_ts.tz_convert("UTC")
+        age = max(0.0, (now_ts - observed).total_seconds() / 60.0)
         stale = not np.isfinite(age) or age > max_age_minutes
-        return {"available": True, "stale": bool(stale), "asof_utc": observed.isoformat(), "age_minutes": round(float(age), 2), "max_age_minutes": max_age_minutes}
+        session: dict[str, Any] = {}
+        freshness_basis = "absolute_age"
+        if market == "US_EQUITY":
+            session = _us_equity_session_context(now_ts)
+            if (
+                session["market_session"] == "closed"
+                and observed >= session["completed_bar_cutoff_utc"]
+            ):
+                stale = False
+                freshness_basis = "latest_completed_session"
+        session.pop("completed_bar_cutoff_utc", None)
+        return {
+            "available": True,
+            "stale": bool(stale),
+            "asof_utc": observed.isoformat(),
+            "age_minutes": round(float(age), 2),
+            "max_age_minutes": max_age_minutes,
+            "freshness_basis": freshness_basis,
+            **session,
+        }
     except Exception as exc:  # noqa: BLE001
-        return {"available": False, "stale": True, "asof_utc": None, "age_minutes": None, "max_age_minutes": max_age_minutes, "error": str(exc)}
+        return {
+            "available": False,
+            "stale": True,
+            "asof_utc": None,
+            "age_minutes": None,
+            "max_age_minutes": max_age_minutes,
+            "market_session": "unknown",
+            "error": str(exc),
+        }
 
 
 def load_active_calibrator(model: str = "v39d_confluence", path: str | Path | None = None) -> dict[str, Any]:

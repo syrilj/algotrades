@@ -102,6 +102,29 @@ def test_runtime_enters_only_with_active_gated_calibrator():
     assert result["size_limit"] == 1.0
 
 
+def test_completed_us_session_bar_remains_current_overnight():
+    freshness = assess_data_freshness(
+        "2026-07-14T20:00:00Z",
+        now=pd.Timestamp("2026-07-15T04:00:00Z").to_pydatetime(),
+        market="US_EQUITY",
+    )
+
+    assert freshness["stale"] is False
+    assert freshness["market_session"] == "closed"
+    assert freshness["next_open_utc"] == "2026-07-15T13:30:00+00:00"
+
+
+def test_old_bar_fails_once_next_us_session_is_open():
+    freshness = assess_data_freshness(
+        "2026-07-14T20:00:00Z",
+        now=pd.Timestamp("2026-07-15T15:00:00Z").to_pydatetime(),
+        market="US_EQUITY",
+    )
+
+    assert freshness["stale"] is True
+    assert freshness["market_session"] == "open"
+
+
 def test_shadow_ledger_records_and_settles(tmp_path):
     ledger = ShadowDecisionLedger(tmp_path / "shadow.jsonl")
     event_id = ledger.record({"symbol": "TEST", "state": "ABSTAIN"})

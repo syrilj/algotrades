@@ -1,0 +1,35 @@
+{
+  "source": "local",
+  "codes": [
+    "NVDA.US"
+  ],
+  "start_date": "2024-08-01",
+  "end_date": "2026-07-11",
+  "initial_cash": 1000000,
+  "commission": 0.001,
+  "engine": "daily",
+  "interval": "1H",
+  "strategy": {
+    "name": "v65_spec_nvda",
+    "model_version": "v65_spec_nvda",
+    "desk_specialist": true,
+    "desk_symbol": "NVDA.US",
+    "dna_donor": "dna_apld",
+    "engine_base": "v39d_confluence",
+    "bakeoff": {
+      "id": "_bake_nvda_dna_apld",
+      "dna": "dna_apld",
+      "kind": "donor",
+      "ret": 0.0659247116053403,
+      "dd": -0.019607484722278603,
+      "sharpe": 1.3002007759712693,
+      "n": 12,
+      "wr": 0.75,
+      "final": 1065.9247116053402,
+      "ok": true,
+      "source_data": "local",
+      "symbol": "NVDA.US"
+    },
+    "note": "Proper specialist rebuilt from v39d + winning DNA bakeoff"
+  }
+}

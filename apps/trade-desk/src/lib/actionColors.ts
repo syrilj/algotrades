@@ -27,8 +27,10 @@ export function matchActionVarName(value: string | null | undefined): string | n
   if (a.includes("BUY BREAKOUT")) return "--td-action-buy-breakout";
   if (a.includes("BREAKOUT WATCH") || a.includes("SIZE_DOWN")) return "--td-action-breakout-watch";
   if (a.includes("PULLBACK")) return "--td-action-pullback";
-  if (a.includes("AVOID") || a.includes("FLATTEN")) return "--td-action-avoid";
-  if (a.includes("WAIT") || a.includes("HALT_NEW") || a.includes("EQUITY_HEDGE")) return "--td-action-wait";
+  if (a.includes("AVOID") || a.includes("FLATTEN") || a.includes("STAND ASIDE") || a.includes("ABSTAIN"))
+    return "--td-action-avoid";
+  if (a.includes("WAIT") || a.includes("HALT_NEW") || a.includes("EQUITY_HEDGE") || a.includes("WATCH"))
+    return "--td-action-wait";
   return null;
 }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   WatchBoard,
   type WatchBoardRow,
@@ -191,8 +191,12 @@ async function fetchModels(): Promise<string[]> {
 
 export function WatchDesk({ showHeader = true }: { showHeader?: boolean }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const qSymbol = searchParams.get("symbol")?.trim().toUpperCase() ?? "";
+  const accountRaw = Number(searchParams.get("account") || "1000");
+  const account = Number.isFinite(accountRaw) && accountRaw > 0 ? accountRaw : 1000;
   const [controls, setControls] = useState<WatchControlsValue>({
-    symbols: "NVDA, MU, APLD",
+    symbols: qSymbol || "NVDA, MU, APLD",
     every: 30,
     interval: "1m",
     model: "auto",
@@ -296,6 +300,7 @@ export function WatchDesk({ showHeader = true }: { showHeader?: boolean }) {
       const body: Record<string, unknown> = {
         symbols,
         interval: cfg.interval,
+        account,
       };
       if (cfg.model && cfg.model !== "auto") body.model = cfg.model;
 
@@ -325,7 +330,7 @@ export function WatchDesk({ showHeader = true }: { showHeader?: boolean }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [account]);
 
   const runMarketScan = useCallback(async () => {
     setScanning(true);
@@ -454,7 +459,7 @@ export function WatchDesk({ showHeader = true }: { showHeader?: boolean }) {
           loading={loading}
           error={error}
           onSelectSymbol={(sym) => {
-            router.push(liveHref(sym));
+            router.push(liveHref(sym, "ticket", account));
           }}
         />
       </div>

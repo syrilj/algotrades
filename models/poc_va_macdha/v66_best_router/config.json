@@ -1,0 +1,19 @@
+{
+  "source": "yfinance",
+  "codes": [
+    "TSLA.US", "MU.US", "IONQ.US", "MSTR.US", "SNDK.US", "ASTS.US",
+    "META.US", "GOOG.US", "COIN.US", "CRWV.US", "NVDA.US", "APLD.US",
+    "SPY.US", "QQQ.US"
+  ],
+  "start_date": "2024-08-01",
+  "end_date": "2026-07-14",
+  "initial_cash": 1000000,
+  "commission": 0.001,
+  "engine": "daily",
+  "interval": "1H",
+  "strategy": {
+    "name": "v66_best_router",
+    "model_version": "v66_best_router",
+    "note": "Competitive best-model router: specialist DNA vs v39d/generics per symbol"
+  }
+}

@@ -16,9 +16,12 @@ import { colorVarFor } from "@/lib/actionColors";
 function OptionsDeskInner({ showHeader = true }: { showHeader?: boolean }) {
   const searchParams = useSearchParams();
   const qSymbol = searchParams.get("symbol")?.toUpperCase() ?? "";
+  const qAccount = Number(searchParams.get("account") || "1000");
 
   const [symbol, setSymbol] = useState(qSymbol || "APLD");
-  const [account, setAccount] = useState(1000);
+  const [account, setAccount] = useState(
+    Number.isFinite(qAccount) && qAccount > 0 ? qAccount : 1000,
+  );
   const [riskPct, setRiskPct] = useState(18);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -85,7 +88,7 @@ function OptionsDeskInner({ showHeader = true }: { showHeader?: boolean }) {
               >
                 Analyze
               </Link>
-              <Link href={liveHref(symbol)} className="td-btn td-btn-ghost no-underline">
+              <Link href={liveHref(symbol, "ticket", account)} className="td-btn td-btn-ghost no-underline">
                 Live
               </Link>
             </div>

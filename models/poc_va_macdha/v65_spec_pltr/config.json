@@ -1,0 +1,35 @@
+{
+  "source": "local",
+  "codes": [
+    "PLTR.US"
+  ],
+  "start_date": "2024-08-01",
+  "end_date": "2026-07-11",
+  "initial_cash": 1000000,
+  "commission": 0.001,
+  "engine": "daily",
+  "interval": "1H",
+  "strategy": {
+    "name": "v65_spec_pltr",
+    "model_version": "v65_spec_pltr",
+    "desk_specialist": true,
+    "desk_symbol": "PLTR.US",
+    "dna_donor": "dna_tsla",
+    "engine_base": "v39d_confluence",
+    "bakeoff": {
+      "id": "_bake_pltr_dna_tsla",
+      "dna": "dna_tsla",
+      "kind": "donor",
+      "ret": 0.10887587109156804,
+      "dd": -0.06498232491307787,
+      "sharpe": 0.6711927676943363,
+      "n": 35,
+      "wr": 0.5428571428571428,
+      "final": 1108.8758710915681,
+      "ok": true,
+      "source_data": "local",
+      "symbol": "PLTR.US"
+    },
+    "note": "Proper specialist rebuilt from v39d + winning DNA bakeoff"
+  }
+}

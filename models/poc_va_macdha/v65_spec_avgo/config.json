@@ -1,0 +1,35 @@
+{
+  "source": "yfinance",
+  "codes": [
+    "AVGO.US"
+  ],
+  "start_date": "2024-08-01",
+  "end_date": "2026-07-11",
+  "initial_cash": 1000000,
+  "commission": 0.001,
+  "engine": "daily",
+  "interval": "1H",
+  "strategy": {
+    "name": "v65_spec_avgo",
+    "model_version": "v65_spec_avgo",
+    "desk_specialist": true,
+    "desk_symbol": "AVGO.US",
+    "dna_donor": "dna_mu",
+    "engine_base": "v39d_confluence",
+    "bakeoff": {
+      "id": "_bake_avgo_dna_mu",
+      "dna": "dna_mu",
+      "kind": "donor",
+      "ret": 0.16624614682587113,
+      "dd": -0.07427448869207012,
+      "sharpe": 0.7368561036212484,
+      "n": 66,
+      "wr": 0.5303030303030303,
+      "final": 1166.2461468258712,
+      "ok": true,
+      "source_data": "yfinance",
+      "symbol": "AVGO.US"
+    },
+    "note": "Proper specialist rebuilt from v39d + winning DNA bakeoff"
+  }
+}

@@ -292,6 +292,20 @@ def _deep_analyze(
             score *= 0.85 + 0.15 * adapt
             action = plan.get("action") or "WAIT"
             playable = action in ("BUY NOW", "BUY BREAKOUT", "BREAKOUT WATCH", "PULLBACK ZONE")
+            # Near-play: not a hard avoid, has a level map operator can arm alerts on.
+            has_level = any(
+                st.get(k) is not None
+                for k in ("breakout_level", "entry", "ema22", "val", "vah", "stop")
+            )
+            near_play = (not playable) and kind in (
+                "wait", "pullback_watch", "breakout_watch"
+            ) and has_level and not bool(st.get("lost_200"))
+            if action.startswith("WAIT") and has_level and not bool(st.get("lost_200")):
+                near_play = True
+            # Soft-upgrade dry-tape waits into near_play so the board isn't 90% AVOID.
+            if action.startswith("AVOID") and has_level and not bool(st.get("lost_200")) and float(st.get("confidence") or 0) >= 0.50:
+                # Keep action honest, but mark as candidate for alert board.
+                near_play = True
             return {
                 "symbol": st.get("symbol") or sym,
                 "ok": True,
@@ -300,17 +314,23 @@ def _deep_analyze(
                 "setup_kind": kind,
                 "setup_ok": bool(st.get("setup_ok")),
                 "playable": playable,
+                "near_play": near_play,
                 "price": st.get("price"),
                 "entry": st.get("entry"),
                 "breakout_level": st.get("breakout_level"),
                 "stop": st.get("stop"),
                 "trail_arm": st.get("trail_arm"),
                 "risk_per_share": st.get("risk_per_share"),
+                "ema22": st.get("ema22"),
+                "ema200": st.get("ema200"),
+                "val": st.get("val"),
+                "vah": st.get("vah"),
                 "confidence": st.get("confidence"),
                 "hit_probability": st.get("hit_probability"),
                 "rvol": st.get("rvol"),
                 "vol_surge": st.get("vol_surge"),
                 "vol_dry": st.get("vol_dry"),
+                "lost_200": bool(st.get("lost_200")),
                 "shares": sz.get("shares"),
                 "dollar_risk": sz.get("dollar_risk"),
                 "live_adapt_mult": adapt,
@@ -383,26 +403,59 @@ def run_open_scan(
                 d["vpa_screen_score"] = v.get("vpa_screen_score")
                 # blend scores
                 d["score"] = round(float(d.get("score") or 0) + 0.15 * float(v.get("vpa_screen_score") or 0), 4)
-        deep_rows.sort(
-            key=lambda r: (
-                0 if r.get("action") in ("BUY NOW", "BUY BREAKOUT") else
-                1 if r.get("action") in ("BREAKOUT WATCH", "PULLBACK ZONE") else 2,
-                -float(r.get("score") or -1),
-            )
-        )
+        def _rank_key(r: dict[str, Any]) -> tuple:
+            a = str(r.get("action") or "")
+            if a in ("BUY NOW", "BUY BREAKOUT"):
+                tier = 0
+            elif a in ("BREAKOUT WATCH", "PULLBACK ZONE"):
+                tier = 1
+            elif r.get("near_play") or a.startswith("WAIT"):
+                tier = 2
+            elif a.startswith("AVOID") and not r.get("lost_200") and r.get("near_play"):
+                tier = 3
+            elif a.startswith("AVOID (structure"):
+                tier = 5
+            else:
+                tier = 4
+            return (tier, -float(r.get("score") or -1))
+
+        deep_rows.sort(key=_rank_key)
 
     plays = [r for r in deep_rows if r.get("ok") and r.get("playable")] if deep_rows else []
-    # Always surface ranked book: playable first, then highest-score deep rows
+    near = [r for r in deep_rows if r.get("ok") and r.get("near_play") and not r.get("playable")] if deep_rows else []
+    # Prefer buys → watches → near levels. Do NOT pad top with pure AVOID spam.
     ranked_deep = list(deep_rows) if deep_rows else []
-    top_plays = (plays + [r for r in ranked_deep if r not in plays])[: max(1, top)]
+    avoid_only = [
+        r for r in ranked_deep
+        if r.get("ok") and str(r.get("action", "")).startswith("AVOID") and not r.get("near_play")
+    ]
+    preferred = plays + near + [
+        r for r in ranked_deep
+        if r not in plays and r not in near and r not in avoid_only
+    ]
+    # Only append a few avoids so the book still shows "what not to touch"
+    top_plays = (preferred + avoid_only[:3])[: max(1, top)]
     if not top_plays:
         top_plays = candidates[: max(1, top)]
 
-    # Watchlist: playable + high score deep + CALL VPA (for live board)
+    # Watchlist: playable + near + CALL VPA + day movers (skip broken structure)
+    raw_movers = uni.get("day_movers") or []
+    day_movers: list[str] = []
+    for m in raw_movers:
+        if isinstance(m, str) and m.strip():
+            day_movers.append(m.strip().upper())
+        elif isinstance(m, dict) and m.get("symbol"):
+            day_movers.append(str(m["symbol"]).strip().upper())
     watch_syms = _uniq(
         [r.get("symbol") for r in plays if r.get("symbol")]
-        + [r.get("symbol") for r in ranked_deep[: top * 2] if r.get("ok")]
+        + [r.get("symbol") for r in near if r.get("symbol")]
+        + [
+            r.get("symbol")
+            for r in ranked_deep
+            if r.get("ok") and not str(r.get("action", "")).startswith("AVOID (structure")
+        ]
         + [r["symbol"] for r in candidates if str(r.get("bias", "")).startswith("CALL")]
+        + day_movers
     )[:18]
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -421,12 +474,22 @@ def run_open_scan(
             "vpa_candidates": len(candidates),
             "deep_n": len(deep_rows),
             "top_plays": top_plays,
+            "buys": [r for r in plays if str(r.get("action")) in ("BUY NOW", "BUY BREAKOUT")],
+            "watches": [r for r in plays if str(r.get("action")) in ("BREAKOUT WATCH", "PULLBACK ZONE")],
+            "near_plays": near,
             "all_deep": deep_rows,
             "vpa_top": vpa_rows[:20],
             "watchlist": watch_syms,
             "operator": {
                 "use": "Load watchlist into /watch or: trade_desk.py watch " + ",".join(watch_syms[:12]),
-                "model": "auto → v39b_live_adapt WINNER",
+                "model": "auto → specialist when mapped else bag WINNER",
+                "how_to_trade": (
+                    "BUY NOW / BUY BREAKOUT = size with stop. "
+                    "PULLBACK ZONE = alert on VAL / 22 EMA, buy dip not chase. "
+                    "BREAKOUT WATCH = alert above level, only with volume surge. "
+                    "NEAR = arm alerts from levels; not an entry yet. "
+                    "AVOID = ignore unless reclaim 200 EMA on volume."
+                ),
                 "breakout_watch": (
                     "BREAKOUT WATCH is not a buy. Alert above breakout_level; "
                     "enter only when volume expands through the level (rvol ≥ ~1.3x)."
@@ -442,6 +505,57 @@ def run_open_scan(
     return payload
 
 
+def _fmt_lvl(v: Any) -> str:
+    try:
+        return f"${float(v):.2f}"
+    except (TypeError, ValueError):
+        return "—"
+
+
+def _print_row(r: dict[str, Any], i: int | None = None) -> None:
+    prefix = f"  {i:<3} " if i is not None else "    "
+    if r.get("error"):
+        print(f"{prefix}{r.get('symbol','?'):<6} ERROR {r.get('error')[:40]}")
+        return
+    sh = int(r.get("shares") or 0)
+    rps = r.get("risk_per_share")
+    risk = r.get("dollar_risk")
+    math_bits = []
+    if sh > 0:
+        math_bits.append(f"{sh} sh")
+    if rps:
+        math_bits.append(f"R/sh {_fmt_lvl(rps).lstrip('$')}")
+    if risk:
+        try:
+            math_bits.append(f"${float(risk):.0f} risk")
+        except (TypeError, ValueError):
+            pass
+    conf = r.get("confidence")
+    conf_s = f" conf {float(conf):.0%}" if conf is not None else ""
+    rvol = r.get("rvol")
+    rvol_s = f" rvol {float(rvol):.1f}x" if rvol is not None else ""
+    print(
+        f"{prefix}{str(r.get('symbol')):<6} {str(r.get('action') or '—'):<18} "
+        f"px {_fmt_lvl(r.get('price'))}  stop {_fmt_lvl(r.get('stop'))}"
+        f"{conf_s}{rvol_s}"
+        + (f"  · {' · '.join(math_bits)}" if math_bits else "")
+    )
+    levels = []
+    if r.get("breakout_level") is not None:
+        levels.append(f"break {_fmt_lvl(r.get('breakout_level'))}")
+    if r.get("ema22") is not None:
+        levels.append(f"22 {_fmt_lvl(r.get('ema22'))}")
+    if r.get("val") is not None:
+        levels.append(f"VAL {_fmt_lvl(r.get('val'))}")
+    if r.get("vah") is not None:
+        levels.append(f"VAH {_fmt_lvl(r.get('vah'))}")
+    if levels:
+        print(f"       levels: {' · '.join(levels)}")
+    tip = r.get("do_next") or r.get("why")
+    if tip:
+        print(f"       → {str(tip)[:100]}")
+
+
 def _print_human(p: dict[str, Any]) -> None:
     print()
     print("=" * 72)
@@ -449,32 +563,110 @@ def _print_human(p: dict[str, Any]) -> None:
     print(f"  scanned {p.get('scanned')}  deep {p.get('deep_n')}  model={p.get('model')}")
     print(f"  hot sectors: {', '.join(p.get('hot_sectors') or []) or '—'}")
     print("=" * 72)
-    plays = p.get("top_plays") or []
-    if not plays:
-        print("  No deep plays — check network / market hours. VPA top:")
-        for r in (p.get("vpa_top") or [])[:8]:
-            print(f"    {r.get('symbol'):6} {r.get('bias'):12} {r.get('vpa_tag','')[:40]}")
-        return
-    print(f"  {'#':<3} {'SYM':<6} {'ACTION':<16} {'SCORE':>6} {'PX':>8} {'STOP':>8} {'SH':>4}  VPA / WHY")
-    for i, r in enumerate(plays, 1):
-        if r.get("error"):
-            print(f"  {i:<3} {r.get('symbol','?'):<6} ERROR {r.get('error')[:40]}")
-            continue
-        print(
-            f"  {i:<3} {str(r.get('symbol')):<6} {str(r.get('action') or '—'):<16} "
-            f"{float(r.get('score') or 0):>6.3f} "
-            f"{float(r.get('price') or 0):>8.2f} "
-            f"{float(r.get('stop') or 0):>8.2f} "
-            f"{int(r.get('shares') or 0):>4}  "
-            f"{str(r.get('vpa_bias') or '')[:10]} {(r.get('setup_kind') or '')}"
-        )
-        if r.get("do_next"):
-            print(f"       → {r['do_next'][:90]}")
+
+    buys = p.get("buys") or []
+    watches = p.get("watches") or []
+    near = p.get("near_plays") or []
+    all_deep = p.get("all_deep") or p.get("top_plays") or []
+    avoids = [
+        r for r in all_deep
+        if r.get("ok") and str(r.get("action", "")).startswith("AVOID") and not r.get("near_play")
+    ]
+
+    # Fallback if older payload without buckets
+    if not buys and not watches and not near:
+        for r in (p.get("top_plays") or []):
+            a = str(r.get("action") or "")
+            if a in ("BUY NOW", "BUY BREAKOUT"):
+                buys.append(r)
+            elif a in ("BREAKOUT WATCH", "PULLBACK ZONE"):
+                watches.append(r)
+            elif r.get("near_play") or a.startswith("WAIT"):
+                near.append(r)
+
+    print("\n  ══ BUY NOW / BUY BREAKOUT  (size with stop) ══")
+    if not buys:
+        print("    None live right now — use WATCH + NEAR alerts at the open.")
+    else:
+        for i, r in enumerate(buys[:12], 1):
+            _print_row(r, i)
+
+    print("\n  ══ WATCH  (arm alerts — not a chase) ══")
+    if not watches:
+        print("    None classified as breakout/pullback yet.")
+    else:
+        for i, r in enumerate(watches[:15], 1):
+            _print_row(r, i)
+
+    print("\n  ══ NEAR  (levels ready — wait for trigger) ══")
+    if not near:
+        print("    None — tape is soft / structure weak.")
+    else:
+        for i, r in enumerate(near[:12], 1):
+            _print_row(r, i)
+
+    # Day movers — momentum names outside the deep avoid wall
+    movers = p.get("day_movers") or []
+    if movers:
+        print("\n  ══ DAY MOVERS  (check at open for volume) ══")
+        for m in movers[:10]:
+            if isinstance(m, str):
+                print(f"    {m:<6}  (yahoo gainer — re-check tape at open)")
+                continue
+            if not isinstance(m, dict):
+                continue
+            sym = m.get("symbol") or m.get("ticker") or "?"
+            chg = m.get("change_pct") or m.get("ret") or m.get("pct")
+            try:
+                chg_s = f"{float(chg):+.1f}%" if chg is not None else ""
+            except (TypeError, ValueError):
+                chg_s = ""
+            print(f"    {str(sym):<6} {chg_s}  {str(m.get('name') or m.get('note') or '')[:40]}")
+
+    # VPA CALL lean
+    vpa_calls = [
+        r for r in (p.get("vpa_top") or [])
+        if str(r.get("bias", "")).startswith("CALL") or "call" in str(r.get("action", "")).lower()
+    ]
+    if vpa_calls:
+        print("\n  ══ VPA CALL lean  (participation bias) ══")
+        for r in vpa_calls[:8]:
+            print(
+                f"    {str(r.get('symbol')):<6} {str(r.get('bias') or ''):<14} "
+                f"{str(r.get('vpa_tag') or r.get('action') or '')[:48]}"
+            )
+
+    if avoids:
+        print(f"\n  ══ AVOID  ({len(avoids)} names — do not pad the board) ══")
+        for r in avoids[:5]:
+            why = (r.get("do_next") or r.get("why") or "stand aside")[:70]
+            print(f"    {str(r.get('symbol')):<6} {str(r.get('action') or 'AVOID')[:22]:<22} {why}")
+        if len(avoids) > 5:
+            print(f"    … +{len(avoids) - 5} more skipped (structural break / dry volume)")
+
+    print("\n  HOW TO USE THIS")
+    print("    1) BUY NOW / BUY BREAKOUT → enter with listed stop & share count")
+    print("    2) PULLBACK ZONE → alert VAL / 22 EMA; buy the dip, not the extension")
+    print("    3) BREAKOUT WATCH → alert above break level only with rvol ≥ ~1.3x")
+    print("    4) NEAR → arm levels; re-scan after open volume prints")
+    print("    5) AVOID → cash; only revisit on 200-EMA reclaim + volume")
+    op = (p.get("operator") or {}).get("how_to_trade")
+    if op:
+        print(f"    {op}")
+
     print()
     wl = p.get("watchlist") or []
-    print(f"  WATCHLIST ({len(wl)}): {', '.join(wl)}")
+    # Prefer actionable watchlist order: buys + watches + near first
+    preferred = _uniq(
+        [r.get("symbol") for r in buys]
+        + [r.get("symbol") for r in watches]
+        + [r.get("symbol") for r in near]
+        + wl
+    )[:18]
+    print(f"  WATCHLIST ({len(preferred)}): {', '.join(str(s) for s in preferred if s)}")
     print(f"  Saved → {SCAN_PATH.relative_to(ROOT)}")
-    print(f"  Watch → .venv/bin/python tools/trade_desk.py watch {','.join(wl[:12])} --every 30")
+    if preferred:
+        print(f"  Watch → .venv/bin/python tools/trade_desk.py watch {','.join(str(s) for s in preferred[:12])} --every 30")
     print()
 
 

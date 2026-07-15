@@ -1,0 +1,35 @@
+{
+  "source": "yfinance",
+  "codes": [
+    "AAPL.US"
+  ],
+  "start_date": "2024-08-01",
+  "end_date": "2026-07-11",
+  "initial_cash": 1000000,
+  "commission": 0.001,
+  "engine": "daily",
+  "interval": "1H",
+  "strategy": {
+    "name": "v65_spec_aapl",
+    "model_version": "v65_spec_aapl",
+    "desk_specialist": true,
+    "desk_symbol": "AAPL.US",
+    "dna_donor": "dna_spy",
+    "engine_base": "v39d_confluence",
+    "bakeoff": {
+      "id": "v39d_confluence",
+      "dna": "v39d_default",
+      "kind": "baseline",
+      "ret": 0.11976997317169302,
+      "dd": -0.04359950863102975,
+      "sharpe": 1.0786694972651931,
+      "n": 24,
+      "wr": 0.4166666666666667,
+      "final": 1119.769973171693,
+      "ok": true,
+      "source_data": "yfinance",
+      "symbol": "AAPL.US"
+    },
+    "note": "Proper specialist rebuilt from v39d + winning DNA bakeoff"
+  }
+}

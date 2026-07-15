@@ -1,0 +1,15 @@
+{
+  "primary": "v39d_confluence",
+  "lookback_days": 5,
+  "require_vix_down": true,
+  "require_oil_down": true,
+  "combine": "or",
+  "high_beta_only": true,
+  "high_beta_codes": ["IONQ.US", "APLD.US", "TSLA.US", "MU.US", "ARM.US", "COIN.US", "MSTR.US", "PLTR.US", "NVDA.US"],
+  "gate_mode": "hard",
+  "soft_size": 0.25,
+  "vix_path": "data_cache/1d/VIX.parquet",
+  "oil_path": "data_cache/1d/USO.parquet",
+  "oil_symbol": "USO",
+  "note": "Risk-on entry gate on high-beta: VIX declining OR oil (USO) declining over lookback_days. Pure AND was too sparse (killed yield). OR beat baseline yield + DD + Sharpe on IONQ and high-beta bag."
+}

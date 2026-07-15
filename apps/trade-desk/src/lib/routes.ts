@@ -19,25 +19,32 @@ export function analyzeHref(q: AnalyzeQuery = {}): string {
 export type LiveMode = "ticket" | "watch" | "options" | "gamma";
 
 /** Execution hub — default tab is risk ticket. */
-export function liveHref(symbol?: string, mode: LiveMode = "ticket"): string {
+export function liveHref(
+  symbol?: string,
+  mode: LiveMode = "ticket",
+  account?: number,
+): string {
   const s = symbol?.trim().toUpperCase();
   const params = new URLSearchParams();
   if (mode !== "ticket") params.set("mode", mode);
   if (s) params.set("symbol", s);
+  if (account != null && Number.isFinite(account) && account > 0) {
+    params.set("account", String(account));
+  }
   const qs = params.toString();
   return qs ? `/live?${qs}` : "/live";
 }
 
-export function watchHref(): string {
-  return "/live?mode=watch";
+export function watchHref(symbol?: string, account?: number): string {
+  return liveHref(symbol, "watch", account);
 }
 
-export function optionsHref(symbol?: string): string {
-  return liveHref(symbol, "options");
+export function optionsHref(symbol?: string, account?: number): string {
+  return liveHref(symbol, "options", account);
 }
 
-export function gammaHref(symbol?: string): string {
-  return liveHref(symbol, "gamma");
+export function gammaHref(symbol?: string, account?: number): string {
+  return liveHref(symbol, "gamma", account);
 }
 
 export function leaderboardHref(symbol?: string): string {

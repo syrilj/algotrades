@@ -265,6 +265,10 @@ export interface LiveConfidence {
     asof_utc?: string | null;
     age_minutes?: number | null;
     max_age_minutes?: number;
+    market_session?: string;
+    freshness_basis?: string;
+    next_open_utc?: string;
+    previous_close_utc?: string;
     error?: string;
   };
   reasons?: string[];
@@ -278,7 +282,9 @@ export interface LivePlanResponse {
   drawdown?: number;
   live?: {
     go_long?: boolean;
+    go_short?: boolean;
     soft_long?: boolean;
+    soft_short?: boolean;
     confidence?: number;
     vol_z?: number;
     price?: number;
@@ -288,6 +294,10 @@ export interface LivePlanResponse {
     macd_positive?: boolean;
     signal_strength?: number;
     timestamp?: string;
+    source?: "lse" | "yfinance" | string;
+    interval?: string;
+    market_session?: string;
+    freshness?: LiveConfidence["data_freshness"];
     error?: string;
   };
   macro?: {
@@ -309,6 +319,7 @@ export interface LivePlanResponse {
   };
   blended_confidence?: number;
   confidence?: LiveConfidence;
+  gex?: GammaResponse | null;
   decision_support_ready?: boolean;
   shadow_event_id?: string | null;
   decision?: {
@@ -797,6 +808,13 @@ export interface GammaResponse {
   n_contracts: number;
   weight: string;
   sign_convention: string;
+  exposure_kind?: "dealer_positioning_estimate" | "intraday_gamma_flow_proxy" | string;
+  formula?: string;
+  unit?: string;
+  sign_assumption?: string;
+  price_consistent?: boolean;
+  price_divergence_pct?: number;
+  warnings?: string[];
   squeeze_score?: number;
   squeeze_label?: "bullish_squeeze" | "bearish_squeeze" | "neutral";
   squeeze_components?: Record<string, number>;
@@ -841,17 +859,46 @@ export interface AnalysisSuggestion {
   alternatives: string[];
 }
 
+export interface AnalysisDecisionConfidence {
+  state?: string;
+  band?: string;
+  raw_probability?: number | null;
+  calibrated_probability?: number | null;
+  size_limit?: number | null;
+  evidence?: string[];
+  failed_checks?: string[];
+  reasons?: string[];
+}
+
+export interface AnalysisDecisionSizing {
+  price?: number | null;
+  entry?: number | null;
+  stop?: number | null;
+  risk_per_share?: number | null;
+  shares?: number;
+  notional?: number | null;
+  target?: number | null;
+  side?: string;
+}
+
 export interface AnalysisDecision {
   confidence_state?: string;
   blended_confidence?: number | null;
   mode?: string;
   vehicle?: string;
+  /** Operator setup label (BUY NOW / BREAKOUT WATCH / AVOID / …). */
   action?: string;
+  analysis_action?: string;
+  risk_manager_action?: string;
+  execution_action?: string;
+  execution_blocked?: boolean;
   risk_pct?: number | null;
   max_loss_dollars?: number | null;
   conviction?: number | null;
   reasons?: string[];
   exit_rules?: Record<string, string>;
+  confidence?: AnalysisDecisionConfidence;
+  sizing?: AnalysisDecisionSizing;
 }
 
 export interface AnalysisFacts {

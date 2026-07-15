@@ -74,7 +74,7 @@ def _get_spot_lse(symbol: str) -> tuple[float | None, str | None]:
     try:
         adapter = LSEAdapter(api_key=key)
         start = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d")
-        candles = adapter.client.candles(_lse_symbol(symbol), "1d", start=start, limit=2)
+        candles = adapter.client.candles(_lse_symbol(symbol), "1h", start=start, limit=2000)
         if not candles:
             return None, "LSE returned empty candles"
         df = pd.DataFrame(candles)
@@ -103,6 +103,28 @@ def _bs_gamma(S: float, K: float, T: float, r: float, sigma: float) -> float:
     sqrtT = np.sqrt(T)
     d1 = (np.log(S / K) + (r + 0.5 * sigma * sigma) * T) / (sigma * sqrtT)
     return float(norm.pdf(d1) / (S * sigma * sqrtT))
+
+
+def _gex_per_one_percent(gamma, contracts, spot: float):
+    """Dollar gamma exposure for a one-percent underlying move."""
+    value = gamma * contracts * 100.0 * float(spot) ** 2 * 0.01
+    return float(value) if np.isscalar(value) else value
+
+
+def _price_consistency(
+    trusted_spot: float,
+    option_spot: float,
+    max_divergence_pct: float = 5.0,
+) -> dict:
+    trusted = float(trusted_spot)
+    option = float(option_spot)
+    if not (np.isfinite(trusted) and trusted > 0 and np.isfinite(option) and option > 0):
+        return {"consistent": False, "divergence_pct": float("inf")}
+    divergence = abs(option - trusted) / trusted * 100.0
+    return {
+        "consistent": bool(divergence <= float(max_divergence_pct)),
+        "divergence_pct": float(divergence),
+    }
 
 
 def _max_pain(call_strikes: np.ndarray, call_oi: np.ndarray, put_strikes: np.ndarray, put_oi: np.ndarray, strikes: list[float]) -> float | None:
@@ -399,7 +421,7 @@ def compute_gamma_exposure_oi(
                 vol = float(r.volume)
                 last_trade = r.lastTradeDate if hasattr(r, "lastTradeDate") and pd.notna(r.lastTradeDate) else None
                 g = _bs_gamma(spot, K, T, 0.0, iv)
-                dealer = side_sign * g * oi * 100.0 * (spot ** 2) * 0.01
+                dealer = side_sign * _gex_per_one_percent(g, oi, spot)
                 cust = -dealer
                 rows.append(
                     {
@@ -548,6 +570,15 @@ def compute_gamma_exposure_oi(
         "n_contracts": int(len(df)),
         "weight": "open_interest",
         "sign_convention": "call +, put -; dealer assumed long calls / short puts",
+        "exposure_kind": "dealer_positioning_estimate",
+        "formula": "gamma × contracts × 100 × spot² × 0.01",
+        "unit": "USD per 1% underlying move",
+        "sign_assumption": "calls positive, puts negative; dealer side is inferred, not observed",
+        "price_consistent": True,
+        "price_divergence_pct": 0.0,
+        "warnings": [
+            "Open interest is delayed and dealer direction is an assumption."
+        ],
         "by_strike": by_strike,
         "squeeze_score": squeeze["squeeze_score"],
         "squeeze_label": squeeze["squeeze_label"],
@@ -583,7 +614,16 @@ def compute_gamma_exposure_lse(
     if chain.empty or "underlying_price" not in chain.columns:
         raise RuntimeError(f"empty/invalid LSE options chain for {lse_sym}")
 
-    spot = float(chain["underlying_price"].dropna().iloc[0])
+    option_spots = pd.to_numeric(chain["underlying_price"], errors="coerce").dropna()
+    if option_spots.empty:
+        raise RuntimeError(f"LSE options chain missing underlying price for {lse_sym}")
+    option_spot = float(option_spots.median())
+    consistency = _price_consistency(spot, option_spot)
+    if not consistency["consistent"]:
+        raise RuntimeError(
+            f"LSE option underlying price {option_spot:.2f} differs from trusted spot "
+            f"{spot:.2f} by {consistency['divergence_pct']:.1f}%"
+        )
     df = chain.dropna(subset=["gamma"]).copy()
     if df.empty:
         raise RuntimeError(f"no gamma data in LSE chain for {lse_sym}")
@@ -642,7 +682,9 @@ def compute_gamma_exposure_lse(
 
     df["weight"] = weight
     df["side_sign"] = df["is_call"].map({True: 1.0, False: -1.0})
-    df["dealer_gex"] = df["side_sign"] * df["gamma"].astype(float) * weight * 100.0 * (spot ** 2) * 0.01
+    df["dealer_gex"] = df["side_sign"] * _gex_per_one_percent(
+        df["gamma"].astype(float), weight, spot
+    )
     df["otm"] = (df["is_call"] & (df["strike"] > spot)) | ((~df["is_call"]) & (df["strike"] < spot))
 
     net_dealer = float(df["dealer_gex"].sum())
@@ -776,6 +818,15 @@ def compute_gamma_exposure_lse(
         "n_contracts": int(len(df)),
         "weight": weight_used,
         "sign_convention": "call +, put -; dealer assumed long calls / short puts (volume/premium-derived contract-equivalent weighted)",
+        "exposure_kind": "intraday_gamma_flow_proxy",
+        "formula": "gamma × contract-equivalent flow × 100 × spot² × 0.01",
+        "unit": "USD per 1% underlying move (flow proxy)",
+        "sign_assumption": "calls positive, puts negative; dealer side is inferred, not observed",
+        "price_consistent": True,
+        "price_divergence_pct": consistency["divergence_pct"],
+        "warnings": [
+            "Volume/premium measures today's flow, not dealer open-interest inventory."
+        ],
         "by_strike": by_strike,
         "squeeze_score": squeeze["squeeze_score"],
         "squeeze_label": squeeze["squeeze_label"],

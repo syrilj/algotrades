@@ -381,10 +381,19 @@ def _print_rotate(payload: dict, horizon: str) -> None:
     print("=" * 72)
     print()
 
+# Historical bag priors — ONLY used when no model+symbol hist_wr exists.
+# Do NOT use as a fake live confidence floor for specialists.
 _PRIOR_WR = {
     "TSLA": 0.56, "ARM": 0.60, "MU": 0.59, "SPY": 0.56,
     "IONQ": 0.74, "APLD": 0.75, "QQQ": 0.55, "AAPL": 0.55,
 }
+
+# Research / specialist engines that must drive confidence from generate()
+# (binary gate-average would hard-cluster ~50–56% for every name).
+_GENERATE_CONF_PREFIXES = (
+    "v41", "v45", "v46", "v47", "v48", "v49", "v50", "v51",
+    "v60", "v61", "v63", "v64", "v65", "v66", "v67",
+)
 
 
 def _resolve_model(model_arg: str, symbol: str | None = None) -> tuple[str, dict[str, Any]]:
@@ -558,10 +567,19 @@ def _fallback_kelly(conf: float, atr_pct: float, med_atr_pct: float, kelly_fract
 
 
 def _to_yf(symbol: str) -> str:
+    """Yahoo ticker. Applies desk aliases (INFQ→IONQ, GOOGL→GOOG)."""
     s = symbol.strip().upper()
     for suf in (".US", ".us"):
         if s.endswith(suf):
             s = s[: -len(suf)]
+    try:
+        from model_registry import resolve_desk_symbol  # local tools/
+
+        code = resolve_desk_symbol(s)
+        if code:
+            return code.replace(".US", "")
+    except Exception:
+        pass
     return s
 
 
@@ -774,11 +792,13 @@ def _compute_state(mod, code: str, df: pd.DataFrame, model_name: str, live: bool
     gen_signal: float | None = None
     gen_error: str | None = None
     uses_classic = _has_classic_desk_helpers(desk_mod)
-    # Always try generate for non-classic; also try when model is explicitly
-    # featured research so partial-helper engines (e.g. v45) use real logic.
-    should_try_generate = (not uses_classic) or (
-        model_name.startswith(("v45", "v46", "v47", "v48", "v49", "v50", "v51", "v60", "v61", "v41"))
+    is_generate_model = model_name.startswith(_GENERATE_CONF_PREFIXES) or (
+        "spec_" in model_name or "router" in model_name or "bounce" in model_name
     )
+    # Always try generate for non-classic OR specialist/research engines.
+    # Specialists often also ship classic helpers — still prefer generate() DNA.
+    should_try_generate = (not uses_classic) or is_generate_model
+    size_frac = 0.0
     if should_try_generate:
         # Prefer original loaded module so wrappers keep their own generate()
         gen_mod = mod if hasattr(mod, "SignalEngine") else desk_mod
@@ -790,22 +810,49 @@ def _compute_state(mod, code: str, df: pd.DataFrame, model_name: str, live: bool
             size_frac = float(np.clip(size_raw if size_raw <= 1.5 else 1.0, 0.0, 1.5))
             if gen_long:
                 setup_ok = True
-                # Blend confidence upward from model conviction
-                c = float(np.clip(max(c, 0.55 + 0.30 * min(size_frac, 1.0)), 0.40, 0.90))
+                # Confidence from LIVE signal weight, not a hard-coded 0.55 floor.
+                # size 0.2 → ~0.50, size 0.5 → ~0.64, size 1.0 → ~0.88
+                structure = float(np.clip(c, 0.0, 1.0))  # classic gate average as soft bonus
+                c = float(
+                    np.clip(
+                        0.42 + 0.46 * min(size_frac, 1.0) + 0.10 * structure,
+                        0.35,
+                        0.95,
+                    )
+                )
                 sleeve = max(float(sleeve), max(0.20, min(1.0, size_frac if size_frac > 0 else 0.35)))
                 hard = True
-            elif not uses_classic:
-                # Generate-only model is flat — do not invent a classic buy.
-                setup_ok = False
-                hard = False
+            else:
+                # Flat specialist: keep STRUCTURE confidence so pullback/breakout
+                # watch kinds can still fire with real levels. Do NOT crush to ~30%
+                # (that made every non-CRWV specialist look broken with no plan).
+                structure = float(np.clip(c, 0.0, 1.0))
+                c = float(np.clip(0.28 + 0.52 * structure, 0.22, 0.78))
+                if not uses_classic or is_generate_model:
+                    setup_ok = False
+                    hard = False
 
-    prior = _PRIOR_WR.get(_to_yf(code), 0.55)
-    # prefer historical WR for this model+symbol if available (cached card lookup)
+    # Historical prior only when real evidence exists (model+symbol or symbol bag).
+    # Default used to be hard-coded 0.55 → every specialist collapsed near 56%.
     hist_wr = hist_win_rate(model_name, code)
+    symbol_prior = _PRIOR_WR.get(_to_yf(code))
     if hist_wr is not None:
         prior = float(hist_wr)
-    conf_prob = float(np.clip(0.35 + c * 0.45, 0.40, 0.78))
-    hit_prob = float(np.clip(0.55 * conf_prob + 0.45 * prior, 0.40, 0.80))
+        prior_source = "model_symbol_hist_wr"
+    elif symbol_prior is not None and not is_generate_model:
+        prior = float(symbol_prior)
+        prior_source = "symbol_bag_prior"
+    else:
+        prior = None
+        prior_source = "none_live_only"
+
+    # conf_prob maps structural/live c into a probability-like band
+    conf_prob = float(np.clip(0.20 + c * 0.70, 0.15, 0.95))
+    if prior is not None:
+        # Light prior blend — live structure still dominates (70/30)
+        hit_prob = float(np.clip(0.70 * conf_prob + 0.30 * prior, 0.15, 0.92))
+    else:
+        hit_prob = conf_prob
 
     stop = px - stop_atr * a
     arm = px + arm_trail_atr * a
@@ -903,17 +950,22 @@ def _compute_state(mod, code: str, df: pd.DataFrame, model_name: str, live: bool
         setup_kind = "breakout_watch"
     elif pullback_to_22 or ("in_value_area" in missing and c >= 0.60 and trend_ok and above_200):
         setup_kind = "pullback_watch"
-    elif (not part_flags.get("not_red_flag", True)) or vol_dry:
+    # Hard AVOID only on red-flag traps. Dry volume alone is WAIT so the
+    # scan still surfaces levels (breakout / dip) instead of a wall of AVOID.
+    elif not part_flags.get("not_red_flag", True):
+        setup_kind = "avoid"
+    elif vol_dry and not (pressing_high or near_22_pull or structure_ok or near_vah):
         setup_kind = "avoid"
     else:
         setup_kind = "wait"
 
     if setup_kind == "structural_break":
-        hit_prob = float(np.clip(hit_prob - 0.12, 0.30, 0.55))
+        hit_prob = float(np.clip(hit_prob - 0.12, 0.12, 0.55))
     elif setup_kind not in ("classic_buy", "breakout_buy"):
-        hit_prob = float(np.clip(hit_prob - 0.08, 0.35, 0.70))
+        # Soft penalty for wait — was clamping everything into 35–70% → looked like 56%.
+        hit_prob = float(np.clip(hit_prob - 0.06, 0.12, 0.75))
     elif setup_kind == "breakout_buy":
-        hit_prob = float(np.clip(hit_prob - 0.03, 0.38, 0.75))
+        hit_prob = float(np.clip(hit_prob - 0.03, 0.30, 0.90))
 
     breakout_level = None
     if np.isfinite(hh20) and (just_broke_vah or (vah_v is not None and px >= vah_v) or pressing_high):
@@ -972,6 +1024,11 @@ def _compute_state(mod, code: str, df: pd.DataFrame, model_name: str, live: bool
         "sleeve_fraction": round(float(sleeve), 3),
         "hit_probability": round(hit_prob, 3),
         "prior_wr": prior,
+        "prior_source": prior_source,
+        "gen_signal": None if gen_signal is None else round(float(gen_signal), 4),
+        "confidence_source": (
+            "generate_signal" if (gen_signal is not None and is_generate_model) else "classic_gate_average"
+        ),
         "flags": part_flags,
         "missing": missing,
         "entry": round(px, 4) if setup_kind in ("classic_buy", "breakout_buy") else None,
@@ -1442,24 +1499,48 @@ def _plain_plan(state: dict) -> dict[str, Any]:
         why = f"Only {len(missing)} check(s) left — close, but not a green light yet."
         do_next = " ".join(_MISSING_DO.get(m, m) for m in missing[:2])
     else:
+        # Operator English with levels — never "several conditions are off" alone.
         action = "WAIT"
-        why = "Several required conditions are off."
-        do_next = " ".join(_MISSING_DO.get(m, m) for m in missing[:3]) if missing else "Re-check later."
+        off = [ _FLAG_LABELS.get(m, m) for m in missing[:3] ]
+        off_s = "; ".join(off) if off else "entry score not ready"
+        why = (
+            f"No long entry yet · structure readiness {conf:.0%}. "
+            f"Still off: {off_s}."
+        )
+        bits = []
+        if e22:
+            bits.append(f"dip-buy zone ~22 EMA ${e22:.2f}")
+        if val:
+            bits.append(f"demand/VAL ${val:.2f}")
+        if lvl:
+            bits.append(f"break only on volume through ${lvl:.2f}")
+        if e200:
+            bits.append(f"invalid if lose 200 EMA ${e200:.2f} on volume")
+        if bits:
+            do_next = "Watch: " + " · ".join(bits[:3]) + ". Stand aside until one path prints."
+        else:
+            do_next = (
+                " ".join(_MISSING_DO.get(m, m) for m in missing[:3])
+                if missing
+                else "Re-check later — no clean level map yet."
+            )
 
     checklist = [
         {"ok": bool(flags.get(k)), "label": _FLAG_LABELS.get(k, k), "key": k}
         for k in _FLAG_LABELS
     ]
+    gen_sig = state.get("generate_signal")
+    conf_note = (
+        f"Confidence {conf:.0%} = live structure readiness"
+        + (f" · specialist size {float(gen_sig):.2f}" if gen_sig not in (None, 0, 0.0) else " · specialist flat")
+        + ". Breakouts need VOLUME; 22 EMA = dip zone; lost 200 EMA = structural break."
+    )
     return {
         "action": action,
         "why": why,
         "do_next": do_next,
         "checklist": checklist,
-        "confidence_note": (
-            f"Confidence {conf:.0%} = quality checks. "
-            f"Breakouts need VOLUME first; 22 EMA = drawdown buy zone; "
-            f"lost 200 EMA = structural break."
-        ),
+        "confidence_note": conf_note,
     }
 
 

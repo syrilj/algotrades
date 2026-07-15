@@ -1,0 +1,18 @@
+{
+  "source": "yfinance",
+  "codes": [],
+  "start_date": "2024-08-01",
+  "end_date": "2026-07-14",
+  "initial_cash": 1000000,
+  "commission": 0.001,
+  "engine": "daily",
+  "interval": "1H",
+  "strategy": {
+    "name": "v67_universal_specialist",
+    "model_version": "v67_universal_specialist",
+    "desk_specialist": true,
+    "universal": true,
+    "why": "Applies family DNA from specialist_factory for any symbol",
+    "accuracy_note": "Recipe only \u2014 competes with bag champions"
+  }
+}

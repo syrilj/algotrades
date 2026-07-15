@@ -1,0 +1,35 @@
+{
+  "source": "yfinance",
+  "codes": [
+    "SOFI.US"
+  ],
+  "start_date": "2024-08-01",
+  "end_date": "2026-07-11",
+  "initial_cash": 1000000,
+  "commission": 0.001,
+  "engine": "daily",
+  "interval": "1H",
+  "strategy": {
+    "name": "v65_spec_sofi",
+    "model_version": "v65_spec_sofi",
+    "desk_specialist": true,
+    "desk_symbol": "SOFI.US",
+    "dna_donor": "dna_spy",
+    "engine_base": "v39d_confluence",
+    "bakeoff": {
+      "id": "v39d_confluence",
+      "dna": "v39d_default",
+      "kind": "baseline",
+      "ret": 0.5210087853474965,
+      "dd": -0.17243760735782546,
+      "sharpe": 1.3264185548465088,
+      "n": 37,
+      "wr": 0.4864864864864865,
+      "final": 1521.0087853474965,
+      "ok": true,
+      "source_data": "yfinance",
+      "symbol": "SOFI.US"
+    },
+    "note": "Proper specialist rebuilt from v39d + winning DNA bakeoff"
+  }
+}

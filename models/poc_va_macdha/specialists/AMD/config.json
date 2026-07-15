@@ -1,0 +1,35 @@
+{
+  "source": "yfinance",
+  "codes": [
+    "AMD.US"
+  ],
+  "start_date": "2024-08-01",
+  "end_date": "2026-07-11",
+  "initial_cash": 1000000,
+  "commission": 0.001,
+  "engine": "daily",
+  "interval": "1H",
+  "strategy": {
+    "name": "v65_spec_amd",
+    "model_version": "v65_spec_amd",
+    "desk_specialist": true,
+    "desk_symbol": "AMD.US",
+    "dna_donor": "dna_tsla",
+    "engine_base": "v39d_confluence",
+    "bakeoff": {
+      "id": "_bake_amd_dna_tsla",
+      "dna": "dna_tsla",
+      "kind": "donor",
+      "ret": 0.14005755850769286,
+      "dd": -0.05585714873581106,
+      "sharpe": 0.9279160659136019,
+      "n": 41,
+      "wr": 0.5121951219512195,
+      "final": 1140.0575585076929,
+      "ok": true,
+      "source_data": "yfinance",
+      "symbol": "AMD.US"
+    },
+    "note": "Proper specialist rebuilt from v39d + winning DNA bakeoff"
+  }
+}

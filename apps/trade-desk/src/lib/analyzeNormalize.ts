@@ -115,15 +115,19 @@ export function derivePlan(state: AnalyzeResponse["state"]): PlainPlan {
       : "Conditions not fully aligned. Monitor for a clearer setup.";
   } else {
     action = "WAIT";
-    why =
-      state.setup_kind && state.setup_kind !== "none"
-        ? `setup: ${state.setup_kind} · conf ${(conf * 100).toFixed(0)}%`
-        : `confidence ${(conf * 100).toFixed(0)}% · ${
-            missing.length ? `${missing.length} gate(s) missing` : "all gates clear"
-          }`;
-    doNext = missing.length
-      ? `Waiting on: ${missing.slice(0, 3).join(", ")}`
-      : "Conditions not fully aligned. Monitor for a clearer setup.";
+    const off = missing.slice(0, 3);
+    why = `No long entry yet · structure readiness ${(conf * 100).toFixed(0)}%${
+      off.length ? ` · still off: ${off.join(", ")}` : ""
+    }.`;
+    const bits: string[] = [];
+    if (e22 != null) bits.push(`dip zone 22 EMA $${e22.toFixed(2)}`);
+    if (val != null) bits.push(`demand/VAL $${val.toFixed(2)}`);
+    if (lvl != null) bits.push(`volume break $${lvl.toFixed(2)}`);
+    doNext = bits.length
+      ? `Watch: ${bits.slice(0, 3).join(" · ")}. Stand aside until one path prints.`
+      : off.length
+        ? `Waiting on: ${off.join(", ")}`
+        : "Conditions not fully aligned. Monitor for a clearer setup.";
   }
 
   return {

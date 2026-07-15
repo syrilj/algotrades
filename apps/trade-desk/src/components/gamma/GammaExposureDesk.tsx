@@ -18,6 +18,7 @@ import { analyzeHref, liveHref, optionsHref } from "@/lib/routes";
 import { Chip } from "@/components/ui/Chip";
 import { colorVarFor } from "@/lib/actionColors";
 import { Stat } from "@/components/ui/Stat";
+import { gammaFreshness, gammaMethodology } from "@/lib/executionState";
 
 function RegimeChip({ regime }: { regime: string }) {
   const isPin = regime === "positive_gex_pin";
@@ -170,6 +171,8 @@ function useVerdict(gamma: GammaResponse | null, live: LivePlanResponse | null) 
     const hasModel = live?.model?.ok === true;
 
     const gexSign = gamma?.gex_sign ?? 0;
+    const isFlowProxy = gamma?.exposure_kind === "intraday_gamma_flow_proxy";
+    const gammaSubject = isFlowProxy ? "Near-spot gamma flow" : "Near-spot dealer gamma";
     const regime = gamma?.regime ?? "flat";
     const squeezeLabel = gamma?.squeeze_label ?? "neutral";
     const squeezeScore = gamma?.squeeze_score ?? 0;
@@ -227,10 +230,10 @@ function useVerdict(gamma: GammaResponse | null, live: LivePlanResponse | null) 
       } else {
         consensus = gexSign < 0 ? "BREAKOUT WATCH" : "WAIT";
         note = gexSign < 0
-          ? "Near-spot dealer gamma is negative. A level break can expand volatility."
+          ? `${gammaSubject} is negative. A level break can expand volatility.`
           : gexSign > 0
-            ? "Near-spot dealer gamma is positive. Expect more pinning around the strongest strikes."
-            : "Dealer gamma is balanced. Wait for a price-level break.";
+            ? `${gammaSubject} is positive. Expect more pinning around the strongest strikes.`
+            : `${isFlowProxy ? "Gamma flow" : "Dealer gamma"} is balanced. Wait for a price-level break.`;
       }
     }
 
@@ -297,16 +300,6 @@ function buildNotes(gamma: GammaResponse): string[] {
   return notes;
 }
 
-function gammaFreshness(gamma: GammaResponse) {
-  const dataAsof = gamma.options_asof ?? null;
-  const dataDate = new Date(dataAsof ?? 0);
-  const hasTimestamp = dataAsof != null && Number.isFinite(dataDate.getTime());
-  const ageMs = hasTimestamp ? Date.now() - dataDate.getTime() : Number.POSITIVE_INFINITY;
-  const isStale = ageMs > 90 * 60 * 60 * 1000;
-  const staleHours = Math.max(0, Math.round(ageMs / (60 * 60 * 1000)));
-  return { dataAsof, dataDate, hasTimestamp, isStale, staleHours, isCurrent: hasTimestamp && !isStale };
-}
-
 function isoDateDaysAhead(days: number): string {
   const date = new Date();
   date.setDate(date.getDate() + days);
@@ -320,6 +313,8 @@ export function GammaExposureDesk({
 }) {
   const searchParams = useSearchParams();
   const qSymbol = searchParams.get("symbol")?.toUpperCase() ?? "";
+  const qAccount = Number(searchParams.get("account") || "1000");
+  const account = Number.isFinite(qAccount) && qAccount > 0 ? qAccount : 1000;
   const [symbol, setSymbol] = useState(qSymbol || "APLD");
   const [expiryFrom, setExpiryFrom] = useState(() => isoDateDaysAhead(0));
   const [expiryTo, setExpiryTo] = useState(() => isoDateDaysAhead(45));
@@ -358,7 +353,7 @@ export function GammaExposureDesk({
           fetch("/api/live-plan", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ symbol: sym, account: 1000 }),
+            body: JSON.stringify({ symbol: sym, account }),
             signal: liveController.signal,
           }),
         ]);
@@ -391,7 +386,7 @@ export function GammaExposureDesk({
         setLoading(false);
       }
     },
-    [symbol, expiryFrom, expiryTo],
+    [symbol, expiryFrom, expiryTo, account],
   );
 
   useEffect(() => {
@@ -402,7 +397,8 @@ export function GammaExposureDesk({
 
   const verdict = useVerdict(gamma, live);
   const notes = useMemo(() => (gamma ? buildNotes(gamma) : []), [gamma]);
-  const freshness = useMemo(() => (gamma ? gammaFreshness(gamma) : null), [gamma]);
+  const freshness = useMemo(() => (gamma ? gammaFreshness(gamma.options_asof) : null), [gamma]);
+  const methodology = useMemo(() => gammaMethodology(gamma), [gamma]);
   const showLevels = Boolean(gamma && freshness?.isCurrent);
 
   const body = (
@@ -410,7 +406,7 @@ export function GammaExposureDesk({
       {showHeader ? (
         <PageHeader
           title="Gamma"
-          description="Dealer gamma exposure by strike. Use as a confirmation overlay for the model verdict."
+          description="Gamma-derived levels from current option flow, with open-interest fallback when available."
           meta={
             gamma ? (
               <span
@@ -441,13 +437,13 @@ export function GammaExposureDesk({
                   Analyze
                 </Link>
                 <Link
-                  href={liveHref(symbol)}
+                  href={liveHref(symbol, "ticket", account)}
                   className="td-btn td-btn-ghost no-underline"
                 >
                   Ticket
                 </Link>
                 <Link
-                  href={optionsHref(symbol)}
+                  href={optionsHref(symbol, account)}
                   className="td-btn td-btn-ghost no-underline"
                 >
                   Options
@@ -487,7 +483,7 @@ export function GammaExposureDesk({
           </button>
         </div>
         <p className="text-[11px]" style={{ color: "var(--td-ink-500)" }}>
-          Live LSE options are preferred automatically. The selected dates filter the option expiries used for levels and the squeeze read. Levels are shown only when the chain carries a timestamp from the last 90 minutes.
+          Current option flow is preferred when its price agrees with the live feed; otherwise the desk falls back to open interest. Levels expire after 90 minutes.
         </p>
       </section>
 
@@ -512,7 +508,7 @@ export function GammaExposureDesk({
           }}
         >
           {freshness?.hasTimestamp
-            ? `The latest options update is ${freshness.staleHours} hours old, so levels are hidden rather than presented as live.`
+            ? `The latest options update is ${freshness.ageMinutes} minutes old, so levels are hidden rather than presented as live.`
             : "The options provider did not return a usable update time, so levels are hidden rather than presented as live."}
         </div>
       ) : null}
@@ -576,13 +572,7 @@ export function GammaExposureDesk({
                     Model: {live?.model?.model ?? "—"} · {live?.model?.confidence != null ? formatPct(live.model.confidence, 0) : "—"}
                   </span>
                   <span>
-                    Source:{" "}
-                    {gamma.weight === "volume_today"
-                      ? "LSE volume"
-                      : gamma.weight === "premium_today"
-                        ? "LSE premium"
-                        : "yfinance OI"}{" "}
-                    · {gamma.n_contracts} contracts
+                    {methodology.label} · {gamma.n_contracts} contracts
                   </span>
                 </div>
               </div>
@@ -590,9 +580,9 @@ export function GammaExposureDesk({
               <div className="grid gap-3 border-t p-4 lg:border-l lg:border-t-0" style={{ borderColor: "var(--td-hairline)" }}>
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                   <ReadoutTile
-                    label="Net dealer GEX"
+                    label={gamma.exposure_kind === "intraday_gamma_flow_proxy" ? "Net gamma-flow proxy" : "Net dealer GEX estimate"}
                     value={formatNum(gamma.net_dealer_gex, 0)}
-                    detail={gamma.gex_sign < 0 ? "Short gamma: range can expand." : gamma.gex_sign > 0 ? "Long gamma: pinning risk." : "Flat dealer book."}
+                    detail={gamma.gex_sign < 0 ? "Negative gamma: range can expand." : gamma.gex_sign > 0 ? "Positive gamma: pinning risk." : gamma.exposure_kind === "intraday_gamma_flow_proxy" ? "Balanced option flow." : "Flat dealer book."}
                     color={gamma.gex_sign < 0 ? "var(--td-action-avoid)" : gamma.gex_sign > 0 ? "var(--td-brand)" : "var(--td-ink-300)"}
                   />
                   <ReadoutTile
@@ -670,7 +660,7 @@ export function GammaExposureDesk({
               <SqueezeSummary gamma={gamma} />
 
               <div className="td-panel p-4">
-                <span className="td-eyebrow">Book inventory</span>
+                <span className="td-eyebrow">{gamma.exposure_kind === "intraday_gamma_flow_proxy" ? "Flow snapshot" : "Positioning estimate"}</span>
                 <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-3">
                   <Stat label="Spot" value={`${formatNum(gamma.spot)} (${gamma.spot_source})`} emphasize />
                   <Stat label="Regime" value={<RegimeChip regime={gamma.regime} />} emphasize />
@@ -680,6 +670,9 @@ export function GammaExposureDesk({
                   <Stat label="OTM put OI" value={formatNum(gamma.otm_put_oi, 0)} />
                   <Stat label="Options updated" value={freshness?.hasTimestamp ? freshness.dataDate.toLocaleString() : "—"} />
                 </div>
+                <p className="mt-3 text-[11px] leading-snug" style={{ color: "var(--td-ink-500)" }}>
+                  {methodology.detail}
+                </p>
               </div>
 
               <div className="td-panel p-4">

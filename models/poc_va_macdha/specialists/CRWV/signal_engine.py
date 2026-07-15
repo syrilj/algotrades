@@ -1,3 +1,4 @@
+from __future__ import annotations
 """v64_crwv_bounce — CoreWeave (CRWV) demand-bounce specialist.
 
 Global meta models often print low confidence on CRWV because they are
@@ -16,7 +17,6 @@ Exit:
   - Close below demand floor (invalidate bounce), or
   - Trail after +1.5 ATR extension
 """
-from __future__ import annotations
 
 from typing import Dict, Optional
 

@@ -1,0 +1,13 @@
+{
+  "portfolio": null,
+  "specialists": {
+    "GOOG.US": {
+      "specialist": "goog_vwap_trend",
+      "family": "megacap_quality",
+      "win_rate": null,
+      "note": "desk specialist scaffold \u2014 use live specialist DNA not bag backtest score"
+    }
+  },
+  "desk_specialist": true,
+  "primary_symbol": "GOOG.US"
+}

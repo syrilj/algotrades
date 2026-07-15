@@ -1,0 +1,35 @@
+{
+  "source": "yfinance",
+  "codes": [
+    "TSM.US"
+  ],
+  "start_date": "2024-08-01",
+  "end_date": "2026-07-11",
+  "initial_cash": 1000000,
+  "commission": 0.001,
+  "engine": "daily",
+  "interval": "1H",
+  "strategy": {
+    "name": "v65_spec_tsm",
+    "model_version": "v65_spec_tsm",
+    "desk_specialist": true,
+    "desk_symbol": "TSM.US",
+    "dna_donor": "dna_mu",
+    "engine_base": "v39d_confluence",
+    "bakeoff": {
+      "id": "_bake_tsm_dna_mu",
+      "dna": "dna_mu",
+      "kind": "donor",
+      "ret": 0.1480510139750708,
+      "dd": -0.05360215263570022,
+      "sharpe": 1.3295444416989888,
+      "n": 57,
+      "wr": 0.5789473684210527,
+      "final": 1148.0510139750709,
+      "ok": true,
+      "source_data": "yfinance",
+      "symbol": "TSM.US"
+    },
+    "note": "Proper specialist rebuilt from v39d + winning DNA bakeoff"
+  }
+}

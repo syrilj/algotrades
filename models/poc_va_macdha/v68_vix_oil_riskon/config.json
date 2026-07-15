@@ -1,0 +1,12 @@
+{
+  "source": "local",
+  "codes": ["TSLA.US", "MU.US", "SPY.US", "IONQ.US", "APLD.US", "XLP.US", "QQQ.US"],
+  "interval": "1H",
+  "commission": 0.001,
+  "engine": "daily",
+  "strategy": {
+    "name": "v68_vix_oil_riskon",
+    "model_version": "v68_vix_oil_riskon",
+    "note": "v39d_confluence gated on high-beta names by declining VIX + declining oil (USO)"
+  }
+}

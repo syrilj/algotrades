@@ -96,7 +96,7 @@ def _lse_candles_to_df(candles: list[dict]) -> pd.DataFrame:
 
 def _daily_close_lse(adapter: LSEAdapter, ticker: str) -> pd.Series:
     try:
-        start = (datetime.now(timezone.utc) - timedelta(days=180)).isoformat()
+        start = (datetime.now(timezone.utc) - timedelta(days=180)).strftime("%Y-%m-%d")
         candles = adapter.client.candles(_lse_symbol(ticker), "1d", start=start, limit=500)
         df = _lse_candles_to_df(candles)
         if not df.empty:
@@ -112,7 +112,7 @@ def _daily_close_lse(adapter: LSEAdapter, ticker: str) -> pd.Series:
 
 def _intraday_df_lse(adapter: LSEAdapter, symbol: str) -> pd.DataFrame | None:
     try:
-        start = (datetime.now(timezone.utc) - timedelta(days=60)).isoformat()
+        start = (datetime.now(timezone.utc) - timedelta(days=60)).strftime("%Y-%m-%d")
         candles = adapter.client.candles(_lse_symbol(symbol), "1h", start=start, limit=2000)
         df = _lse_candles_to_df(candles)
         if not df.empty and len(df) >= 20:
@@ -160,10 +160,12 @@ def macro_regime(adapter: LSEAdapter | None = None) -> dict[str, Any]:
     return out
 
 
-def _default_equity_model() -> str:
+def _default_equity_model(symbol: str | None = None) -> str:
     try:
-        from model_registry import equity_default_model
+        from model_registry import equity_model_for_symbol, equity_default_model
 
+        if symbol:
+            return equity_model_for_symbol(symbol)
         return equity_default_model()
     except Exception:
         return "v39b_live_adapt"
@@ -171,7 +173,7 @@ def _default_equity_model() -> str:
 
 def try_model_confidence(symbol: str, model: str | None = None) -> dict[str, Any]:
     """Best-effort model conf from trade_desk analyze (may be slow / fail offline)."""
-    model = model or _default_equity_model()
+    model = model or _default_equity_model(symbol)
     try:
         from trade_desk import analyze  # local tools/
 
@@ -226,7 +228,7 @@ def plan_symbol(
     open_options: int = 0,
     lse_adapter: LSEAdapter | None = None,
 ) -> dict[str, Any]:
-    model = model or _default_equity_model()
+    model = model or _default_equity_model(symbol)
     pol = load_policy()
     eng = LiveSignalEngine()
 
@@ -238,6 +240,8 @@ def plan_symbol(
     if df is not None and (df.empty or len(df) < 20):
         df = None
     live = eng.analyze(symbol, df=df)
+    live["source"] = "lse" if df is not None else "yfinance"
+    live["interval"] = "1h"
     if live.get("error"):
         return {
             "ok": False,
@@ -253,7 +257,9 @@ def plan_symbol(
             "asof_utc": datetime.now(timezone.utc).isoformat(),
         }
 
-    freshness = assess_data_freshness(live.get("timestamp"))
+    freshness = assess_data_freshness(live.get("timestamp"), market="US_EQUITY")
+    live["freshness"] = freshness
+    live["market_session"] = freshness.get("market_session", "unknown")
 
     macro = macro_regime(adapter)
     model_info: dict[str, Any] = {"ok": False, "skipped": not use_model}
@@ -265,25 +271,46 @@ def plan_symbol(
 
     go_long = bool(live.get("go_long"))
     go_short = bool(live.get("go_short"))
-    
-    # Bearish bias if short signal is active, or if long signal is flat and trend is down
-    is_bearish = go_short or (not go_long and not bool(live.get("macd_positive") or live.get("swing_uptrend") or live.get("above_vwap")))
-    
-    if is_bearish:
+
+    # Side from explicit signals only. Flat tape is neutral-long for desk risk
+    # (equity path is long-only) — never invent a short bias just because trend
+    # is soft. That was flipping flat names into "macro bullish — stand aside
+    # for shorts" while analysis still showed long-biased structure.
+    if go_short and not go_long:
         side = "short"
-        trend_ok = not bool(live.get("swing_uptrend") or live.get("above_vwap") or live.get("macd_positive"))
+        trend_ok = not bool(
+            live.get("swing_uptrend") or live.get("above_vwap") or live.get("macd_positive")
+        )
         live_conf = float(live.get("confidence_bear") or 0.0)
         model_conf = model_info.get("confidence")
         model_conf_bear = 1.0 - model_conf if (model_conf is not None) else None
-        conf = blend_confidence(live_conf, model_conf_bear if model_info.get("ok") else None, go_short, trend_ok)
-        setup_trend_ok = trend_ok and bool((not live.get("macd_positive")) or go_short or conf >= 0.65)
+        conf = blend_confidence(
+            live_conf,
+            model_conf_bear if model_info.get("ok") else None,
+            go_short,
+            trend_ok,
+        )
+        setup_trend_ok = trend_ok and bool(
+            (not live.get("macd_positive")) or go_short or conf >= 0.65
+        )
     else:
         side = "long"
-        trend_ok = bool(live.get("swing_uptrend") or live.get("above_vwap") or live.get("macd_positive"))
+        trend_ok = bool(
+            live.get("swing_uptrend") or live.get("above_vwap") or live.get("macd_positive")
+        )
         live_conf = float(live.get("confidence") or 0.0)
         model_conf = model_info.get("confidence")
-        conf = blend_confidence(live_conf, model_conf if model_info.get("ok") else None, go_long, trend_ok)
-        setup_trend_ok = trend_ok and bool(live.get("macd_positive") or go_long or conf >= 0.65)
+        conf = blend_confidence(
+            live_conf,
+            model_conf if model_info.get("ok") else None,
+            go_long,
+            trend_ok,
+        )
+        # Flat long: keep structure confidence for display, but setup_for_confidence
+        # still requires go_long/go_short below.
+        setup_trend_ok = trend_ok and bool(
+            live.get("macd_positive") or go_long or conf >= 0.65
+        )
 
     model_probability = model_info.get("raw_probability") if model_info.get("ok") else None
     setup_for_confidence = bool(
@@ -406,7 +433,11 @@ def plan_symbol(
         if setup.model_conf >= 0.60 and setup.trend_ok and setup.macro_ok:
             setup2 = SetupSnapshot(**{**setup.__dict__, "options_affordable": False})
             decision2 = plan_entry(setup2, state, pol)
+            decision = decision2
             dec = decision_to_dict(decision2)
+            dec["risk_manager_action"] = dec.get("action")
+            dec["confidence_state"] = confidence["state"]
+            dec["confidence_reasons"] = confidence.get("reasons", [])
             ticket["mode"] = decision2.mode
             ticket["vehicle"] = decision2.vehicle
             ticket["action"] = decision2.action
@@ -427,7 +458,11 @@ def plan_symbol(
             "Exit if macro flips defensive or model side off",
         ]
     elif decision.mode == "STAND_ASIDE":
-        ticket["steps"] = ["No edge / defensive macro — cash is a position"]
+        # Use real risk-manager reasons — never invent "defensive macro".
+        rm_reasons = [str(r) for r in (decision.reasons or []) if r]
+        if not rm_reasons:
+            rm_reasons = ["No tradeable edge — cash is a position"]
+        ticket["steps"] = rm_reasons[:4]
     elif decision.mode in ("FLATTEN", "HALT_NEW"):
         ticket["steps"] = list(decision.reasons)
 
@@ -469,15 +504,40 @@ def plan_symbol(
     except Exception:
         pass
 
-    # The confidence layer is fail-closed until an active, gated artifact exists.
+    # Confidence layer is fail-closed for *execution* only.
+    # Keep risk-manager action/mode/reasons intact so analysis UI does not
+    # contradict the setup narrative (e.g. BUY NOW facts + ABSTAIN gate).
+    rm_action = dec.get("action")
+    dec["risk_manager_action"] = rm_action
     if confidence["state"] != "ENTER":
-        dec["action"] = confidence["state"].lower()
         ticket["action"] = confidence["state"].lower()
+        ticket["execution_blocked"] = True
         ticket["steps"] = [
-            f"Confidence gate: {confidence['state']}",
+            f"Execution gate: {confidence['state']}",
             *[str(reason) for reason in confidence.get("reasons", [])],
             *ticket.get("steps", []),
         ]
+        dec["execution_action"] = confidence["state"].lower()
+        dec["execution_blocked"] = True
+        # Do NOT overwrite dec["action"] / mode — those are analysis truth.
+    else:
+        ticket["execution_blocked"] = False
+        dec["execution_action"] = rm_action
+        dec["execution_blocked"] = False
+
+    # Operator-facing setup label from the model plan (BUY NOW / WATCH / AVOID).
+    mode_now = ticket.get("mode") or dec.get("mode")
+    analysis_action = model_info.get("action_hint") or (
+        "BUY NOW"
+        if rm_action == "enter" and mode_now in ("EQUITY_HEDGE", "OPTIONS_ATTACK")
+        else "STAND ASIDE"
+        if mode_now == "STAND_ASIDE"
+        else str(mode_now or "WAIT")
+    )
+    dec["analysis_action"] = analysis_action
+    ticket["analysis_action"] = analysis_action
+    dec["mode"] = mode_now
+    dec["confidence_state"] = confidence["state"]
 
     out = {
         "ok": True,

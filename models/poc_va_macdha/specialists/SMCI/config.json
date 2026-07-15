@@ -1,0 +1,35 @@
+{
+  "source": "yfinance",
+  "codes": [
+    "SMCI.US"
+  ],
+  "start_date": "2024-08-01",
+  "end_date": "2026-07-11",
+  "initial_cash": 1000000,
+  "commission": 0.001,
+  "engine": "daily",
+  "interval": "1H",
+  "strategy": {
+    "name": "v65_spec_smci",
+    "model_version": "v65_spec_smci",
+    "desk_specialist": true,
+    "desk_symbol": "SMCI.US",
+    "dna_donor": "dna_mu",
+    "engine_base": "v39d_confluence",
+    "bakeoff": {
+      "id": "_bake_smci_dna_mu",
+      "dna": "dna_mu",
+      "kind": "donor",
+      "ret": 0.20677497155976776,
+      "dd": -0.31536439986177106,
+      "sharpe": 0.5594715920121357,
+      "n": 72,
+      "wr": 0.5277777777777778,
+      "final": 1206.7749715597677,
+      "ok": true,
+      "source_data": "yfinance",
+      "symbol": "SMCI.US"
+    },
+    "note": "Proper specialist rebuilt from v39d + winning DNA bakeoff"
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "source": "yfinance",
+  "codes": [
+    "SNDK.US"
+  ],
+  "start_date": "2024-08-01",
+  "end_date": "2026-07-11",
+  "initial_cash": 1000000,
+  "commission": 0.001,
+  "engine": "daily",
+  "interval": "1H",
+  "strategy": {
+    "name": "v65_spec_sndk",
+    "model_version": "v65_spec_sndk",
+    "desk_specialist": true,
+    "desk_symbol": "SNDK.US",
+    "dna_donor": "dna_spy",
+    "engine_base": "v39d_confluence",
+    "bakeoff": {
+      "id": "v39d_confluence",
+      "dna": "v39d_default",
+      "kind": "baseline",
+      "ret": 1.4742620938312938,
+      "dd": -0.17126170377257416,
+      "sharpe": 2.2298179046748685,
+      "n": 25,
+      "wr": 0.56,
+      "final": 2474.262093831294,
+      "ok": true,
+      "source_data": "yfinance",
+      "symbol": "SNDK.US"
+    },
+    "note": "Proper specialist rebuilt from v39d + winning DNA bakeoff"
+  }
+}

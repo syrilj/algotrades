@@ -44,6 +44,24 @@ def _rank_models_for_symbol(symbol: str, top_n: int = 3) -> list[dict[str, Any]]
     return rows[:top_n]
 
 
+def _resolve_analysis_model(symbol: str, model: str | None) -> tuple[str | None, dict[str, Any] | None]:
+    """Prefer explicit model; else desk specialist routing; else WINNER."""
+    if model and str(model).strip() and str(model).strip().lower() not in {"auto", "best", "default"}:
+        return str(model).strip(), None
+    try:
+        rec = _mr.recommend_model(symbol, desk_only=True)
+        return rec.get("model"), rec
+    except Exception:
+        try:
+            return _mr.equity_model_for_symbol(symbol), {
+                "model": _mr.equity_model_for_symbol(symbol),
+                "source": "desk_or_winner",
+                "reason": "equity_model_for_symbol fallback",
+            }
+        except Exception:
+            return None, None
+
+
 def _build_facts(plan: dict[str, Any], ranks: list[dict[str, Any]]) -> dict[str, Any]:
     live = plan.get("live") or {}
     model = plan.get("model") or {}
@@ -101,20 +119,93 @@ def _build_facts(plan: dict[str, Any], ranks: list[dict[str, Any]]) -> dict[str,
     }
 
 
+def _operator_action(plan: dict[str, Any], decision: dict[str, Any], model: dict[str, Any]) -> str:
+    """Primary chip label: setup analysis, not the execution-gate string."""
+    hint = model.get("action_hint") or decision.get("analysis_action") or (plan.get("ticket") or {}).get("analysis_action")
+    if hint and str(hint).strip():
+        return str(hint).strip()
+    rm = decision.get("risk_manager_action") or decision.get("action")
+    mode = decision.get("mode")
+    if rm == "enter" and mode == "OPTIONS_ATTACK":
+        return "BUY NOW"
+    if rm == "enter" and mode == "EQUITY_HEDGE":
+        return "BUY NOW"
+    if mode == "STAND_ASIDE":
+        return "STAND ASIDE"
+    if mode in ("FLATTEN", "HALT_NEW"):
+        return str(mode)
+    return str(rm or mode or "WAIT")
+
+
 def _build_decision(plan: dict[str, Any]) -> dict[str, Any]:
     decision = plan.get("decision") or {}
     confidence = plan.get("confidence") or {}
+    ticket = plan.get("ticket") or {}
+    live = plan.get("live") or {}
+    model = plan.get("model") or {}
+
+    price = _safe_float(model.get("price") or live.get("price") or plan.get("price"))
+    entry = _safe_float(model.get("entry") or live.get("price") or plan.get("price"))
+    stop = _safe_float(model.get("stop"))
+    max_loss = _safe_float(decision.get("max_loss_dollars") or ticket.get("max_loss_dollars"))
+    go_short = bool(live.get("go_short"))
+    go_long = bool(live.get("go_long"))
+    side = "short" if go_short else ("long" if go_long else "neutral")
+
+    sizing = None
+    # Execution math stays valid whenever levels + risk budget exist, even if
+    # the confidence gate is ABSTAIN (sizing is illustrative until ENTER).
+    if entry is not None and stop is not None and max_loss is not None and max_loss > 0:
+        risk_per_share = abs(entry - stop)
+        if risk_per_share > 0:
+            shares = int(max_loss / risk_per_share)
+            sizing = {
+                "price": price,
+                "entry": entry,
+                "stop": stop,
+                "risk_per_share": risk_per_share,
+                "shares": max(0, shares),
+                "notional": shares * entry,
+                "target": entry + 2.0 * risk_per_share * (1.0 if side != "short" else -1.0),
+                "side": side,
+            }
+
+    conf_state = confidence.get("state") or decision.get("confidence_state")
+    rm_action = decision.get("risk_manager_action") or decision.get("action")
+    exec_action = decision.get("execution_action") or ticket.get("action")
+    analysis_action = _operator_action(plan, decision, model)
+
     return {
-        "confidence_state": confidence.get("state"),
+        "confidence_state": conf_state,
         "blended_confidence": _safe_float(plan.get("blended_confidence")),
-        "mode": decision.get("mode"),
-        "vehicle": decision.get("vehicle"),
-        "action": decision.get("action"),
-        "risk_pct": _safe_float(decision.get("risk_pct")),
-        "max_loss_dollars": _safe_float(decision.get("max_loss_dollars")),
+        "mode": decision.get("mode") or ticket.get("mode"),
+        "vehicle": decision.get("vehicle") or ticket.get("vehicle"),
+        # Primary operator action = setup analysis (matches Analyze/Watch language).
+        "action": analysis_action,
+        "analysis_action": analysis_action,
+        "risk_manager_action": rm_action,
+        "execution_action": exec_action,
+        "execution_blocked": bool(
+            decision.get("execution_blocked")
+            or ticket.get("execution_blocked")
+            or (conf_state not in (None, "ENTER"))
+        ),
+        "risk_pct": _safe_float(decision.get("risk_pct") or ticket.get("risk_pct")),
+        "max_loss_dollars": max_loss,
         "conviction": _safe_float(decision.get("conviction")),
         "reasons": decision.get("reasons") or confidence.get("reasons") or [],
-        "exit_rules": decision.get("exit_rules") or {},
+        "exit_rules": decision.get("exit_rules") or ticket.get("exit_rules") or {},
+        "confidence": {
+            "state": conf_state,
+            "band": confidence.get("band"),
+            "raw_probability": _safe_float(confidence.get("raw_probability")),
+            "calibrated_probability": _safe_float(confidence.get("calibrated_probability")),
+            "size_limit": _safe_float(confidence.get("size_limit")),
+            "evidence": confidence.get("evidence", []),
+            "failed_checks": confidence.get("failed_checks", []),
+            "reasons": confidence.get("reasons", []),
+        },
+        "sizing": sizing,
     }
 
 
@@ -126,6 +217,8 @@ def _build_suggestion(plan: dict[str, Any]) -> dict[str, Any]:
             "mode": ticket.get("mode"),
             "vehicle": ticket.get("vehicle"),
             "action": ticket.get("action"),
+            "analysis_action": ticket.get("analysis_action"),
+            "execution_blocked": bool(ticket.get("execution_blocked")),
             "symbol": ticket.get("symbol"),
             "max_loss_dollars": _safe_float(ticket.get("max_loss_dollars")),
             "risk_pct": _safe_float(ticket.get("risk_pct")),
@@ -242,32 +335,83 @@ def _build_rationale_and_drivers(facts: dict[str, Any], decision: dict[str, Any]
             "impact": "positive" if conf_state == "ENTER" else "neutral" if conf_state == "WATCH" else "negative",
         })
 
-    # Build rationale
-    side = "long" if live.get("go_long") else ("short" if live.get("go_short") else "neutral")
+    # Build rationale — keep setup analysis and execution gate as separate sentences.
+    side = "long" if live.get("go_long") else ("short" if live.get("go_short") else "flat")
     macro_state = macro.get("xlp_spy_ratio_state") or ("risk-on" if macro.get("macro_ok") else "defensive")
     qqq_state = macro.get("qqq_trend") or ("up" if macro.get("qqq_ok") else "weak")
+    analysis_action = decision.get("analysis_action") or decision.get("action") or "WAIT"
+    conf_state = decision.get("confidence_state") or "ABSTAIN"
+    mode = ticket.get("mode") or decision.get("mode") or "STAND_ASIDE"
+    rm_action = decision.get("risk_manager_action")
 
     rationale = (
-        f"{symbol} at {price_txt} — {side} live signal, "
+        f"{symbol} at {price_txt} — live side {side}, "
         f"macro {macro_state}, QQQ {qqq_state}, "
         f"GEX {gex.get('regime', 'unknown')}. "
     )
     if model_conf is not None:
-        rationale += f"Model {model.get('model') or 'auto'} confidence {model_conf:.2f}. "
-    rationale += (
-        f"Decision: {decision.get('confidence_state') or 'ABSTAIN'} → "
-        f"{ticket.get('action') or 'stand aside'} "
-        f"({ticket.get('mode') or 'STAND_ASIDE'})."
-    )
+        rationale += f"Model {model.get('model') or 'auto'} structure conf {model_conf:.2f}. "
+    setup_ok = model.get("setup_ok")
+    if setup_ok is True:
+        rationale += "Setup is live. "
+    elif setup_ok is False:
+        rationale += "Setup not ready. "
+    rationale += f"Analysis: {analysis_action}"
+    if mode:
+        rationale += f" · risk mode {mode}"
+    if rm_action and rm_action != ticket.get("action"):
+        rationale += f" · risk mgr {rm_action}"
+    rationale += f". Execution gate: {conf_state}"
+    if decision.get("execution_blocked") or conf_state != "ENTER":
+        gate_reasons = (decision.get("confidence") or {}).get("reasons") or []
+        if gate_reasons:
+            rationale += f" ({', '.join(str(r) for r in gate_reasons[:2])})"
+        rationale += " — levels/math may still show; do not size until ENTER."
+    else:
+        rationale += " — ready to size."
 
-    # Alternatives
+    # Alternatives — only suggest what is still missing (no contradictory prompts).
     alternatives: list[str] = []
-    if decision.get("action") == "enter":
+    conf_reasons = set(str(r) for r in ((decision.get("confidence") or {}).get("reasons") or []))
+    failed = set(str(r) for r in ((decision.get("confidence") or {}).get("failed_checks") or []))
+
+    if conf_state == "ENTER" and (rm_action == "enter" or ticket.get("action") == "enter"):
         alternatives.append("Cut size or stand aside if live vol_z drops below 1.0 or macro flips defensive.")
         alternatives.append("Trail stop per ticket exit rules if position moves in your favor.")
     else:
-        alternatives.append("Re-evaluate if MACD turns positive, vol_z exceeds 1.5, and QQQ trend improves.")
-        alternatives.append("Watch the model confidence gate; ENTER requires setup_ok + macro_ok + confidence gate.")
+        if "calibration_artifact_missing" in conf_reasons or "active_calibration" in failed:
+            alternatives.append(
+                "Execution is blocked by missing active calibration — analysis can still show levels, but do not paper/live size until the gate clears."
+            )
+        if "market_data_stale_or_unavailable" in conf_reasons or "fresh_data" in failed:
+            alternatives.append("Refresh market data; gate is blocked on stale/unavailable feed.")
+        needs: list[str] = []
+        if not live.get("macd_positive") and side != "short":
+            needs.append("MACD turns positive")
+        if (live.get("vol_z") or 0) < 1.5:
+            needs.append("vol_z ≥ 1.5")
+        if not live.get("above_vwap") and side != "short":
+            needs.append("price reclaims VWAP")
+        if not live.get("go_long") and not live.get("go_short"):
+            needs.append("live signal prints go_long/go_short")
+        if not macro.get("qqq_ok") and side != "short":
+            needs.append("QQQ trend improves")
+        if needs:
+            alternatives.append("Watch for: " + "; ".join(needs[:4]) + ".")
+        else:
+            alternatives.append(
+                "Tape already has several bullish pieces — wait for specialist/generate size > 0 or a volume surge through the breakout level."
+            )
+        if setup_ok is False:
+            aa = str(analysis_action or "").upper()
+            if "AVOID" in aa or "STAND" in aa:
+                alternatives.append(
+                    "No force entry — cash is fine. Prefer names with BREAKOUT WATCH / PULLBACK ZONE and a clear level."
+                )
+            else:
+                alternatives.append(
+                    f"Setup path: follow '{analysis_action}' levels (dip zone / breakout trigger) — not a force entry."
+                )
 
     return rationale, drivers, alternatives
 
@@ -283,11 +427,12 @@ def run_analysis(
         return {"ok": False, "error": "symbol required", "asof_utc": _now()}
 
     raw_symbol = symbol.strip().upper()
-    # live_plan handles both TSLA and TSLA.US
+    resolved_model, model_selection = _resolve_analysis_model(raw_symbol, model)
+    # live_plan handles both TSLA and TSLA.US; routes desk specialists via model_registry
     plan = _lp.plan_symbol(
         raw_symbol,
         account=account,
-        model=model or _lp._default_equity_model(),
+        model=resolved_model,
         use_model=True,
     )
 
@@ -297,10 +442,20 @@ def run_analysis(
             "symbol": raw_symbol,
             "error": plan.get("error") or "live plan failed",
             "asof_utc": plan.get("asof_utc") or _now(),
+            "model_selection": model_selection,
         }
 
     ranks = _rank_models_for_symbol(raw_symbol, top_n=top_n)
     facts = _build_facts(plan, ranks)
+    if model_selection:
+        facts["model_selection"] = {
+            "model": model_selection.get("model") or resolved_model or plan.get("model_used"),
+            "reason": model_selection.get("reason"),
+            "source": model_selection.get("source"),
+            "specialist": model_selection.get("specialist"),
+            "family": model_selection.get("family"),
+            "code": model_selection.get("code"),
+        }
     decision = _build_decision(plan)
     suggestion = _build_suggestion(plan)
     rationale, drivers, alternatives = _build_rationale_and_drivers(
@@ -309,11 +464,27 @@ def run_analysis(
     suggestion["rationale"] = rationale
     suggestion["drivers"] = drivers
     suggestion["alternatives"] = alternatives
+    if model_selection and model_selection.get("source") == "desk_specialist":
+        drivers = list(drivers or [])
+        drivers.insert(
+            0,
+            {
+                "name": "Model route",
+                "value": (
+                    f"{model_selection.get('model')} "
+                    f"({model_selection.get('specialist') or model_selection.get('family') or 'DNA'})"
+                ),
+                "impact": "neutral",
+            },
+        )
+        suggestion["drivers"] = drivers
 
     return {
         "ok": True,
         "symbol": plan.get("symbol") or raw_symbol,
         "asof_utc": plan.get("asof_utc") or _now(),
+        "model_used": resolved_model or plan.get("model_used"),
+        "model_selection": model_selection,
         "report": {
             "facts": facts,
             "decision": decision,

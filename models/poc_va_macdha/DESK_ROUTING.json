@@ -1,0 +1,305 @@
+{
+  "version": 3,
+  "note": "Specialists are v39d+XGB forks. dna_edge=true only when bakeoff multi-locked a routing DNA beat vs v39d default. All v65_spec_* now use the champion engine.",
+  "tracks": {
+    "specialist": "by_symbol map \u2192 v65_spec_* / v64_crwv_bounce",
+    "standard": "equity_default_model() WINNER, prefer v39d_confluence when present"
+  },
+  "alias": {
+    "INFQ": "IONQ",
+    "INFQ.US": "IONQ.US",
+    "GOOGL": "GOOG",
+    "GOOGL.US": "GOOG.US"
+  },
+  "by_symbol": {
+    "TSLA.US": {
+      "model": "v65_spec_tsla",
+      "specialist": "tsla_dna_tsla",
+      "family": "dna_tsla",
+      "dna": "dna_tsla",
+      "source_dir": "specialists/TSLA",
+      "track": "specialist",
+      "engine_base": "v39d_confluence",
+      "bakeoff_promoted": false,
+      "dna_edge": false
+    },
+    "MU.US": {
+      "model": "v65_spec_mu",
+      "specialist": "mu_dna_mu",
+      "family": "dna_mu",
+      "dna": "dna_mu",
+      "source_dir": "specialists/MU",
+      "track": "specialist",
+      "engine_base": "v39d_confluence",
+      "bakeoff_promoted": false,
+      "dna_edge": false
+    },
+    "IONQ.US": {
+      "model": "v65_spec_ionq",
+      "specialist": "ionq_dna_ionq",
+      "family": "dna_ionq",
+      "dna": "dna_ionq",
+      "source_dir": "specialists/IONQ",
+      "track": "specialist",
+      "engine_base": "v39d_confluence",
+      "bakeoff_promoted": false,
+      "dna_edge": false
+    },
+    "MSTR.US": {
+      "model": "v65_spec_mstr",
+      "specialist": "mstr_dna_tsla",
+      "family": "dna_tsla",
+      "dna": "dna_tsla",
+      "source_dir": "specialists/MSTR",
+      "track": "specialist",
+      "engine_base": "v39d_confluence",
+      "bakeoff_promoted": true,
+      "dna_edge": true
+    },
+    "SNDK.US": {
+      "model": "v65_spec_sndk",
+      "specialist": "sndk_dna_spy",
+      "family": "dna_spy",
+      "dna": "dna_spy",
+      "source_dir": "specialists/SNDK",
+      "track": "specialist",
+      "engine_base": "v39d_confluence",
+      "bakeoff_promoted": false,
+      "dna_edge": false
+    },
+    "ASTS.US": {
+      "model": "v65_spec_asts",
+      "specialist": "asts_dna_apld",
+      "family": "dna_apld",
+      "dna": "dna_apld",
+      "source_dir": "specialists/ASTS",
+      "track": "specialist",
+      "engine_base": "v39d_confluence",
+      "bakeoff_promoted": true,
+      "dna_edge": true
+    },
+    "META.US": {
+      "model": "v65_spec_meta",
+      "specialist": "meta_dna_tsla",
+      "family": "dna_tsla",
+      "dna": "dna_tsla",
+      "source_dir": "specialists/META",
+      "track": "specialist",
+      "engine_base": "v39d_confluence",
+      "bakeoff_promoted": true,
+      "dna_edge": true
+    },
+    "GOOG.US": {
+      "model": "v65_spec_goog",
+      "specialist": "goog_vwap_trend",
+      "family": "megacap_quality",
+      "source_dir": "specialists/GOOG",
+      "track": "specialist"
+    },
+    "COIN.US": {
+      "model": "v65_spec_coin",
+      "specialist": "coin_dna_spy",
+      "family": "dna_spy",
+      "dna": "dna_spy",
+      "source_dir": "specialists/COIN",
+      "track": "specialist",
+      "engine_base": "v39d_confluence",
+      "bakeoff_promoted": false,
+      "dna_edge": false
+    },
+    "CRWV.US": {
+      "model": "v65_spec_crwv",
+      "specialist": "crwv_dna_tsla",
+      "family": "dna_tsla",
+      "dna": "dna_tsla",
+      "source_dir": "specialists/CRWV",
+      "track": "specialist",
+      "engine_base": "v39d_confluence",
+      "bakeoff_promoted": true,
+      "dna_edge": true
+    },
+    "APLD.US": {
+      "model": "v65_spec_apld",
+      "specialist": "apld_dna_apld",
+      "family": "dna_apld",
+      "dna": "dna_apld",
+      "source_dir": "specialists/APLD",
+      "track": "specialist",
+      "engine_base": "v39d_confluence",
+      "bakeoff_promoted": false,
+      "dna_edge": false
+    },
+    "ARM.US": {
+      "model": "v65_spec_arm",
+      "specialist": "arm_dna_spy",
+      "family": "dna_spy",
+      "dna": "dna_spy",
+      "source_dir": "specialists/ARM",
+      "track": "specialist",
+      "engine_base": "v39d_confluence",
+      "bakeoff_promoted": false,
+      "dna_edge": false
+    },
+    "NVDA.US": {
+      "model": "v65_spec_nvda",
+      "specialist": "nvda_dna_apld",
+      "family": "dna_apld",
+      "dna": "dna_apld",
+      "source_dir": "specialists/NVDA",
+      "track": "specialist",
+      "engine_base": "v39d_confluence",
+      "bakeoff_promoted": true,
+      "dna_edge": true
+    },
+    "AMD.US": {
+      "model": "v65_spec_amd",
+      "specialist": "amd_dna_tsla",
+      "family": "dna_tsla",
+      "dna": "dna_tsla",
+      "source_dir": "specialists/AMD",
+      "track": "specialist",
+      "engine_base": "v39d_confluence",
+      "bakeoff_promoted": false,
+      "dna_edge": false
+    },
+    "SMCI.US": {
+      "model": "v65_spec_smci",
+      "specialist": "smci_dna_mu",
+      "family": "dna_mu",
+      "dna": "dna_mu",
+      "source_dir": "specialists/SMCI",
+      "track": "specialist",
+      "engine_base": "v39d_confluence",
+      "bakeoff_promoted": false,
+      "dna_edge": false
+    },
+    "PLTR.US": {
+      "model": "v65_spec_pltr",
+      "specialist": "pltr_dna_tsla",
+      "family": "dna_tsla",
+      "dna": "dna_tsla",
+      "source_dir": "specialists/PLTR",
+      "track": "specialist",
+      "engine_base": "v39d_confluence",
+      "bakeoff_promoted": true,
+      "dna_edge": true
+    },
+    "HOOD.US": {
+      "model": "v65_spec_hood",
+      "specialist": "hood_dna_arm",
+      "family": "dna_arm",
+      "dna": "dna_arm",
+      "source_dir": "specialists/HOOD",
+      "track": "specialist",
+      "engine_base": "v39d_confluence",
+      "bakeoff_promoted": true,
+      "dna_edge": true
+    },
+    "AMZN.US": {
+      "model": "v65_spec_amzn",
+      "specialist": "amzn_dna_mu",
+      "family": "dna_mu",
+      "dna": "dna_mu",
+      "source_dir": "specialists/AMZN",
+      "track": "specialist",
+      "engine_base": "v39d_confluence",
+      "bakeoff_promoted": true,
+      "dna_edge": true
+    },
+    "MSFT.US": {
+      "model": "v65_spec_msft",
+      "specialist": "msft_dna_tsla",
+      "family": "dna_tsla",
+      "dna": "dna_tsla",
+      "source_dir": "specialists/MSFT",
+      "track": "specialist",
+      "engine_base": "v39d_confluence",
+      "bakeoff_promoted": true,
+      "dna_edge": true
+    },
+    "AAPL.US": {
+      "model": "v65_spec_aapl",
+      "specialist": "aapl_dna_spy",
+      "family": "dna_spy",
+      "dna": "dna_spy",
+      "source_dir": "specialists/AAPL",
+      "track": "specialist",
+      "engine_base": "v39d_confluence",
+      "bakeoff_promoted": false,
+      "dna_edge": false
+    },
+    "AVGO.US": {
+      "model": "v65_spec_avgo",
+      "specialist": "avgo_dna_mu",
+      "family": "dna_mu",
+      "dna": "dna_mu",
+      "source_dir": "specialists/AVGO",
+      "track": "specialist",
+      "engine_base": "v39d_confluence",
+      "bakeoff_promoted": true,
+      "dna_edge": true
+    },
+    "SPY.US": {
+      "model": "v65_spec_spy",
+      "specialist": "spy_dna_spy",
+      "family": "dna_spy",
+      "dna": "dna_spy",
+      "source_dir": "specialists/SPY",
+      "track": "specialist",
+      "engine_base": "v39d_confluence",
+      "bakeoff_promoted": false,
+      "dna_edge": false
+    },
+    "TSM.US": {
+      "model": "v65_spec_tsm",
+      "specialist": "tsm_dna_mu",
+      "family": "dna_mu",
+      "dna": "dna_mu",
+      "source_dir": "specialists/TSM",
+      "track": "specialist",
+      "engine_base": "v39d_confluence",
+      "bakeoff_promoted": true,
+      "dna_edge": true
+    },
+    "VRT.US": {
+      "model": "v65_spec_vrt",
+      "specialist": "vrt_dna_tsla",
+      "family": "dna_tsla",
+      "dna": "dna_tsla",
+      "source_dir": "specialists/VRT",
+      "track": "specialist",
+      "engine_base": "v39d_confluence",
+      "bakeoff_promoted": true,
+      "dna_edge": true
+    },
+    "SOFI.US": {
+      "model": "v65_spec_sofi",
+      "specialist": "sofi_dna_spy",
+      "family": "dna_spy",
+      "dna": "dna_spy",
+      "source_dir": "specialists/SOFI",
+      "track": "specialist",
+      "engine_base": "v39d_confluence",
+      "bakeoff_promoted": false,
+      "dna_edge": false
+    },
+    "QQQ.US": {
+      "model": "v65_spec_qqq",
+      "specialist": "qqq_dna_spy",
+      "family": "dna_spy",
+      "dna": "dna_spy",
+      "source_dir": "specialists/QQQ",
+      "track": "specialist",
+      "engine_base": "v39d_confluence",
+      "bakeoff_promoted": false,
+      "dna_edge": false
+    }
+  },
+  "multi_model": "v65_desk_specialists",
+  "best_router": "v66_best_router",
+  "universal_model": "v67_universal_specialist",
+  "fallback_equity": "v39d_confluence",
+  "fallback_equity_alt": "v39b_live_adapt",
+  "routing_mode": "competitive_best",
+  "note_universal": "Unmapped symbols get v67_universal_specialist as a candidate (family DNA), competing with v39d \u2014 not auto-promoted."
+}

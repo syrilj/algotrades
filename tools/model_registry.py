@@ -15,6 +15,7 @@ DEFAULT_MODEL = "v39b_live_adapt"
 OPTIONS_DEFAULT_MODEL = "v32_soft_react_opts"
 OPTIONS_WINNER_PATH = MODELS_ROOT / "OPTIONS_WINNER.json"
 EQUITY_WINNER_PATH = MODELS_ROOT / "WINNER.json"
+DESK_ROUTING_PATH = MODELS_ROOT / "DESK_ROUTING.json"
 
 
 def equity_default_model() -> str:
@@ -28,6 +29,340 @@ def equity_default_model() -> str:
     except Exception:
         pass
     return DEFAULT_MODEL
+
+
+def _normalize_symbol_code(symbol: str) -> str:
+    code = str(symbol or "").strip().upper()
+    if not code:
+        return ""
+    if code.endswith(".US"):
+        return code
+    return f"{code}.US"
+
+
+def load_desk_routing() -> dict[str, Any]:
+    """Load DESK_ROUTING.json (symbol → specialist model)."""
+    if not DESK_ROUTING_PATH.exists():
+        return {"by_symbol": {}, "alias": {}}
+    try:
+        data = json.loads(DESK_ROUTING_PATH.read_text())
+    except Exception:
+        return {"by_symbol": {}, "alias": {}}
+    return data if isinstance(data, dict) else {"by_symbol": {}, "alias": {}}
+
+
+def resolve_desk_symbol(symbol: str) -> str:
+    """Normalize aliases (INFQ→IONQ, GOOGL→GOOG) to CODE.US form."""
+    raw = str(symbol or "").strip().upper()
+    if not raw:
+        return ""
+    routing = load_desk_routing()
+    alias = routing.get("alias") or {}
+    if raw in alias:
+        raw = str(alias[raw]).upper()
+    elif f"{raw}.US" in alias:
+        raw = str(alias[f"{raw}.US"]).upper()
+    return _normalize_symbol_code(raw.replace(".US", "") if raw.endswith(".US") else raw)
+
+
+def desk_specialist_for_symbol(symbol: str) -> dict[str, Any] | None:
+    """Return routed desk specialist model for a symbol, or None.
+
+    Used by recommend_model / analysis / live_plan so TSLA→v65_spec_tsla,
+    CRWV→v64_crwv_bounce, INFQ→IONQ specialist, etc.
+    """
+    code = resolve_desk_symbol(symbol)
+    if not code:
+        return None
+    routing = load_desk_routing()
+    by_sym = routing.get("by_symbol") or {}
+    row = by_sym.get(code)
+    if not isinstance(row, dict):
+        return None
+    model = str(row.get("model") or "")
+    if not model or not (MODELS_ROOT / model / "signal_engine.py").exists():
+        return None
+    return {
+        "model": model,
+        "code": code,
+        "specialist": row.get("specialist"),
+        "family": row.get("family"),
+        "source_dir": row.get("source_dir"),
+        "reason": (
+            f"desk specialist for {code}"
+            + (f" ({row.get('specialist')})" if row.get("specialist") else "")
+        ),
+        "source": "desk_specialist",
+        "track": "specialist",
+        "kind": engine_kind(model),
+    }
+
+
+def standard_equity_model() -> str:
+    """Track B — normal bag models for symbols without a specialist.
+
+    Prefers DESK_ROUTING.fallback_equity (v39d_confluence) when that engine
+    exists, else WINNER.json / DEFAULT_MODEL.
+    """
+    routing = load_desk_routing()
+    for key in ("fallback_equity", "fallback_equity_alt"):
+        cand = routing.get(key)
+        if cand and (MODELS_ROOT / str(cand) / "signal_engine.py").exists():
+            return str(cand)
+    return equity_default_model()
+
+
+def equity_model_for_symbol(symbol: str | None = None) -> str:
+    """Best-model router for a symbol (specialist vs standard competition).
+
+    Delegates to ``route_best_model`` so analysis / live always get the winner
+    of specialist DNA vs bag champions (v39d etc.), not a hard-coded track.
+    """
+    if symbol:
+        hit = route_best_model(symbol)
+        if hit and hit.get("model"):
+            return str(hit["model"])
+    return standard_equity_model()
+
+
+# Standard bag models always considered by the best-model router.
+_STANDARD_CANDIDATES: tuple[str, ...] = (
+    "v39d_confluence",
+    "v39b_live_adapt",
+    "v63_spy_prune",
+    "v50_high_win_rate",
+)
+
+
+def route_best_model(symbol: str, *, desk_only: bool = True) -> dict[str, Any]:
+    """Compete specialist vs standard models; return the best for ``symbol``.
+
+    This is the legitimate router: specialists are *candidates*, not automatic
+    winners. Generics (v39d etc.) can win when evidence favors them.
+
+    Score = blend of:
+      - prior (specialist DNA prior, standard champion prior)
+      - historical per-symbol card score when present
+      - fresh symbol_ranker score when present
+    """
+    code = resolve_desk_symbol(symbol) or _normalize_symbol_code(symbol)
+    desk = set(list_desk_engines()) if desk_only else None
+
+    def _allowed(model: str) -> bool:
+        if not (MODELS_ROOT / model / "signal_engine.py").exists():
+            return False
+        if desk is not None and model not in desk and not is_desk_engine(model):
+            return False
+        return True
+
+    # Build candidate set: specialist (if any) + standards + ranker top.
+    candidates: dict[str, dict[str, Any]] = {}
+
+    def _add(model: str, *, prior: float, kind: str, meta: dict[str, Any] | None = None) -> None:
+        if not model or model in candidates or not _allowed(model):
+            return
+        candidates[model] = {
+            "model": model,
+            "prior": float(prior),
+            "kind": kind,
+            "meta": meta or {},
+            "hist_score": None,
+            "ranker_score": None,
+            "final_score": float(prior),
+            "evidence": [],
+        }
+
+    spec = desk_specialist_for_symbol(code) if code else None
+    if spec:
+        # v39d-based specialists: high prior only when bakeoff multi-locked DNA edge.
+        # Otherwise near champion so bag models can still win on evidence.
+        mid = str(spec["model"])
+        routing = load_desk_routing()
+        row = (routing.get("by_symbol") or {}).get(code) or {}
+        dna_edge = bool(row.get("bakeoff_promoted") or row.get("dna_edge"))
+        if mid == "v39d_confluence":
+            prior_s = 0.74
+        elif mid.startswith("v65_spec_") or mid.startswith("v64_"):
+            prior_s = 0.80 if dna_edge else 0.73
+        else:
+            prior_s = 0.76
+        _add(
+            mid,
+            prior=prior_s,
+            kind="specialist",
+            meta={
+                "specialist": spec.get("specialist"),
+                "family": spec.get("family") or row.get("family"),
+                "code": spec.get("code"),
+                "dna": row.get("dna"),
+                "dna_edge": dna_edge,
+            },
+        )
+        if mid in candidates:
+            candidates[mid]["evidence"].append(
+                f"desk specialist prior {prior_s:.2f}"
+                + (" (dna edge)" if dna_edge else " (v39d-based)")
+            )
+        elif (MODELS_ROOT / mid / "signal_engine.py").exists():
+            candidates[mid] = {
+                "model": mid,
+                "prior": prior_s,
+                "kind": "specialist",
+                "meta": {
+                    "specialist": spec.get("specialist"),
+                    "family": spec.get("family"),
+                    "code": spec.get("code"),
+                },
+                "hist_score": None,
+                "ranker_score": None,
+                "final_score": prior_s,
+                "evidence": [f"desk specialist prior {prior_s:.2f} (force-added)"],
+            }
+    else:
+        # Unmapped symbol → universal family-DNA engine as a *candidate*
+        # (not auto-win). Prior is softer than named specialists.
+        uni = "v67_universal_specialist"
+        fam_meta: dict[str, Any] = {}
+        prior_u = 0.58
+        try:
+            from specialist_factory import classify_symbol  # type: ignore
+
+            info = classify_symbol(code or "")
+            fam_meta = {
+                "specialist": info.get("specialist"),
+                "family": info.get("family"),
+                "code": info.get("code") or code,
+            }
+            prior_u = float(info.get("prior") or 0.55)
+        except Exception:
+            fam_meta = {"family": "default_equity", "code": code}
+        _add(uni, prior=prior_u, kind="specialist", meta=fam_meta)
+        if uni in candidates:
+            candidates[uni]["evidence"].append(
+                f"universal family DNA prior {prior_u:.2f}"
+                + (f" ({fam_meta.get('family')})" if fam_meta.get("family") else "")
+            )
+
+    for m in _STANDARD_CANDIDATES:
+        prior = 0.74 if m == "v39d_confluence" else 0.68 if m == "v39b_live_adapt" else 0.66
+        if m == standard_equity_model():
+            prior = max(prior, 0.74)
+        _add(m, prior=prior, kind="standard")
+        if m in candidates:
+            candidates[m]["evidence"].append(f"standard prior {candidates[m]['prior']:.2f}")
+
+    # Historical per-symbol metrics from model cards.
+    for card in all_model_cards(engines_only=True):
+        model = str(card.get("model") or "")
+        if not model or not _allowed(model):
+            continue
+        row = (card.get("per_symbol") or {}).get(code) if code else None
+        if not isinstance(row, dict):
+            continue
+        wr = row.get("win_rate")
+        sh = row.get("sharpe")
+        if wr is None and sh is None:
+            continue
+        hist = score_metrics(
+            _safe_float(wr),
+            _safe_float(sh),
+            _safe_float(row.get("profit_factor"), 1.0),
+            _safe_float(row.get("max_drawdown")),
+        )
+        if model not in candidates:
+            _add(model, prior=0.55, kind="historical")
+        if model in candidates:
+            candidates[model]["hist_score"] = hist
+            candidates[model]["evidence"].append(f"hist score {hist:.3f}")
+            if row.get("win_rate") is not None:
+                candidates[model]["win_rate"] = row.get("win_rate")
+            if row.get("sharpe") is not None:
+                candidates[model]["sharpe"] = row.get("sharpe")
+
+    # Fresh symbol ranker (strong evidence when present).
+    ranker = ranker_best_model(code, desk_only=desk_only) if code else None
+    if ranker and ranker.get("model"):
+        rm = str(ranker["model"])
+        rscore = float(ranker.get("score") or 0.0)
+        # normalize loose ranker scores into ~[0,1]
+        r_norm = max(0.0, min(rscore / 2.0, 1.0)) if rscore > 1.0 else max(0.0, min(rscore, 1.0))
+        if rm not in candidates:
+            _add(rm, prior=0.60, kind="ranker")
+        if rm in candidates:
+            candidates[rm]["ranker_score"] = r_norm
+            candidates[rm]["evidence"].append(f"symbol_ranker {r_norm:.3f}")
+            candidates[rm]["win_rate"] = ranker.get("win_rate")
+            candidates[rm]["sharpe"] = ranker.get("sharpe")
+
+    if not candidates:
+        std = standard_equity_model()
+        return {
+            "model": std,
+            "reason": f"no candidates; standard {std}",
+            "source": "best_router",
+            "track": "standard",
+            "code": code or None,
+            "score": None,
+            "candidates": [],
+            "kind": engine_kind(std),
+        }
+
+    # Final blend.
+    scored_rows: list[dict[str, Any]] = []
+    for model, c in candidates.items():
+        prior = float(c["prior"])
+        hist = c.get("hist_score")
+        ranker_s = c.get("ranker_score")
+        if hist is not None and ranker_s is not None:
+            final = 0.25 * prior + 0.35 * float(hist) + 0.40 * float(ranker_s)
+        elif hist is not None:
+            final = 0.40 * prior + 0.60 * float(hist)
+        elif ranker_s is not None:
+            final = 0.35 * prior + 0.65 * float(ranker_s)
+        else:
+            final = prior
+        # Tiny tie-break: prefer specialist DNA when essentially tied.
+        if c["kind"] == "specialist":
+            final += 0.01
+        c["final_score"] = round(final, 4)
+        scored_rows.append(c)
+
+    scored_rows.sort(key=lambda r: r["final_score"], reverse=True)
+    best = scored_rows[0]
+    runner_up = scored_rows[1] if len(scored_rows) > 1 else None
+    reason = (
+        f"best_router: {best['model']} score={best['final_score']:.3f} "
+        f"({best['kind']}"
+        + (f", beats {runner_up['model']} {runner_up['final_score']:.3f}" if runner_up else "")
+        + ")"
+    )
+    if best.get("evidence"):
+        reason += " | " + "; ".join(best["evidence"][:3])
+
+    return {
+        "model": best["model"],
+        "reason": reason,
+        "source": "best_router",
+        "track": "specialist" if best["kind"] == "specialist" else "standard",
+        "kind": engine_kind(best["model"]),
+        "code": code or None,
+        "score": best["final_score"],
+        "win_rate": best.get("win_rate"),
+        "sharpe": best.get("sharpe"),
+        "specialist": (best.get("meta") or {}).get("specialist"),
+        "family": (best.get("meta") or {}).get("family"),
+        "candidates": [
+            {
+                "model": r["model"],
+                "kind": r["kind"],
+                "prior": r["prior"],
+                "hist_score": r.get("hist_score"),
+                "ranker_score": r.get("ranker_score"),
+                "final_score": r["final_score"],
+            }
+            for r in scored_rows[:8]
+        ],
+    }
 
 # Process-local card cache — scan/watch call rank_models_for_symbol per symbol.
 _CARD_CACHE: dict[str, Any] = {"mtime_key": None, "cards": None}
@@ -116,8 +451,27 @@ def is_desk_engine(model: str) -> bool:
 
 # Featured recent research models surfaced near the top of desk pickers.
 FEATURED_DESK_MODELS: tuple[str, ...] = (
+    # Meta-router (picks best child per symbol)
+    "v66_best_router",
+    # Universal family-DNA specialist (any symbol)
+    "v67_universal_specialist",
+    # Track B — standard bag champions
     "v39d_confluence",
     "v39b_live_adapt",
+    "v63_spy_prune",
+    # Track A — multi + core specialists
+    "v65_desk_specialists",
+    "v65_spec_tsla",
+    "v65_spec_mu",
+    "v65_spec_ionq",
+    "v65_spec_mstr",
+    "v65_spec_coin",
+    "v65_spec_meta",
+    "v65_spec_goog",
+    "v65_spec_nvda",
+    "v65_spec_apld",
+    "v64_crwv_bounce",
+    # Research / alt sleeves
     "v50_high_win_rate",
     "v51_vpa_reflexivity",
     "v60_microstructure",
@@ -390,10 +744,12 @@ def rank_models(engines_only: bool = False) -> list[dict[str, Any]]:
 
 
 def rank_models_for_symbol(symbol: str, engines_only: bool = False) -> list[dict[str, Any]]:
-    """Rank models by historical performance on one symbol."""
-    code = symbol.strip().upper()
-    if not code.endswith(".US"):
-        code = f"{code}.US"
+    """Rank models by historical performance on one symbol.
+
+    Desk specialist for the symbol is pinned to rank #1 when present so analysis
+    surfaces the routed specialist even before a bag backtest score exists.
+    """
+    code = resolve_desk_symbol(symbol) or _normalize_symbol_code(symbol)
     ranked = []
     for card in all_model_cards(engines_only=engines_only):
         row = (card.get("per_symbol") or {}).get(code)
@@ -420,6 +776,29 @@ def rank_models_for_symbol(symbol: str, engines_only: bool = False) -> list[dict
             }
         )
     ranked.sort(key=lambda r: r["score"], reverse=True)
+
+    # Pin desk specialist to the front for analysis / auto.
+    desk = desk_specialist_for_symbol(code)
+    if desk:
+        pinned = {
+            "model": desk["model"],
+            "has_engine": True,
+            "code": code,
+            "win_rate": None,
+            "sharpe": None,
+            "profit_factor": None,
+            "max_drawdown": None,
+            "total_return": None,
+            "trade_count": None,
+            "score": 1.0,  # display pin; not a backtest claim
+            "source": "desk_specialist",
+            "specialist": desk.get("specialist"),
+            "family": desk.get("family"),
+            "routed": True,
+        }
+        ranked = [r for r in ranked if r.get("model") != desk["model"]]
+        ranked.insert(0, pinned)
+
     for i, r in enumerate(ranked, 1):
         r["rank"] = i
     return ranked
@@ -485,8 +864,8 @@ def recommend_model(
 ) -> dict[str, Any]:
     """Pick best runnable model overall, or best for a symbol.
 
-    desk_only=True (default): only equity engines with desk helpers so Analyze
-    / auto never lands on options wrappers that lack _resample_ohlcv.
+    Per-symbol: uses ``route_best_model`` (competitive router — specialist DNA
+    vs v39d/generics). Overall (no symbol): standard equity champion.
     """
     desk = set(list_desk_engines()) if desk_only else None
 
@@ -497,48 +876,26 @@ def recommend_model(
             return False
         return True
 
-    # Per-symbol ranker first (return-forward OOS backtest), then promoted
-    # WINNER, then historical score, then overall portfolio rank.
     if symbol:
-        hit = ranker_best_model(symbol, desk_only=desk_only)
-        if hit:
-            return {
-                "model": hit["model"],
-                "reason": (
-                    f"symbol ranker #1 on {hit['code']} "
-                    f"(backtested {hit['asof'][:10]}, score {hit['score']:.2f})"
-                ),
-                "score": hit["score"],
-                "win_rate": hit.get("win_rate"),
-                "sharpe": hit.get("sharpe"),
-                "kind": engine_kind(hit["model"]),
-                "source": "symbol_ranker",
-            }
-        for row in rank_models_for_symbol(symbol, engines_only=True):
-            if _ok(row):
-                return {
-                    "model": row["model"],
-                    "reason": f"best historical score on {row['code']}",
-                    "score": row["score"],
-                    "win_rate": row["win_rate"],
-                    "sharpe": row["sharpe"],
-                    "kind": engine_kind(row["model"]),
-                }
+        routed = route_best_model(symbol, desk_only=desk_only)
+        # Prefer returning the child model (what analysis should run), not the
+        # meta engine id — callers want the actual signal DNA.
+        return routed
 
-    # Promoted WINNER as desk default when no per-symbol data exists yet.
-    winner = equity_default_model()
-    if (desk is None or winner in desk) and (MODELS_ROOT / winner / "signal_engine.py").exists():
-        reason = "WINNER.json equity champion"
-        if symbol:
-            reason = f"WINNER.json equity champion (desk default for {symbol.upper()})"
+    # No symbol → standard bag champion (or best portfolio engine).
+    standard = standard_equity_model()
+    if (desk is None or standard in desk or is_desk_engine(standard)) and (
+        MODELS_ROOT / standard / "signal_engine.py"
+    ).exists():
         return {
-            "model": winner,
-            "reason": reason,
+            "model": standard,
+            "reason": f"standard equity model {standard}",
             "score": None,
             "win_rate": None,
             "sharpe": None,
-            "kind": engine_kind(winner),
-            "source": "winner",
+            "kind": engine_kind(standard),
+            "source": "standard",
+            "track": "standard",
         }
 
     overall = rank_models(engines_only=True)
@@ -551,6 +908,8 @@ def recommend_model(
                 "win_rate": top["win_rate"],
                 "sharpe": top["sharpe"],
                 "kind": engine_kind(top["model"]),
+                "source": "portfolio_rank",
+                "track": "standard",
             }
     fallback = equity_default_model()
     if desk is not None and fallback not in desk:
@@ -562,6 +921,8 @@ def recommend_model(
         "win_rate": None,
         "sharpe": None,
         "kind": engine_kind(fallback),
+        "source": "fallback",
+        "track": "standard",
     }
 
 

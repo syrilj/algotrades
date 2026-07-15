@@ -1,9 +1,13 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { ActionChip } from "@/components/ui/ActionChip";
 import { Stat } from "@/components/ui/Stat";
 import { ModelFlow } from "@/components/models/ModelFlow";
-import type { AnalysisReport as AnalysisReportType } from "@/lib/types";
+import type {
+  AnalysisDecision,
+  AnalysisReport as AnalysisReportType,
+} from "@/lib/types";
 
 function fmt(n: number | null | undefined, digits = 2): string {
   if (n == null || !Number.isFinite(n)) return "—";
@@ -39,6 +43,100 @@ function driverLabelColor(impact: string): string {
   return "var(--td-ink-400)";
 }
 
+function TraceItem({ label, value }: { label: string; value: ReactNode }) {
+  return (
+    <div className="flex flex-col">
+      <span className="text-[10px] uppercase tracking-wider" style={{ color: "var(--td-ink-500)" }}>
+        {label}
+      </span>
+      <span className="text-[13px] tabular" style={{ fontFamily: "var(--td-font-mono)", color: "var(--td-ink-200)" }}>
+        {value}
+      </span>
+    </div>
+  );
+}
+
+function LevelsPanel({ decision }: { decision: AnalysisDecision }) {
+  const s = decision.sizing;
+  if (!s || s.entry == null || s.stop == null) {
+    return (
+      <p className="text-[13px]" style={{ color: "var(--td-ink-400)" }}>
+        No levels available — model did not emit an entry/stop.
+      </p>
+    );
+  }
+  return (
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 md:grid-cols-6">
+      <Stat label="Price" value={fmtUsd(s.price)} emphasize />
+      <Stat label="Entry" value={fmtUsd(s.entry)} emphasize />
+      <Stat label="Stop" value={fmtUsd(s.stop)} emphasize />
+      <Stat label="Target (2R)" value={fmtUsd(s.target)} emphasize />
+      <Stat label="Risk / share" value={fmtUsd(s.risk_per_share)} emphasize />
+      <Stat label="Shares" value={s.shares ?? "—"} emphasize />
+      <Stat label="Notional" value={fmtUsd(s.notional)} emphasize />
+      <Stat label="Max loss" value={fmtUsd(decision.max_loss_dollars)} emphasize />
+      <Stat label="Risk %" value={fmtPct(decision.risk_pct, 2)} emphasize />
+      <Stat label="Side" value={s.side || "—"} emphasize />
+      <Stat label="Conviction" value={fmt(decision.conviction, 4)} emphasize />
+      <Stat label="Blended conf" value={fmt(decision.blended_confidence, 4)} emphasize />
+    </div>
+  );
+}
+
+function DecisionTrace({ decision }: { decision: AnalysisDecision }) {
+  const c = decision.confidence;
+  return (
+    <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <TraceItem label="Confidence state" value={c?.state ?? "—"} />
+      <TraceItem label="Band" value={c?.band ?? "—"} />
+      <TraceItem label="Raw probability" value={fmt(c?.raw_probability, 4)} />
+      <TraceItem label="Calibrated probability" value={fmt(c?.calibrated_probability, 4)} />
+      <TraceItem label="Size limit" value={fmt(c?.size_limit, 4)} />
+      <TraceItem label="Blended confidence" value={fmt(decision.blended_confidence, 4)} />
+      <TraceItem label="Risk %" value={fmtPct(decision.risk_pct, 2)} />
+      <TraceItem label="Max loss" value={fmtUsd(decision.max_loss_dollars)} />
+      <div className="col-span-full mt-1">
+        {c?.evidence && c.evidence.length > 0 ? (
+          <div className="mb-2">
+            <span className="td-label">Evidence</span>
+            <ul className="mt-1 flex flex-col gap-1">
+              {c.evidence.map((e, i) => (
+                <li key={`evidence-${i}`} className="text-[12px] tabular" style={{ color: "var(--td-ink-300)", fontFamily: "var(--td-font-mono)" }}>
+                  {e}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+        {c?.failed_checks && c.failed_checks.length > 0 ? (
+          <div>
+            <span className="td-label">Failed checks</span>
+            <ul className="mt-1 flex flex-col gap-1">
+              {c.failed_checks.map((r, i) => (
+                <li key={`fail-${i}`} className="text-[12px]" style={{ color: "var(--td-m-red)" }}>
+                  {r}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+        {c?.reasons && c.reasons.length > 0 ? (
+          <div className="mt-2">
+            <span className="td-label">Reasons</span>
+            <ul className="mt-1 flex flex-col gap-1">
+              {c.reasons.map((r, i) => (
+                <li key={`creason-${i}`} className="text-[12px]" style={{ color: "var(--td-ink-300)" }}>
+                  {r.replace(/_/g, " ")}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
 type AnalysisReportProps = {
   symbol: string;
   model: string | null;
@@ -52,6 +150,17 @@ export function AnalysisReport({ symbol, model, report }: AnalysisReportProps) {
   const gex = facts.gex;
   const m = facts.model;
   const ticket = suggestion.ticket;
+  const analysisAction = decision.analysis_action || decision.action || "WAIT";
+  const confState = decision.confidence_state || "ABSTAIN";
+  const execBlocked =
+    decision.execution_blocked === true ||
+    (confState !== "ENTER" && confState !== "—");
+  const gateLabel =
+    confState === "ENTER"
+      ? "EXECUTION READY"
+      : confState === "WATCH"
+        ? "WATCH — NO EXECUTION YET"
+        : "EXECUTION BLOCKED";
 
   return (
     <div className="flex flex-col gap-4">
@@ -88,7 +197,18 @@ export function AnalysisReport({ symbol, model, report }: AnalysisReportProps) {
               ) : null}
             </div>
           </div>
-          <ActionChip action={decision.action || "WAIT"} size="lg" />
+          <div className="flex flex-col items-end gap-1.5">
+            <ActionChip action={analysisAction} size="lg" />
+            <span
+              className="text-[10px] uppercase tracking-wider"
+              style={{
+                fontFamily: "var(--td-font-mono)",
+                color: execBlocked ? "var(--td-m-red)" : "var(--td-success)",
+              }}
+            >
+              {gateLabel}
+            </span>
+          </div>
         </div>
 
         <p
@@ -99,10 +219,29 @@ export function AnalysisReport({ symbol, model, report }: AnalysisReportProps) {
         </p>
 
         <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Stat label="Confidence" value={decision.confidence_state || "—"} emphasize />
+          <Stat label="Setup" value={analysisAction} emphasize />
+          <Stat label="Exec gate" value={confState} emphasize />
           <Stat label="Mode" value={decision.mode || "—"} emphasize />
-          <Stat label="Risk" value={fmtPct(decision.risk_pct, 2)} emphasize />
           <Stat label="Max loss" value={fmtUsd(decision.max_loss_dollars)} emphasize />
+        </div>
+
+        {execBlocked ? (
+          <p
+            className="mt-3 text-[12px] leading-snug"
+            style={{ color: "var(--td-ink-400)", fontFamily: "var(--td-font-mono)" }}
+          >
+            Levels & share math below are decision support only. Do not execute until the gate is ENTER.
+            {decision.confidence?.reasons?.length
+              ? ` Blocked by: ${decision.confidence.reasons.slice(0, 3).join(", ").replace(/_/g, " ")}.`
+              : ""}
+          </p>
+        ) : null}
+
+        <div className="mt-4 border-t border-dashed pt-4" style={{ borderColor: "var(--td-hairline)" }}>
+          <h3 className="mb-3 text-[12px] font-medium uppercase tracking-wider" style={{ color: "var(--td-ink-500)" }}>
+            Levels & sizing {execBlocked ? "(illustrative)" : ""}
+          </h3>
+          <LevelsPanel decision={decision} />
         </div>
       </section>
 
@@ -197,14 +336,18 @@ export function AnalysisReport({ symbol, model, report }: AnalysisReportProps) {
           Decision
         </h2>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <Stat label="Confidence state" value={decision.confidence_state || "—"} emphasize />
+          <Stat label="Setup action" value={analysisAction} emphasize />
+          <Stat label="Exec gate" value={confState} emphasize />
           <Stat label="Vehicle" value={decision.vehicle || "—"} emphasize />
-          <Stat label="Risk %" value={fmtPct(decision.risk_pct, 2)} emphasize />
           <Stat label="Conviction" value={fmt(decision.conviction, 4)} emphasize />
+          <Stat label="Risk mgr" value={decision.risk_manager_action || "—"} emphasize />
+          <Stat label="Risk %" value={fmtPct(decision.risk_pct, 2)} emphasize />
+          <Stat label="Blended conf" value={fmt(decision.blended_confidence, 4)} emphasize />
+          <Stat label="Model conf" value={fmt(m.confidence, 2)} emphasize />
         </div>
         {decision.reasons && decision.reasons.length > 0 ? (
           <div className="mt-3">
-            <span className="td-label">Reasons</span>
+            <span className="td-label">Risk manager reasons</span>
             <ul className="mt-1 flex flex-col gap-1">
               {decision.reasons.map((r, i) => (
                 <li
@@ -218,6 +361,13 @@ export function AnalysisReport({ symbol, model, report }: AnalysisReportProps) {
             </ul>
           </div>
         ) : null}
+
+        <div className="mt-4 border-t border-dashed pt-4" style={{ borderColor: "var(--td-hairline)" }}>
+          <h3 className="mb-3 text-[12px] font-medium uppercase tracking-wider" style={{ color: "var(--td-ink-500)" }}>
+            Decision trace
+          </h3>
+          <DecisionTrace decision={decision} />
+        </div>
       </section>
 
       {/* Suggestion */}
@@ -226,7 +376,16 @@ export function AnalysisReport({ symbol, model, report }: AnalysisReportProps) {
           Suggestion
         </h2>
         <div className="mb-3 flex flex-wrap items-center gap-2">
-          <ActionChip action={ticket.action || "WAIT"} size="md" />
+          <ActionChip action={analysisAction} size="md" />
+          <span
+            className="text-[11px] uppercase tracking-wider"
+            style={{
+              fontFamily: "var(--td-font-mono)",
+              color: execBlocked ? "var(--td-m-red)" : "var(--td-success)",
+            }}
+          >
+            gate {confState}
+          </span>
           <span
             className="text-[12px]"
             style={{ fontFamily: "var(--td-font-mono)", color: "var(--td-ink-400)" }}
