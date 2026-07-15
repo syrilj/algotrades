@@ -46,6 +46,12 @@
 - Risk-adjusted `perf_metric` options (`raw_return`, `sharpe`, `sortino`, `calmar`, `return_per_dd`) are available, but `perf_weighted` averaging of two teachers cannot exceed the best teacher unless the weighting is strongly predictive.
 - Adding `v42_trend_breakout` to the ensemble (as a third teacher) hurts performance: `v39b+v39d+v42` falls to 183.2% / -16.4% / Sharpe 2.09 with 1,254 trades. Pairwise `v39b+v42` and `v39d+v42` also underperform the `v39b+v39d` baseline.
 
+## v50_high_win_rate (high-win-rate candidate)
+- `models/poc_va_macdha/v50_high_win_rate/` is a new wrapper that gates `v45_ultimate_rsi` mean-reversion signals with a `SMA(250)` trend filter (entry-only) and scales target positions to 22.5% of cash (`signal_scale`).
+- Verified result at `$1,000` scale on `EQUITY_WINNER_BAG` (2024-08-01 to 2026-07-11, `source=local`, `interval=1H`): **108.7% return**, **-19.5% max drawdown**, **Sharpe 1.87**, **52 trades**, **86.5% win rate**.
+- Run: `dmr.run_one(dmr.discover_models(['v50_high_win_rate'])[0], mode='daily', codes=EQUITY_WINNER_BAG, start='2024-08-01', end='2026-07-11', tag='final', cash=1000, source='local', interval='1H')`.
+- `v41` was tested as an additional consensus gate but cut trade count to 16 and return to 5.6%; the final model uses `v45` alone.
+
 ## Market Runtime (LSE streaming)
 - `services/market_runtime/` holds contracts, catalog, ranking, state, persistence, LSE adapter, and supervisor.
 - `services/market_runtime/server.py` exports a FastAPI app (`uvicorn services.market_runtime.server:app`)
