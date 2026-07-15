@@ -1,0 +1,25 @@
+{
+  "source": "yfinance",
+  "codes": ["CRWV.US"],
+  "start_date": "2025-03-28",
+  "end_date": "2026-07-14",
+  "initial_cash": 10000,
+  "commission": 0.001,
+  "engine": "daily",
+  "interval": "1H",
+  "strategy": {
+    "specialist": "crwv_demand_bounce",
+    "model_version": "v64_crwv_bounce",
+    "value_area_pct": 0.7,
+    "profile_rows": 25,
+    "profile_lookback": 20,
+    "macd_htf": "4h",
+    "signal_tf": "1h",
+    "demand_atr_band": 0.75,
+    "min_score": 0.45,
+    "stop_atr": 1.2,
+    "trail_atr": 2.0,
+    "arm_trail_atr": 1.0,
+    "max_hold_bars": 24
+  }
+}

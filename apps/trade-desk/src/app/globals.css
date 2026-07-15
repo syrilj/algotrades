@@ -2375,3 +2375,61 @@ body {
   .td-decision-replay__facts { border-top: 1px solid var(--td-hairline); border-left: 0; padding-top: 0.8rem; }
   .td-decision-replay__facts > div:first-child { padding-left: 0; }
 }
+
+/* --------------------------------------------------------------------------
+   Hub tabs — shared Execution / Radar / Portfolio chrome
+   -------------------------------------------------------------------------- */
+.td-hub-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--td-hairline);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.25);
+}
+
+.td-hub-tab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: var(--td-body);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-decoration: none;
+  transition:
+    color var(--td-dur-fast) var(--td-ease),
+    background var(--td-dur-fast) var(--td-ease),
+    border-color var(--td-dur-fast) var(--td-ease);
+}
+
+.td-hub-tab:hover {
+  color: var(--td-ink);
+  background: rgba(156, 177, 204, 0.08);
+}
+
+.td-hub-tab--active {
+  border-color: var(--td-hairline-strong);
+  background: var(--td-surface-elevated);
+  color: var(--td-ink);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+}
+
+.td-hub-tab:focus-visible {
+  outline: none;
+  box-shadow: var(--td-focus-ring);
+}
+
+.td-hub-panel {
+  min-width: 0;
+}
+
+.td-page-header__actions .td-hub-tabs {
+  margin-left: auto;
+}

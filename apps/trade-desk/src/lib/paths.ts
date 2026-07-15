@@ -68,3 +68,7 @@ export function paperLedgerScript(): string {
 export function supplyChainScript(): string {
   return path.join(repoRoot(), "tools", "supply_chain.py");
 }
+
+export function analysisAgentScript(): string {
+  return path.join(repoRoot(), "tools", "analysis_agent.py");
+}

@@ -1,0 +1,15 @@
+{
+  "source": "yfinance",
+  "codes": ["TSLA.US", "MU.US", "SPY.US", "IONQ.US", "APLD.US", "XLP.US", "QQQ.US"],
+  "start_date": "2024-08-01",
+  "end_date": "2026-07-11",
+  "initial_cash": 1000000,
+  "commission": 0.001,
+  "engine": "daily",
+  "interval": "1H",
+  "strategy": {
+    "name": "v62_macro_softsize",
+    "model_version": "v62_macro_softsize",
+    "note": "v39d soft size mult from SPY vol/trend regime; no hard gates"
+  }
+}

@@ -74,7 +74,12 @@ export const AnalyzeForm = forwardRef<AnalyzeFormHandle, AnalyzeFormProps>(
           if (!res.ok || json.ok === false) {
             throw new Error(json.error ?? `Models HTTP ${res.status}`);
           }
-          const list = json.data?.engines ?? [];
+          // Prefer desk-routable engines (featured research first from API order)
+          const desk = json.data?.desk_engines ?? [];
+          const all = json.data?.engines ?? [];
+          const list = desk.length
+            ? [...desk, ...all.filter((id) => !desk.includes(id))]
+            : all;
           const meta: Record<string, { kind?: string; desk?: boolean }> = {};
           for (const m of json.data?.models ?? []) {
             meta[m.id] = { kind: m.kind, desk: m.desk_compatible };

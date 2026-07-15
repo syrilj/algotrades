@@ -71,8 +71,59 @@ def _uniq(seq: list[str]) -> list[str]:
     return out
 
 
-def build_universe(mode: str = "open", top_sectors: int = 4) -> dict[str, Any]:
-    """Assemble scan universe for the open."""
+def _yahoo_day_movers(n: int = 30) -> list[str]:
+    """Pull US day-gainers from Yahoo predefined screener (catches names outside liquid core).
+
+    Soft-fails to [] on network / rate-limit so open scan still runs.
+    """
+    import json as _json
+    import urllib.error
+    import urllib.request
+
+    out: list[str] = []
+    for scr_id in ("day_gainers", "most_actives"):
+        url = (
+            "https://query1.finance.yahoo.com/v1/finance/screener/predefined/saved"
+            f"?formatted=false&lang=en-US&region=US&scrIds={scr_id}&count={max(5, min(n, 50))}"
+        )
+        try:
+            req = urllib.request.Request(
+                url,
+                headers={
+                    "User-Agent": "Mozilla/5.0 (compatible; TradingAlgoWork/1.0)",
+                    "Accept": "application/json",
+                },
+            )
+            with urllib.request.urlopen(req, timeout=8) as resp:
+                payload = _json.loads(resp.read().decode("utf-8", errors="replace"))
+            finance = (payload or {}).get("finance") or {}
+            results = finance.get("result") or []
+            if not results:
+                continue
+            quotes = results[0].get("quotes") or []
+            for q in quotes:
+                sym = str(q.get("symbol") or "").strip().upper()
+                # Skip non-common: warrants, preferreds, OTC junk, crypto pairs
+                if not sym or any(x in sym for x in ("-", "=", "^", "/")):
+                    continue
+                if sym.endswith(("W", "U", "R")) and len(sym) > 5:
+                    continue
+                # Prefer ordinary equities / liquid ETFs
+                quote_type = str(q.get("quoteType") or q.get("typeDisp") or "").upper()
+                if quote_type and quote_type not in ("EQUITY", "ETF", "STOCK", ""):
+                    continue
+                out.append(sym)
+        except (urllib.error.URLError, TimeoutError, ValueError, KeyError, OSError):
+            continue
+    return _uniq(out)[: max(1, n)]
+
+
+def build_universe(mode: str = "open", top_sectors: int = 8) -> dict[str, Any]:
+    """Assemble scan universe for the open.
+
+    Includes liquid core + rotating hot sectors + Yahoo day movers/actives so
+    we do not miss names outside the static bag (e.g. small-cap runners).
+    """
     from trade_desk import DEFAULT_WATCH, rank_sector_flows, SECTORS
 
     sector_rows = []
@@ -86,29 +137,33 @@ def build_universe(mode: str = "open", top_sectors: int = 4) -> dict[str, Any]:
             # also pull SECTORS members if rotate uses sector key
             sk = sec.get("sector")
             if sk and sk in SECTORS:
-                hot_names.extend(SECTORS[sk][:8])
+                # more depth per hot sector (was 8)
+                hot_names.extend(SECTORS[sk][:12])
     except Exception as e:  # noqa: BLE001
         sector_rows = [{"error": str(e)}]
 
+    day_movers = _yahoo_day_movers(32 if mode == "full" else 24)
+
     if mode == "full":
-        names = list(DEFAULT_WATCH) + hot_names + OPEN_CORE
+        names = list(DEFAULT_WATCH) + hot_names + OPEN_CORE + day_movers
     else:
-        # open mode: core + hot sector leaders (fast enough for pre/open)
-        names = OPEN_CORE + hot_names
-        # sprinkle a few more liquid beta names from DEFAULT_WATCH
-        names.extend([n for n in DEFAULT_WATCH if n not in names][:20])
+        # open mode: core + hot sector leaders + day movers (latency-bounded)
+        names = OPEN_CORE + hot_names + day_movers
+        # sprinkle more liquid beta names from DEFAULT_WATCH
+        names.extend([n for n in DEFAULT_WATCH if n not in names][:36])
 
     symbols = _uniq(names)
     # cap for open latency (deep phase is the bottleneck)
-    if mode == "open" and len(symbols) > 72:
-        symbols = symbols[:72]
-    if mode == "full" and len(symbols) > 120:
-        symbols = symbols[:120]
+    if mode == "open" and len(symbols) > 100:
+        symbols = symbols[:100]
+    if mode == "full" and len(symbols) > 160:
+        symbols = symbols[:160]
 
     return {
         "symbols": symbols,
-        "sector_flows": sector_rows[:12],
+        "sector_flows": sector_rows[:14],
         "hot_sectors": [r.get("sector") for r in sector_rows[:top_sectors] if "error" not in r],
+        "day_movers": day_movers,
         "count": len(symbols),
         "mode": mode,
     }
@@ -247,12 +302,15 @@ def _deep_analyze(
                 "playable": playable,
                 "price": st.get("price"),
                 "entry": st.get("entry"),
+                "breakout_level": st.get("breakout_level"),
                 "stop": st.get("stop"),
                 "trail_arm": st.get("trail_arm"),
+                "risk_per_share": st.get("risk_per_share"),
                 "confidence": st.get("confidence"),
                 "hit_probability": st.get("hit_probability"),
                 "rvol": st.get("rvol"),
                 "vol_surge": st.get("vol_surge"),
+                "vol_dry": st.get("vol_dry"),
                 "shares": sz.get("shares"),
                 "dollar_risk": sz.get("dollar_risk"),
                 "live_adapt_mult": adapt,
@@ -358,6 +416,7 @@ def run_open_scan(
             "model": model,
             "universe": universe,
             "hot_sectors": uni.get("hot_sectors"),
+            "day_movers": uni.get("day_movers") or [],
             "scanned": len(symbols),
             "vpa_candidates": len(candidates),
             "deep_n": len(deep_rows),
@@ -368,7 +427,11 @@ def run_open_scan(
             "operator": {
                 "use": "Load watchlist into /watch or: trade_desk.py watch " + ",".join(watch_syms[:12]),
                 "model": "auto → v39b_live_adapt WINNER",
-                "note": "Long-biased desk DNA; PUT bias names listed in vpa_top for stand-aside / hedge only",
+                "breakout_watch": (
+                    "BREAKOUT WATCH is not a buy. Alert above breakout_level; "
+                    "enter only when volume expands through the level (rvol ≥ ~1.3x)."
+                ),
+                "note": "Long-biased desk DNA; day_movers catch names outside static bag; PUT bias in vpa_top = stand-aside",
             },
         }
     )

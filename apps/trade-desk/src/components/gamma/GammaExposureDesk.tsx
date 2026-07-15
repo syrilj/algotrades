@@ -313,7 +313,11 @@ function isoDateDaysAhead(days: number): string {
   return date.toISOString().slice(0, 10);
 }
 
-export function GammaExposureDesk() {
+export function GammaExposureDesk({
+  showHeader = true,
+}: {
+  showHeader?: boolean;
+}) {
   const searchParams = useSearchParams();
   const qSymbol = searchParams.get("symbol")?.toUpperCase() ?? "";
   const [symbol, setSymbol] = useState(qSymbol || "APLD");
@@ -401,42 +405,58 @@ export function GammaExposureDesk() {
   const freshness = useMemo(() => (gamma ? gammaFreshness(gamma) : null), [gamma]);
   const showLevels = Boolean(gamma && freshness?.isCurrent);
 
-  return (
-    <div className="td-page">
-      <PageHeader
-        title="Gamma"
-        description="Dealer gamma exposure by strike. Use as a confirmation overlay for the model verdict."
-        meta={
-          gamma ? (
-            <span
-              className="tabular"
-              style={{
-                fontFamily: "var(--td-font-mono)",
-                color: freshness?.isStale ? "var(--td-action-avoid)" : "var(--td-ink-500)",
-                fontSize: "var(--td-text-caption)",
-              }}
-            >
-              {symbol} · options {freshness?.hasTimestamp ? freshness.dataDate.toLocaleString() : "timestamp unavailable"}
-              {!freshness?.isCurrent ? " · not live" : ""}
-            </span>
-          ) : null
-        }
-        actions={
-          symbol ? (
-            <div className="flex flex-wrap gap-2">
-              <Link href={analyzeHref({ symbol })} className="td-btn td-btn-ghost no-underline">
-                Analyze
-              </Link>
-              <Link href={liveHref(symbol)} className="td-btn td-btn-ghost no-underline">
-                Live
-              </Link>
-              <Link href={optionsHref(symbol)} className="td-btn td-btn-ghost no-underline">
-                Options
-              </Link>
-            </div>
-          ) : null
-        }
-      />
+  const body = (
+    <>
+      {showHeader ? (
+        <PageHeader
+          title="Gamma"
+          description="Dealer gamma exposure by strike. Use as a confirmation overlay for the model verdict."
+          meta={
+            gamma ? (
+              <span
+                className="tabular"
+                style={{
+                  fontFamily: "var(--td-font-mono)",
+                  color: freshness?.isStale
+                    ? "var(--td-action-avoid)"
+                    : "var(--td-ink-500)",
+                  fontSize: "var(--td-text-caption)",
+                }}
+              >
+                {symbol} · options{" "}
+                {freshness?.hasTimestamp
+                  ? freshness.dataDate.toLocaleString()
+                  : "timestamp unavailable"}
+                {!freshness?.isCurrent ? " · not live" : ""}
+              </span>
+            ) : null
+          }
+          actions={
+            symbol ? (
+              <div className="flex flex-wrap gap-2">
+                <Link
+                  href={analyzeHref({ symbol })}
+                  className="td-btn td-btn-ghost no-underline"
+                >
+                  Analyze
+                </Link>
+                <Link
+                  href={liveHref(symbol)}
+                  className="td-btn td-btn-ghost no-underline"
+                >
+                  Ticket
+                </Link>
+                <Link
+                  href={optionsHref(symbol)}
+                  className="td-btn td-btn-ghost no-underline"
+                >
+                  Options
+                </Link>
+              </div>
+            ) : null
+          }
+        />
+      ) : null}
 
       <section className="td-toolbar">
         <div className="td-toolbar__row">
@@ -678,6 +698,8 @@ export function GammaExposureDesk() {
           </motion.div>
         ) : null}
       </AnimatePresence>
-    </div>
+    </>
   );
+
+  return showHeader ? <div className="td-page">{body}</div> : body;
 }

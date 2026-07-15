@@ -135,6 +135,8 @@ export interface EngineModelInfo {
   /** equity = desk-native; options = wrapper (desk unwraps to equity child) */
   kind?: "equity" | "options" | "other";
   desk_compatible?: boolean;
+  /** Recent research engines prioritised in pickers */
+  featured?: boolean;
   metrics?: Partial<ModelRankRow>;
 }
 
@@ -144,6 +146,7 @@ export interface ModelsCatalog {
   previous_winner?: string | null;
   engines: string[];
   desk_engines?: string[];
+  featured_desk_engines?: string[];
   all_versions: string[];
   models: EngineModelInfo[];
   updated_at?: string | null;
@@ -799,4 +802,116 @@ export interface GammaResponse {
   squeeze_components?: Record<string, number>;
   by_strike: GammaStrike[];
   error?: string;
+}
+
+export interface AnalysisDriver {
+  name: string;
+  value: string;
+  impact: "positive" | "negative" | "neutral";
+}
+
+export interface AnalysisTicket {
+  mode?: string;
+  vehicle?: string;
+  action?: string;
+  symbol?: string;
+  max_loss_dollars?: number | null;
+  risk_pct?: number | null;
+  conviction?: number | null;
+  steps?: string[];
+  exit_rules?: Record<string, string>;
+}
+
+export interface AnalysisSuggestion {
+  ticket: AnalysisTicket;
+  options?: {
+    action?: string;
+    structure?: string;
+    expiry?: string;
+    dte?: number;
+    long_strike?: number | null;
+    short_strike?: number | null;
+    debit_per_share?: number | null;
+    max_loss_1_contract?: number | null;
+    budget?: number | null;
+    reason?: string;
+  } | null;
+  rationale: string;
+  drivers: AnalysisDriver[];
+  alternatives: string[];
+}
+
+export interface AnalysisDecision {
+  confidence_state?: string;
+  blended_confidence?: number | null;
+  mode?: string;
+  vehicle?: string;
+  action?: string;
+  risk_pct?: number | null;
+  max_loss_dollars?: number | null;
+  conviction?: number | null;
+  reasons?: string[];
+  exit_rules?: Record<string, string>;
+}
+
+export interface AnalysisFacts {
+  symbol?: string;
+  price?: number | null;
+  asof_utc?: string;
+  live: {
+    price?: number | null;
+    vol_z?: number | null;
+    atr_pct?: number | null;
+    go_long?: boolean;
+    go_short?: boolean;
+    above_vwap?: boolean;
+    swing_uptrend?: boolean;
+    macd_positive?: boolean;
+    signal_strength?: number | null;
+    timestamp?: string;
+  };
+  macro: {
+    qqq_ok?: boolean;
+    macro_ok?: boolean;
+    defensive?: boolean;
+    qqq_trend?: string | null;
+    xlp_spy_ratio_state?: string | null;
+  };
+  gex: {
+    regime?: string;
+    gex_sign?: number | null;
+    spot?: number | null;
+    call_wall?: number | null;
+    put_wall?: number | null;
+    approx_flip_strike?: number | null;
+    squeeze_score?: number | null;
+    squeeze_label?: string;
+    expected_move_pct?: number | null;
+    max_pain?: number | null;
+  };
+  model: {
+    model?: string;
+    ok?: boolean;
+    confidence?: number | null;
+    setup_ok?: boolean | null;
+    entry?: number | null;
+    stop?: number | null;
+    action_hint?: string | null;
+    raw_probability_source?: string | null;
+  };
+  top_models: ModelRankRow[];
+}
+
+export interface AnalysisReport {
+  facts: AnalysisFacts;
+  decision: AnalysisDecision;
+  suggestion: AnalysisSuggestion;
+}
+
+export interface AnalysisAgentResponse {
+  ok: boolean;
+  symbol?: string;
+  error?: string;
+  asof_utc?: string;
+  report?: AnalysisReport;
 }

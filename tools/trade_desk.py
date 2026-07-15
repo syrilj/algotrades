@@ -485,6 +485,64 @@ def _desk_mod_for_state(mod: Any, model_name: str) -> tuple[Any, str | None]:
     return mod, None
 
 
+def _has_classic_desk_helpers(mod: Any) -> bool:
+    return hasattr(mod, "_resample_ohlcv") and hasattr(mod, "_prior_session_profile")
+
+
+def _engine_last_signal(
+    mod: Any,
+    code: str,
+    frame: pd.DataFrame,
+) -> tuple[float | None, str | None]:
+    """Run SignalEngine.generate on the latest bar; return (weight, error).
+
+    Newer research engines (v45+, v50/v51/v60/v61) expose generate() rather than
+    the classic VA/MACD helpers. Desk uses the last non-null target weight as the
+    live long/flat decision.
+    """
+    try:
+        eng = mod.SignalEngine()
+    except Exception as exc:  # noqa: BLE001
+        return None, f"SignalEngine init failed: {exc}"
+    if not hasattr(eng, "generate"):
+        return None, None
+
+    yf = _to_yf(code)
+    keys = [code, yf, f"{yf}.US"]
+    # Unique preserve order
+    seen: set[str] = set()
+    data_map: dict[str, pd.DataFrame] = {}
+    for k in keys:
+        if k not in seen:
+            data_map[k] = frame
+            seen.add(k)
+
+    try:
+        out = eng.generate(data_map)
+    except Exception as exc:  # noqa: BLE001
+        return None, f"generate failed: {exc}"
+
+    if not isinstance(out, dict):
+        return None, "generate returned non-dict"
+
+    sig = None
+    for k in keys:
+        if k in out and out[k] is not None:
+            sig = out[k]
+            break
+    if sig is None and out:
+        sig = next(iter(out.values()))
+    if sig is None:
+        return None, "generate returned no series"
+    try:
+        s = pd.Series(sig).dropna()
+        if s.empty:
+            return 0.0, None
+        return float(s.iloc[-1]), None
+    except Exception as exc:  # noqa: BLE001
+        return None, f"signal parse failed: {exc}"
+
+
 def _fallback_kelly(conf: float, atr_pct: float, med_atr_pct: float, kelly_fraction: float = 0.5) -> float:
     if conf < 0.55 or not np.isfinite(conf):
         return 0.0
@@ -709,6 +767,38 @@ def _compute_state(mod, code: str, df: pd.DataFrame, model_name: str, live: bool
     part_flags = {k: bool(v.iloc[i]) for k, v in parts.items()}
     missing = [k for k, ok in part_flags.items() if not ok]
 
+    # --- Generate-path engines (v45/v48–v51/v60/v61 and other research models) ---
+    # Classic VA helpers still run for levels/structure overlays. When the model
+    # exposes generate() and lacks full classic helpers, the live long/flat
+    # decision comes from the last target weight.
+    gen_signal: float | None = None
+    gen_error: str | None = None
+    uses_classic = _has_classic_desk_helpers(desk_mod)
+    # Always try generate for non-classic; also try when model is explicitly
+    # featured research so partial-helper engines (e.g. v45) use real logic.
+    should_try_generate = (not uses_classic) or (
+        model_name.startswith(("v45", "v46", "v47", "v48", "v49", "v50", "v51", "v60", "v61", "v41"))
+    )
+    if should_try_generate:
+        # Prefer original loaded module so wrappers keep their own generate()
+        gen_mod = mod if hasattr(mod, "SignalEngine") else desk_mod
+        gen_signal, gen_error = _engine_last_signal(gen_mod, code, frame)
+        if gen_signal is not None:
+            gen_long = gen_signal > 1e-9
+            # Target weight may be 0–1 (fraction) or ~0.2 (v50 scale) or 1.0 flat.
+            size_raw = abs(float(gen_signal))
+            size_frac = float(np.clip(size_raw if size_raw <= 1.5 else 1.0, 0.0, 1.5))
+            if gen_long:
+                setup_ok = True
+                # Blend confidence upward from model conviction
+                c = float(np.clip(max(c, 0.55 + 0.30 * min(size_frac, 1.0)), 0.40, 0.90))
+                sleeve = max(float(sleeve), max(0.20, min(1.0, size_frac if size_frac > 0 else 0.35)))
+                hard = True
+            elif not uses_classic:
+                # Generate-only model is flat — do not invent a classic buy.
+                setup_ok = False
+                hard = False
+
     prior = _PRIOR_WR.get(_to_yf(code), 0.55)
     # prefer historical WR for this model+symbol if available (cached card lookup)
     hist_wr = hist_win_rate(model_name, code)
@@ -799,8 +889,12 @@ def _compute_state(mod, code: str, df: pd.DataFrame, model_name: str, live: bool
         sleeve = max(float(sleeve), 0.35) * 0.75
 
     # Lost 200 EMA = structural break; only volume-led reclaim is an exception
-    if lost_200 and not (reclaim_200 and vol_surge):
+    if lost_200 and not (reclaim_200 and vol_surge) and gen_signal is None:
         setup_kind = "structural_break"
+    elif gen_signal is not None and gen_signal > 1e-9:
+        setup_kind = "classic_buy"
+    elif gen_signal is not None and gen_signal <= 1e-9 and not uses_classic:
+        setup_kind = "wait"
     elif setup_ok and (above_200 or e200 is None):
         setup_kind = "classic_buy"
     elif breakout_buy:
@@ -887,11 +981,19 @@ def _compute_state(mod, code: str, df: pd.DataFrame, model_name: str, live: bool
         "trail_atr_mult": trail_atr,
         "trail_distance": round(trail_dist, 4),
         "risk_per_share": round(max(px - stop, 0.01), 4),
+        "generate_signal": None if gen_signal is None else round(float(gen_signal), 4),
+        "generate_error": gen_error,
+        "signal_path": (
+            "generate"
+            if gen_signal is not None
+            else ("classic" if uses_classic else "classic_fallback")
+        ),
         "routing_notes": {
             "require_mom_pos": bool(cfg.get("require_mom_pos", False)),
             "require_above_vwap": bool(cfg.get("require_above_vwap", False)),
             "exit_below_vwap": bool(cfg.get("exit_below_vwap", False)),
             "block_red_flag": bool(cfg.get("block_red_flag", False)),
+            "generate_driven": gen_signal is not None,
         },
     }
 
@@ -972,11 +1074,13 @@ def analyze(
     state["data_interval"] = interval
     state["live"] = live
     sizing = _position_math(state, account, risk_pct)
+    plan = _plain_plan(state)
     symbol_ranks = rank_models_for_symbol(symbol, engines_only=False)[:8] if ranks else []
     return {
         "model": model_name,
         "model_selection": selection,
         "state": state,
+        "plan": plan,
         "sizing": sizing,
         "model_ranks_for_symbol": symbol_ranks,
         "generated_at": datetime.now(timezone.utc).isoformat(),

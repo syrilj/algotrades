@@ -2,57 +2,129 @@
 
 import type { AnalyzeResponse, PlainPlan } from "@/lib/types";
 
+/**
+ * Fallback operator plan when Python did not attach `plan`.
+ * Mirrors tools/trade_desk._plain_plan so Watch/Analyze stay actionable.
+ */
 export function derivePlan(state: AnalyzeResponse["state"]): PlainPlan {
-  const action = ((): PlainPlan["action"] => {
-    if (state.breakout_buy) return "BUY NOW";
-    if (state.breakout_ready) return "BUY BREAKOUT";
-    if (state.setup_ok && state.entry != null) return "BUY NOW";
-    if (state.setup_kind === "avoid" || state.hard_gates_ok === false) {
-      // hard_gates false alone is often breakout_watch / incomplete — not always AVOID
-      if (state.setup_kind === "breakout_watch" || state.breakout_ready) {
-        return "BREAKOUT WATCH";
-      }
-      if (state.setup_kind === "avoid") return "AVOID";
-      if (state.hard_gates_ok === false && !state.setup_ok) {
-        // keep soft wait when still a constructive structure
-        if (state.breakout_level != null && state.price != null) {
-          return state.price < state.breakout_level
-            ? "BREAKOUT WATCH"
-            : "PULLBACK ZONE";
-        }
-        return "WAIT";
-      }
-      return "AVOID";
-    }
-    if (state.breakout_level != null && state.price != null) {
-      return state.price < state.breakout_level
-        ? "BREAKOUT WATCH"
-        : "PULLBACK ZONE";
-    }
-    return "WAIT";
-  })();
-
   const missing = Array.isArray(state.missing)
     ? (state.missing as string[])
     : [];
+  const conf = state.confidence ?? 0;
+  const kind = state.setup_kind || (state.setup_ok ? "classic_buy" : "wait");
+  const lvl = state.breakout_level;
+  const e22 = state.ema22;
+  const e200 = state.ema200;
+  const rvol = state.rvol;
+  const px = state.price;
+  const stop = state.stop;
+  const trail = state.trail_arm;
+  const entry = state.entry;
+  const val = state.val;
+  const vah = state.vah;
 
-  const why =
-    state.setup_kind && state.setup_kind !== "none"
-      ? `setup: ${state.setup_kind} · conf ${((state.confidence ?? 0) * 100).toFixed(0)}%`
-      : `confidence ${((state.confidence ?? 0) * 100).toFixed(0)}% · ${missing.length ? `${missing.length} gate(s) missing` : "all gates clear"}`;
+  let action: PlainPlan["action"] = "WAIT";
+  let why = "";
+  let doNext = "";
 
-  const doNext =
-    action === "BUY NOW"
-      ? `Enter ${state.entry ? `near ${state.entry.toFixed(2)}` : "at market"}, stop ${state.stop?.toFixed(2) ?? "—"}, trail ${state.trail_arm?.toFixed(2) ?? "—"}.`
-      : action === "BUY BREAKOUT"
-        ? `Buy a break above ${state.breakout_level?.toFixed(2) ?? "—"}, stop ${state.stop?.toFixed(2) ?? "—"}.`
-        : action === "BREAKOUT WATCH"
-          ? `Watch for a break above ${state.breakout_level?.toFixed(2) ?? "—"}.`
-          : action === "PULLBACK ZONE"
-            ? `Wait for a pullback toward entry ${state.entry?.toFixed(2) ?? "—"}.`
-            : action === "AVOID"
-              ? `Gates not met. Avoid or wait for a reset.`
-              : `Conditions not fully aligned. Monitor for a clearer setup.`;
+  if (kind === "structural_break") {
+    action = "AVOID (structure broken)";
+    why =
+      `Lost the 200 EMA` +
+      (e200 != null ? ` ($${e200.toFixed(2)})` : "") +
+      " — structural break. Don't buy dips until volume reclaims it.";
+    doNext =
+      `Stand aside. Watch for a volume surge reclaim of the 200` +
+      (e200 != null ? ` ($${e200.toFixed(2)})` : "") +
+      ". Until then, longs are fighting broken structure.";
+  } else if (kind === "breakout_buy" || state.breakout_buy) {
+    action = "BUY BREAKOUT";
+    why =
+      `Volume-led breakout` +
+      (rvol != null ? ` (rvol ${rvol.toFixed(1)}x)` : "") +
+      " — participation confirms the move. Smaller size.";
+    const trigger = lvl != null ? `$${lvl.toFixed(2)}` : "breakout level";
+    doNext =
+      `Buy around $${(entry ?? px)?.toFixed(2) ?? "—"} (½–¾ normal size). ` +
+      `Stop $${stop?.toFixed(2) ?? "—"}. ` +
+      `Invalid if it fails back under ${trigger} or volume dies.`;
+  } else if (kind === "classic_buy" || state.setup_ok) {
+    action = "BUY NOW";
+    if (state.near_ema22 && e22 != null) {
+      why = `Pullback into the 22 EMA (~$${e22.toFixed(2)}) with structure intact — best R:R flavor.`;
+    } else {
+      why = "Pullback-in-value setup is live. Use the size/stop below.";
+    }
+    doNext =
+      `Buy around $${(entry ?? px)?.toFixed(2) ?? "—"}. ` +
+      `Hard stop $${stop?.toFixed(2) ?? "—"}. ` +
+      `If it runs to $${trail?.toFixed(2) ?? "—"}, trail under the high.`;
+  } else if (kind === "breakout_watch" || state.breakout_ready) {
+    action = "BREAKOUT WATCH";
+    why =
+      "Near highs with volume waking — breakout precipitates when volume SURGES through the level.";
+    const trigger = lvl != null ? `$${lvl.toFixed(2)}` : "the 20-bar high";
+    if (lvl != null && px != null && px >= lvl * 0.998) {
+      doNext =
+        `Already pressing $${px.toFixed(2)}. Only buy on a VOLUME push through ${trigger} ` +
+        `(rvol ≥ ~1.3x). Abort under $${stop?.toFixed(2) ?? "—"}.`;
+    } else {
+      doNext =
+        `Alert above ${trigger}. Enter only when volume expands with the break; ` +
+        `ignore a quiet drift through. Stop under $${stop?.toFixed(2) ?? "—"}.`;
+    }
+  } else if (kind === "pullback_watch") {
+    action = "PULLBACK ZONE";
+    if (state.near_ema22 && e22 != null) {
+      why = `Trend OK — wait for / buy the dip into the 22 EMA (~$${e22.toFixed(2)}), not the extension.`;
+      doNext =
+        `Alert near 22 EMA $${e22.toFixed(2)}` +
+        (val != null ? ` / VAL $${val.toFixed(2)}` : "") +
+        ". Prefer quiet volume on the dip (healthy), then buy when volume returns up.";
+    } else {
+      why = "Trend is fine but price is chasing above value — wait for a dip.";
+      if (vah != null && val != null) {
+        doNext =
+          `Alert near VAH $${vah.toFixed(2)} or VAL $${val.toFixed(2)}` +
+          (e22 != null ? ` / 22 EMA $${e22.toFixed(2)}` : "") +
+          (px != null ? `. Don't chase $${px.toFixed(2)}.` : ".");
+      } else {
+        doNext = "Wait for price to re-enter the value area before buying.";
+      }
+    }
+  } else if (kind === "avoid" || state.vol_dry) {
+    action = "AVOID";
+    why = "Weak tape: price push on drying volume — classic trap. Volume is the veto.";
+    doNext =
+      "Stand aside until volume confirms (rvol > 1) or price resets into value / 22 EMA.";
+  } else if (state.breakout_level != null && state.price != null) {
+    action =
+      state.price < state.breakout_level ? "BREAKOUT WATCH" : "PULLBACK ZONE";
+    if (action === "BREAKOUT WATCH") {
+      why = `setup: breakout watch · conf ${(conf * 100).toFixed(0)}%`;
+      doNext = `Watch for a volume break above $${state.breakout_level.toFixed(2)}. Not a buy yet.`;
+    } else {
+      why = `setup: extended · conf ${(conf * 100).toFixed(0)}%`;
+      doNext = `Wait for a pullback toward entry ${entry != null ? `$${entry.toFixed(2)}` : "value"}.`;
+    }
+  } else if (missing.length <= 2 && conf >= 0.65) {
+    action = "WAIT (almost ready)";
+    why = `Only ${missing.length} check(s) left — close, but not a green light yet.`;
+    doNext = missing.length
+      ? `Still need: ${missing.join(", ")}`
+      : "Conditions not fully aligned. Monitor for a clearer setup.";
+  } else {
+    action = "WAIT";
+    why =
+      state.setup_kind && state.setup_kind !== "none"
+        ? `setup: ${state.setup_kind} · conf ${(conf * 100).toFixed(0)}%`
+        : `confidence ${(conf * 100).toFixed(0)}% · ${
+            missing.length ? `${missing.length} gate(s) missing` : "all gates clear"
+          }`;
+    doNext = missing.length
+      ? `Waiting on: ${missing.slice(0, 3).join(", ")}`
+      : "Conditions not fully aligned. Monitor for a clearer setup.";
+  }
 
   return {
     action,
@@ -83,8 +155,16 @@ export function normalizeAnalyze(data: unknown): AnalyzeResponse {
   }
   d.state = stateRaw;
 
-  if (d.plan == null) {
+  // Prefer server plan; fill gaps if partial
+  const existing = d.plan as PlainPlan | undefined | null;
+  if (existing == null || typeof existing !== "object") {
     d.plan = derivePlan(stateRaw);
+  } else {
+    const p = { ...existing } as PlainPlan;
+    if (!p.action) p.action = derivePlan(stateRaw).action;
+    if (!p.do_next) p.do_next = derivePlan(stateRaw).do_next;
+    if (!p.why) p.why = derivePlan(stateRaw).why;
+    d.plan = p;
   }
 
   return d as AnalyzeResponse;

@@ -1,0 +1,12 @@
+{
+  "source": "local",
+  "codes": ["TSLA.US", "MU.US", "SPY.US", "IONQ.US", "APLD.US", "XLP.US", "QQQ.US"],
+  "interval": "1H",
+  "commission": 0.001,
+  "engine": "daily",
+  "strategy": {
+    "name": "v51_vpa_reflexivity",
+    "model_version": "v51_vpa_reflexivity",
+    "note": "VPA + reflexivity XGB meta-labeler for desk routing"
+  }
+}

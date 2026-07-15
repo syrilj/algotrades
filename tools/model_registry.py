@@ -76,8 +76,11 @@ def engine_path(model: str) -> Path:
 def engine_kind(model: str) -> str:
     """Classify engine for desk routing: equity | options | other.
 
-    Equity engines expose desk helpers (_resample_ohlcv + profile). Options
-    wrappers load an equity child via equity_engine / _equity_engine_path.
+    Equity engines either expose classic desk helpers (_resample_ohlcv + profile)
+    or implement SignalEngine.generate (trade_desk falls back to helpers and
+    uses generate() for the live long/flat decision). Options wrappers load an
+    equity child via equity_engine / _equity_engine_path or carry ``opts`` in
+    the version id.
     """
     path = MODELS_ROOT / model / "signal_engine.py"
     if not path.exists():
@@ -86,19 +89,50 @@ def engine_kind(model: str) -> str:
         text = path.read_text(encoding="utf-8", errors="ignore")
     except OSError:
         return "other"
-    has_desk = "def _resample_ohlcv" in text and (
+
+    has_resample = "def _resample_ohlcv" in text
+    has_profile = (
         "def _prior_session_profile" in text or "_prior_session_profile" in text
     )
-    if has_desk:
-        return "equity"
-    if "equity_engine" in text or "_equity_engine_path" in text or "opts" in model:
+    has_classic_desk = has_resample and has_profile
+    has_generate = "class SignalEngine" in text and "def generate" in text
+    is_opts_id = "opts" in model
+    is_opts_wrapper = (
+        ("equity_engine" in text or "_equity_engine_path" in text)
+        and not has_classic_desk
+    )
+
+    if is_opts_id or is_opts_wrapper:
         return "options"
+    if has_classic_desk or has_generate:
+        return "equity"
     return "other"
 
 
 def is_desk_engine(model: str) -> bool:
-    """True when Analyze/Live can compute state without unwrapping."""
+    """True when Analyze/Live can run this model (classic helpers or generate)."""
     return engine_kind(model) == "equity"
+
+
+# Featured recent research models surfaced near the top of desk pickers.
+FEATURED_DESK_MODELS: tuple[str, ...] = (
+    "v39d_confluence",
+    "v39b_live_adapt",
+    "v50_high_win_rate",
+    "v51_vpa_reflexivity",
+    "v60_microstructure",
+    "v61_institutional_flow",
+    "v48_regime_barbell",
+    "v49_precision_trend",
+    "v45_ultimate_rsi",
+    "v41_ensemble_feedback",
+)
+
+
+def list_featured_desk_engines() -> list[str]:
+    """Featured equity engines that currently exist and are desk-runnable."""
+    desk = set(list_desk_engines())
+    return [m for m in FEATURED_DESK_MODELS if m in desk]
 
 
 def list_desk_engines() -> list[str]:

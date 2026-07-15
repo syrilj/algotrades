@@ -11,7 +11,7 @@ import type {
 } from "@/lib/types";
 import { formatUsd, formatPct, formatNum } from "@/lib/format";
 import { PageHeader } from "@/components/shell/PageHeader";
-import { analyzeHref, optionsHref } from "@/lib/routes";
+import { analyzeHref, optionsHref, watchHref } from "@/lib/routes";
 import { Chip } from "@/components/ui/Chip";
 import { colorVarFor } from "@/lib/actionColors";
 import { Stat } from "@/components/ui/Stat";
@@ -202,6 +202,12 @@ function LiveDeskInner({ showHeader = true }: { showHeader?: boolean }) {
           >
             {scanning ? "Scanning…" : "Scan book"}
           </button>
+          <Link
+            href={watchHref()}
+            className="td-btn td-btn-ghost no-underline"
+          >
+            Full watch board
+          </Link>
         </div>
       </section>
 

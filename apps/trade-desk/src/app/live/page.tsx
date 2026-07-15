@@ -1,80 +1,96 @@
 "use client";
 
-import Link from "next/link";
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { LiveDesk } from "@/components/live/LiveDesk";
 import { OptionsDesk } from "@/components/options/OptionsDesk";
+import { WatchDesk } from "@/components/watch/WatchDesk";
+import { GammaExposureDesk } from "@/components/gamma/GammaExposureDesk";
+import { HubTabs } from "@/components/shell/HubTabs";
 import { PageHeader } from "@/components/shell/PageHeader";
-import { gammaHref, liveHref, optionsHref } from "@/lib/routes";
+import {
+  gammaHref,
+  liveHref,
+  optionsHref,
+  watchHref,
+} from "@/lib/routes";
 
-type LiveMode = "risk" | "options";
+export type LiveMode = "ticket" | "watch" | "options" | "gamma";
 
-const TABS: { key: LiveMode; label: string }[] = [
-  { key: "risk", label: "Risk Mode" },
-  { key: "options", label: "Options Structure" },
-];
+function resolveMode(raw: string | null): LiveMode {
+  if (raw === "watch") return "watch";
+  if (raw === "options") return "options";
+  if (raw === "gamma") return "gamma";
+  // legacy aliases
+  if (raw === "risk" || raw === "ticket" || !raw) return "ticket";
+  return "ticket";
+}
 
 function LiveOptionsHub() {
   const searchParams = useSearchParams();
-  const rawMode = searchParams.get("mode");
-  const mode: LiveMode = rawMode === "options" ? "options" : "risk";
-  const symbol = searchParams.get("symbol")?.toUpperCase() ?? "";
+  const mode = resolveMode(searchParams.get("mode"));
+  const symbol = searchParams.get("symbol")?.trim().toUpperCase() ?? "";
+
+  const tabs = [
+    { key: "ticket", label: "Ticket", href: liveHref(symbol || undefined) },
+    { key: "watch", label: "Watch", href: watchHref() },
+    {
+      key: "options",
+      label: "Options",
+      href: optionsHref(symbol || undefined),
+    },
+    {
+      key: "gamma",
+      label: "Gamma",
+      href: gammaHref(symbol || undefined),
+    },
+  ] as const;
+
+  const descriptions: Record<LiveMode, string> = {
+    ticket:
+      "Risk ticket for one symbol — stand aside · equity hedge · options attack.",
+    watch:
+      "Multi-symbol operator board. Market scan ranks plays; poll keeps levels fresh. Click a name for a ticket.",
+    options: "Options structure and attack paths for the selected symbol.",
+    gamma: "Dealer gamma exposure — confirmation overlay for the model verdict.",
+  };
 
   return (
     <div className="td-page">
       <PageHeader
-        title="Live / Options"
-        description="Risk mode ticket and options structure side by side."
+        title="Execution"
+        description={descriptions[mode]}
         meta={
           symbol ? (
-            <span className="tabular" style={{ fontFamily: "var(--td-font-mono)" }}>
+            <span
+              className="tabular"
+              style={{ fontFamily: "var(--td-font-mono)" }}
+            >
               {symbol}
             </span>
-          ) : null
+          ) : (
+            <span className="td-chip">ticket · watch · options · gamma</span>
+          )
         }
         actions={
-          <div className="flex flex-wrap items-center gap-1">
-            <nav
-              className="flex flex-wrap gap-1 border-b border-[var(--td-ink-700)]"
-              role="tablist"
-              aria-label="Live desk"
-            >
-              {TABS.map((t) => {
-                const active = mode === t.key;
-                const href = t.key === "risk" ? liveHref(symbol) : optionsHref(symbol);
-                return (
-                  <Link
-                    key={t.key}
-                    href={href}
-                    role="tab"
-                    aria-selected={active}
-                    aria-controls={`live-panel-${t.key}`}
-                    className={`td-btn ${active ? "td-btn-primary" : "td-btn-ghost"}`}
-                  >
-                    {t.label}
-                  </Link>
-                );
-              })}
-            </nav>
-            <Link
-              href={gammaHref(symbol)}
-              className="td-btn td-btn-ghost"
-              aria-label="Gamma exposure"
-            >
-              Gamma
-            </Link>
-          </div>
+          <HubTabs
+            tabs={tabs}
+            active={mode}
+            aria-label="Execution workspace"
+          />
         }
       />
 
       <div
-        id={`live-panel-${mode}`}
+        id={`hub-panel-${mode}`}
         role="tabpanel"
-        className="flex flex-col gap-4"
-        aria-label={TABS.find((t) => t.key === mode)?.label}
+        className="td-hub-panel flex flex-col gap-4"
+        aria-label={tabs.find((t) => t.key === mode)?.label}
       >
-        {mode === "risk" ? <LiveDesk showHeader={false} /> : <OptionsDesk showHeader={false} />}
+        {mode === "ticket" ? <LiveDesk showHeader={false} /> : null}
+        {mode === "watch" ? <WatchDesk showHeader={false} /> : null}
+        {mode === "options" ? <OptionsDesk showHeader={false} /> : null}
+        {mode === "gamma" ? <GammaExposureDesk showHeader={false} /> : null}
       </div>
     </div>
   );
@@ -87,7 +103,7 @@ export default function LivePage() {
     <Suspense
       fallback={
         <div className="td-page">
-          <p className="td-muted">Loading live desk…</p>
+          <p className="td-muted">Loading execution desk…</p>
         </div>
       }
     >

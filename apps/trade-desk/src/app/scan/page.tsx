@@ -1,89 +1,77 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useState } from "react";
-import { useSearchParams } from "next/navigation";
-
-import { PicksList } from "@/components/picks/PicksList";
-import { PicksPanel, type PicksPanelValue } from "@/components/picks/PicksPanel";
+import { Suspense, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { PicksDesk } from "@/components/picks/PicksDesk";
 import { ScanDesk } from "@/components/scan/ScanDesk";
 import SupplyChainDesk from "@/components/supply-chain/SupplyChainDesk";
-import { WatchBoard } from "@/components/watch/WatchBoard";
+import { HubTabs } from "@/components/shell/HubTabs";
 import { PageHeader } from "@/components/shell/PageHeader";
+import { watchHref } from "@/lib/routes";
 
 export const dynamic = "force-dynamic";
 
-type ScanView = "bias" | "watch" | "picks" | "supply-chain";
-const VIEWS: { key: ScanView; label: string; legacy?: string }[] = [
+type ScanView = "bias" | "picks" | "supply-chain";
+
+const VIEWS: { key: ScanView; label: string }[] = [
   { key: "bias", label: "Market Bias" },
-  { key: "watch", label: "Watch List", legacy: "/watch" },
-  { key: "picks", label: "Picks", legacy: "/picks" },
-  { key: "supply-chain", label: "Supply Chain", legacy: "/supply-chain" },
+  { key: "picks", label: "Picks" },
+  { key: "supply-chain", label: "Supply Chain" },
 ];
+
+function resolveView(raw: string | null): ScanView {
+  if (raw === "picks") return "picks";
+  if (raw === "supply-chain") return "supply-chain";
+  return "bias";
+}
 
 function ScanHub() {
   const params = useSearchParams();
+  const router = useRouter();
   const rawView = params.get("view");
-  const view: ScanView = VIEWS.some((item) => item.key === rawView)
-    ? (rawView as ScanView)
-    : "bias";
-  const [picks, setPicks] = useState<PicksPanelValue>({
-    horizon: "day",
-    model: "auto",
-    sectors: ["mag7", "memory", "photonics"],
-    symbols: "",
-  });
+
+  // Legacy: Watch moved under Execution
+  useEffect(() => {
+    if (rawView === "watch") {
+      router.replace(watchHref());
+    }
+  }, [rawView, router]);
+
+  const view = resolveView(rawView);
+
+  const tabs = VIEWS.map((item) => ({
+    key: item.key,
+    label: item.label,
+    href: item.key === "bias" ? "/scan" : `/scan?view=${item.key}`,
+  }));
 
   return (
     <div className="td-page">
       <PageHeader
-        title="Scan hub"
-        description="VPA + VWAP market bias, watch list, picks, and supply-chain context. Research bias only — size via Live adapt + paper ledger."
-        meta={<span className="td-chip td-chip--warn">scan bias · live sizes</span>}
+        title="Radar"
+        description="Market bias, sector picks, and supply-chain context. Watch board lives under Execution."
+        meta={
+          <span className="td-chip td-chip--warn">scan bias · live sizes</span>
+        }
+        actions={
+          <div className="flex flex-wrap items-center gap-2">
+            <HubTabs tabs={tabs} active={view} aria-label="Radar views" />
+            <Link href={watchHref()} className="td-btn td-btn-ghost no-underline">
+              Open Watch
+            </Link>
+          </div>
+        }
       />
 
-      <nav className="mb-4 flex flex-wrap gap-1 border-b border-[var(--td-ink-700)]" aria-label="Scan views" role="tablist">
-        {VIEWS.map((item) => {
-          const selected = view === item.key;
-          return (
-            <Link
-              key={item.key}
-              href={item.key === "bias" ? "/scan" : `/scan?view=${item.key}`}
-              className={`td-btn ${selected ? "td-btn-primary" : "td-btn-ghost"}`}
-              role="tab"
-              aria-selected={selected}
-              aria-controls={`scan-panel-${item.key}`}
-            >
-              {item.label}
-            </Link>
-          );
-        })}
-      </nav>
-
-      <section id={`scan-panel-${view}`} role="tabpanel" aria-label={VIEWS.find((item) => item.key === view)?.label}>
+      <section
+        id={`hub-panel-${view}`}
+        role="tabpanel"
+        className="td-hub-panel"
+        aria-label={VIEWS.find((item) => item.key === view)?.label}
+      >
         {view === "bias" ? <ScanDesk /> : null}
-        {view === "watch" ? (
-          <div className="td-panel overflow-hidden">
-            <WatchBoard
-              rows={[]}
-              emptyHint="No watch snapshot in this hub yet. Open the Watch desk to run the existing watch API; rows link to Analyze."
-            />
-            <div className="border-t border-[var(--td-ink-700)] p-3">
-              <Link href="/watch" className="td-btn td-btn-primary">Open Watch desk</Link>
-            </div>
-          </div>
-        ) : null}
-        {view === "picks" ? (
-          <div className="flex flex-col gap-3">
-            <PicksPanel value={picks} models={[]} onChange={setPicks} onRun={() => window.location.assign("/picks")} />
-            <div className="td-panel">
-              <PicksList rows={[]} emptyHint="Run the existing Picks desk to query live setups; select a result to open Analyze." />
-              <div className="border-t border-[var(--td-ink-700)] p-3">
-                <Link href="/picks" className="td-btn td-btn-primary">Open Picks desk</Link>
-              </div>
-            </div>
-          </div>
-        ) : null}
+        {view === "picks" ? <PicksDesk showHeader={false} /> : null}
         {view === "supply-chain" ? <SupplyChainDesk /> : null}
       </section>
     </div>
@@ -91,5 +79,15 @@ function ScanHub() {
 }
 
 export default function ScanPage() {
-  return <Suspense fallback={<div className="td-page"><div className="td-panel p-3">Loading scan hub…</div></div>}><ScanHub /></Suspense>;
+  return (
+    <Suspense
+      fallback={
+        <div className="td-page">
+          <div className="td-panel p-3">Loading radar…</div>
+        </div>
+      }
+    >
+      <ScanHub />
+    </Suspense>
+  );
 }

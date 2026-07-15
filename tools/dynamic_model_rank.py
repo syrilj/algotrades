@@ -33,6 +33,7 @@ from backtest.runner import main as bt_main
 import backtest.runner as _runner
 from backtest.engines.global_equity import GlobalEquityEngine
 from evolve.v48_execution import CausalGlobalEquityEngine
+from evolve.ac_execution import AlmgrenChrissGlobalEquityEngine
 
 # backtest.runner routes unknown sources to CryptoEngine. source="local" uses
 # LocalLoader (data_cache) but should still get the US/HK equity engine for
@@ -59,14 +60,17 @@ _patch_metrics_for_local()
 
 
 def _create_market_engine_for_local(source: str, config: dict, codes: list[str]):
-    if source == "local" and codes:
+    if codes:
         markets = {_runner._detect_market(c) for c in codes}
         if len(markets) == 1 and markets & {"us_equity", "hk_equity"}:
             market = _runner._detect_submarket(codes)
-            version = str((config.get("strategy") or {}).get("model_version", ""))
-            if config.get("causal_execution") or version in {"v39d_causal", "v47_causal", "v48_regime_barbell", "v49_precision_trend"}:
-                return CausalGlobalEquityEngine(config, market=market)
-            return GlobalEquityEngine(config, market=market)
+            if config.get("impact_model") == "almgren_chriss":
+                return AlmgrenChrissGlobalEquityEngine(config, market=market)
+            if source == "local":
+                version = str((config.get("strategy") or {}).get("model_version", ""))
+                if config.get("causal_execution") or version in {"v39d_causal", "v47_causal", "v48_regime_barbell", "v49_precision_trend"}:
+                    return CausalGlobalEquityEngine(config, market=market)
+                return GlobalEquityEngine(config, market=market)
     return _original_create_market_engine(source, config, codes)
 
 
@@ -282,6 +286,7 @@ def _copy_model_code(model: dict[str, Any], run_code: Path) -> None:
         "hunt_config.json",
         "meta_config.json",
         "meta_xgb_final.json",
+        "secondary_meta.json",
         "vpa.py",
         "vwap_peg.py",
         "vwap_dna.json",

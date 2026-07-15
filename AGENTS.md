@@ -52,6 +52,18 @@
 - Run: `dmr.run_one(dmr.discover_models(['v50_high_win_rate'])[0], mode='daily', codes=EQUITY_WINNER_BAG, start='2024-08-01', end='2026-07-11', tag='final', cash=1000, source='local', interval='1H')`.
 - `v41` was tested as an additional consensus gate but cut trade count to 16 and return to 5.6%; the final model uses `v45` alone.
 
+## v60_microstructure (microstructure / institutional-flow research artifact)
+- `models/poc_va_macdha/v60_microstructure/` is a new standalone microstructure model implementing OHLCV-safe OFI, absorption, volume schedule-deviation, VPIN-style toxicity, VPA confirmation, and an XGB meta-classifier with triple-barrier labels.
+- Run with `mode="daily"`:
+  ```python
+  m = dmr.discover_models(["v60_microstructure"])[0]
+  dmr.run_one(m, mode="daily", codes=EQUITY_WINNER_BAG, start="2024-08-01", end="2026-07-11", tag="final", cash=1000, source="local", interval="1H")
+  ```
+- Train: `.venv/bin/python tools/train_v60_microstructure.py --retrain`
+- In-sample (full) at `$1,000` on `EQUITY_WINNER_BAG` (2024-08-01 to 2026-07-11, `source=local`, `interval=1H`): **+639.4% return**, **-21.8% max DD**, **Sharpe 2.69**, **105 trades**, **62% win rate**, **final $7,394**.
+- Walk-forward OOS (train 2024-08-01 → 2025-08-01, test 2025-08-01 → 2026-07-11, $1,000): **+14.8% return**, **-13.7% max DD**, **Sharpe 0.26**, **13 trades**, **38% win rate**, **final $1,148**.
+- Verdict: **research artifact, not promoted.** The OHLCV-only proxies are too noisy to sustain the targeted high precision out-of-sample. The feature module and training pipeline are retained for refinement with tick/Level-2 data.
+
 ## Market Runtime (LSE streaming)
 - `services/market_runtime/` holds contracts, catalog, ranking, state, persistence, LSE adapter, and supervisor.
 - `services/market_runtime/server.py` exports a FastAPI app (`uvicorn services.market_runtime.server:app`)
@@ -97,3 +109,39 @@
 - `farm.run_one_cached()` and `farm.run_batch()` log every run with model id, tag, source, interval, data hash, env versions, and metrics.
 - `log_run_from_row()` is used by `farm.py`; metrics include `ret`, `dd`, `sharpe`, `n`, `wr`, `final`, and `reused`.
 - View runs: `mlflow ui --backend-store-uri file:///Users/syriljacob/Desktop/TradingAlgoWork/runs/mlruns` (or query `mlflow.search_runs()`).
+
+## Analysis Agent
+- `tools/analysis_agent.py` returns a structured **Facts → Decision → Suggestion** report for a single ticker.
+- It reuses existing runtime components: `live_plan.plan_symbol` (live features, macro, GEX, risk decision, ticket) and `model_registry.rank_models_for_symbol` (top models).
+- It does not modify any model engine or signal file.
+- CLI: `.venv/bin/python tools/analysis_agent.py --symbol TSLA --account 1000 --json`
+- UI: `apps/trade-desk/src/app/analysis-agent/page.tsx` + `/api/analysis-agent` route.
+
+## Almgren-Chriss Impact Model
+- `tools/impact_model.py` provides a simplified Almgren-Chriss temporary + permanent impact calculator (`impact_per_share`) and an optimal-trajectory helper (`optimal_trajectory`).
+- `tools/evolve/ac_execution.py` adds `AlmgrenChrissGlobalEquityEngine`, which extends `GlobalEquityEngine` and adds size-dependent impact to the standard fixed slippage.
+- `tools/dynamic_model_rank.py` routes US/HK equity runs to this engine when `config["impact_model"] == "almgren_chriss"`.
+- Configurable keys: `ac_eta` (temp coeff), `ac_gamma` (perm coeff), `ac_beta` (participation exponent, default 0.5), `ac_adv_days` (default 20), `ac_vol_days` (default 20).
+- Example: `dmr.run_one(model, ..., extra_cfg={"impact_model": "almgren_chriss", "ac_eta": 0.1, "ac_gamma": 0.02, "ac_beta": 0.5})`.
+- Smoke test (TSLA.US, $100k, 1H, 2024-08-01→2024-09-01): base final $96,492.21 vs AC final $96,487.37 for a 90% target weight, confirming the engine adds impact cost.
+
+## Macro, Cross-Asset, and Long-Memory Feature Module
+- New module: `tools/evolve/macro_features.py` with `tools/evolve/macro_features.py` and `MacroCrossAssetEngine`.
+- Computes point-in-time: macro surprise/event proximity, rolling beta/correlation to SPY/TLT, VIX/rate/equity regime features, fractional-differencing long-memory features, and interaction terms (high-beta × macro surprise × low VIX, etc.).
+- Causal contracts: all returns are lagged before rolling windows; macro surprises are joined via backward `merge_asof`; fractional `d` is fit on a training window only (default `hurst`; `adf` method requires `statsmodels`).
+- Tests: `tests/test_macro_features.py` (9 tests pass).
+- Integration path: use `MacroCrossAssetEngine.fit(train)` then `transform(target, spy, tlt, vix, events)` in a purged walk-forward loop; wire into `feature_validation.py` by aligning cross-asset parquet bars and adding `macro_features` to `FEATURE_FAMILIES` when ready.
+- Focused test plan: (1) add a v61 research script that loads `EQUITY_WINNER_BAG` + `SPY/TLT/VIX` + macro CSV and runs `macro_feature_matrix` per fold; (2) baseline: v39d_confluence on same fold; (3) candidate: v39d features + macro features with a small meta-logistic; (4) gates: beat baseline on event-period Sharpe/return and pass subperiod analysis (event vs non-event).
+
+## `tools/institutional_flow` (reusable OHLCV-safe microstructure feature module)
+- Module: `tools/institutional_flow/features.py` with `compute_features(df, params)` returning point-in-time VPIN, OFI, absorption, VPA confirmation, schedule deviation, regime, and fractional-diff columns.
+- Module: `tools/institutional_flow/impact.py` wrapping `tools/impact_model.py` (`impact_per_share`, `cost_for_trade`, `optimal_trajectory`, `estimate_adv`, `estimate_volatility`).
+- Tests: `tests/test_institutional_flow.py` (12 tests pass, including causality and timezone checks).
+- Pilot model: `models/poc_va_macdha/v61_institutional_flow/` uses `tools/institutional_flow.compute_features` with a heuristic classifier.
+- Pilot run: `.venv/bin/python tools/institutional_flow/run_pilot.py`.
+- Pilot result (2025-08-01 → 2026-07-11, `source=local`, `1H`, TSLA/SPY/QQQ, $1,000):
+  - `v60_microstructure`: +19.7% ret, -9.0% max DD, Sharpe 1.95, 74% WR, 19 trades
+  - `v39d_confluence`: -1.6% ret, -7.8% max DD, Sharpe -0.27, 39% WR, 28 trades
+  - `v61_institutional_flow` (standard): +4.0% ret, -14.1% max DD, Sharpe 0.35, 40% WR, 162 trades
+  - `v61_institutional_flow` + Almgren-Chriss impact: +4.0% ret, -14.1% max DD, Sharpe 0.35, final $1,040 (impact cost $0.04 at $1k scale)
+- Verdict: `v61` is a working refactor/proof-of-concept, but the heuristic is not yet competitive with `v60` or `v39d`. The AC impact overlay is correctly active but negligible at $1k scale.

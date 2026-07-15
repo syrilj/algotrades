@@ -21,13 +21,12 @@ const NAV = [
   { href: "/research", label: "Lab", icon: Microscope },
 ] as const;
 
+/** Rare tools not already on primary hubs (Execution / Radar / Lab). */
 const LEGACY_NAV = [
-  { href: "/picks", label: "Picks" },
-  { href: "/supply-chain", label: "Supply chain" },
-  { href: "/options", label: "Options" },
-  { href: "/gamma", label: "Gamma" },
-  { href: "/evolve", label: "Evolve" },
-  { href: "/robust", label: "Backtest" },
+  { href: "/analysis-agent", label: "Analysis agent" },
+  { href: "/evolve", label: "Evolve (direct)" },
+  { href: "/robust", label: "Backtest (direct)" },
+  { href: "/leaderboard", label: "Leaderboard (direct)" },
 ] as const;
 
 function TickerSearch() {
@@ -120,7 +119,12 @@ export function DeskShell({ children }: { children: React.ReactNode }) {
           </span>
         </div>
 
-        <Link className="td-account" href="/portfolio" aria-label="Open workspace profile" data-auth-slot="clerk-user-button">
+        <Link
+          className="td-account"
+          href="/positions"
+          aria-label="Open positions and portfolio"
+          data-auth-slot="clerk-user-button"
+        >
           <span className="td-account__avatar">TD</span>
           <span className="td-account__copy">
             <span className="td-account__label">Workspace</span>

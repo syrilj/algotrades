@@ -4,6 +4,7 @@ import fs from "fs/promises";
 import os from "os";
 import path from "path";
 import {
+  analysisAgentScript,
   gammaExposureScript,
   livePlanScript,
   modelsRoot,
@@ -182,6 +183,14 @@ export async function runLivePlan(
     return callMarketRuntimePlan(args, timeoutMs);
   }
   return runPythonScript(livePlanScript(), args, "live_plan", timeoutMs);
+}
+
+/** Structured Facts → Decision → Suggestion report for a single ticker. */
+export async function runAnalysisAgent(
+  args: string[],
+  timeoutMs = 120_000,
+): Promise<unknown> {
+  return runPythonScript(analysisAgentScript(), args, "analysis_agent", timeoutMs);
 }
 
 export async function runSymbolRanker(
@@ -376,12 +385,13 @@ export async function loadModelsCatalog(): Promise<ModelsCatalog> {
   try {
     const tools = path.join(repoRoot(), "tools");
     const reg = await runPythonSnippet(
-      `import sys,json; sys.path.insert(0, ${JSON.stringify(tools)}); from model_registry import DEFAULT_MODEL, list_engine_models, list_desk_engines, engine_kind; print(json.dumps({"default": DEFAULT_MODEL, "engines": list_engine_models(), "desk_engines": list_desk_engines(), "kinds": {m: engine_kind(m) for m in list_engine_models()}}))`,
+      `import sys,json; sys.path.insert(0, ${JSON.stringify(tools)}); from model_registry import DEFAULT_MODEL, list_engine_models, list_desk_engines, list_featured_desk_engines, engine_kind; print(json.dumps({"default": DEFAULT_MODEL, "engines": list_engine_models(), "desk_engines": list_desk_engines(), "featured_desk_engines": list_featured_desk_engines(), "kinds": {m: engine_kind(m) for m in list_engine_models()}}))`,
     );
     const parsed = JSON.parse(reg) as {
       default: string;
       engines: string[];
       desk_engines?: string[];
+      featured_desk_engines?: string[];
       kinds?: Record<string, "equity" | "options" | "other">;
     };
     defaultModel = parsed.default || defaultModel;
@@ -392,12 +402,21 @@ export async function loadModelsCatalog(): Promise<ModelsCatalog> {
     }
     deskEngines = (parsed.desk_engines ?? engines.filter((id) => !id.includes("opts"))).slice().sort();
     if (parsed.kinds) Object.assign(kindById, parsed.kinds);
+    // Surface featured research engines first in pickers (stable order).
+    if (parsed.featured_desk_engines?.length) {
+      const featured = parsed.featured_desk_engines.filter((id) =>
+        deskEngines.includes(id),
+      );
+      const rest = deskEngines.filter((id) => !featured.includes(id));
+      deskEngines = [...featured, ...rest];
+    }
   } catch {
     /* filesystem fallback */
     deskEngines = engines.filter((id) => !id.includes("opts"));
   }
 
   const winner = winnerDoc?.winner ?? null;
+  const featuredSet = new Set(deskEngines.slice(0, 12));
   const models = versionDirs.map((id) => {
     const kind = kindById[id] ?? (id.includes("opts") ? "options" : engines.includes(id) ? "equity" : "other");
     return {
@@ -407,6 +426,7 @@ export async function loadModelsCatalog(): Promise<ModelsCatalog> {
       is_winner: id === winner,
       kind,
       desk_compatible: deskEngines.includes(id) || kind === "equity",
+      featured: featuredSet.has(id),
     };
   });
 
@@ -416,6 +436,7 @@ export async function loadModelsCatalog(): Promise<ModelsCatalog> {
     previous_winner: winnerDoc?.previous_winner ?? null,
     engines,
     desk_engines: deskEngines,
+    featured_desk_engines: deskEngines.filter((id) => featuredSet.has(id)),
     all_versions: versionDirs,
     models,
     updated_at: winnerDoc?.updated_at ?? null,

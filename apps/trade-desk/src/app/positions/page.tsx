@@ -1,11 +1,11 @@
 "use client";
 
-import Link from "next/link";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 import { PortfolioDesk } from "@/components/portfolio/PortfolioDesk";
 import { PositionsTable } from "@/components/positions/PositionsTable";
+import { HubTabs } from "@/components/shell/HubTabs";
 import { PageHeader } from "@/components/shell/PageHeader";
 import type { ApiEnvelope, PositionsResponse } from "@/lib/types";
 
@@ -80,24 +80,23 @@ function PositionsDesk() {
         }
       />
 
-      <nav className="mb-4 flex flex-wrap gap-1 border-b border-[var(--td-ink-700)]" aria-label="Positions views" role="tablist">
-        {([
-          ["open", "Open Positions", "/positions"],
-          ["portfolio", "Portfolio", "/positions?view=portfolio"],
-          ["history", "History / Risk", "/positions?view=history"],
-        ] as const).map(([key, label, href]) => (
-          <Link
-            key={key}
-            href={href}
-            className={`td-btn ${view === key ? "td-btn-primary" : "td-btn-ghost"}`}
-            role="tab"
-            aria-selected={view === key}
-            aria-controls={`positions-panel-${key}`}
-          >
-            {label}
-          </Link>
-        ))}
-      </nav>
+      <HubTabs
+        tabs={[
+          { key: "open", label: "Open Positions", href: "/positions" },
+          {
+            key: "portfolio",
+            label: "Portfolio",
+            href: "/positions?view=portfolio",
+          },
+          {
+            key: "history",
+            label: "History / Risk",
+            href: "/positions?view=history",
+          },
+        ]}
+        active={view}
+        aria-label="Positions views"
+      />
 
       {view === "portfolio" ? (
         <div id="positions-panel-portfolio" role="tabpanel">
