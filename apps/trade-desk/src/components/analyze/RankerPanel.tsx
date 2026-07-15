@@ -207,7 +207,7 @@ export function RankerPanel({
   if (!sym) return null;
 
   return (
-    <section className="td-panel" aria-label={`Symbol ranker for ${sym}`}>
+    <section className="td-panel p-4" aria-label={`Symbol ranker for ${sym}`}>
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
           <span className="td-label">Best engine for {sym}</span>
@@ -275,7 +275,7 @@ export function RankerPanel({
       ) : null}
 
       {topRows.length > 0 ? (
-        <ul className="mt-1">{topRows.map((row) => (
+        <ul className="mt-1 list-none p-0">{topRows.map((row) => (
           <RankerRowCard
             key={row.model}
             row={row}
@@ -292,7 +292,7 @@ export function RankerPanel({
           <summary className="td-details__summary">
             Options engines (bag symbol) · synthetic pricing · research only
           </summary>
-          <ul className="mt-2">
+          <ul className="mt-2 list-none p-0">
             {data.options_rows.slice(0, 4).map((row) => (
               <RankerRowCard
                 key={`opt-${row.model}`}

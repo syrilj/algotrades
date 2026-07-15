@@ -1,0 +1,15 @@
+{
+  "base_models": [
+    "v45_ultimate_rsi"
+  ],
+  "primary": "v45_ultimate_rsi",
+  "mode": "and",
+  "threshold": 0.5,
+  "trend_filter": {
+    "lookback": 250,
+    "price_col": "close",
+    "direction": "above",
+    "apply": "entry"
+  },
+  "signal_scale": 0.225
+}

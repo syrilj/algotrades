@@ -99,6 +99,36 @@ def compare_to_winners(state: dict[str, Any]) -> dict[str, Any]:
 
     decision["action"] = "candidate_for_manual_promote"
     decision["reasons"].append("CLAIM + PASS_BAR — review multi-lock then update WINNER.json manually")
+
+    # Nominate (NOT promote) the candidate into the human-approval queue. This
+    # only appends a pending entry; it never overwrites WINNER.json (see the
+    # "never auto-overwrite" guarantee above). Wrapped so a queue-write failure
+    # can never crash finalize.
+    try:
+        from evolve.promotion_queue import nominate
+
+        nominate(
+            {
+                "id": top.get("id"),
+                "campaign": state.get("campaign") or track,
+                "family": "poc_va_macdha",
+                "model_dir": top.get("model_dir") or top.get("src_dir"),
+                "metrics": {
+                    k: top.get(k)
+                    for k in ("utility", "ret", "sharpe", "dd", "wr", "n")
+                    if top.get(k) is not None
+                },
+                "gates": {
+                    "claim_level": top.get("claim_level"),
+                    "may_auto_promote": top.get("may_auto_promote"),
+                    "passed": True,
+                },
+            }
+        )
+        decision["queued_for_manual_promote"] = True
+    except Exception as exc:  # noqa: BLE001 - never let queue errors break finalize
+        decision["queue_error"] = str(exc)
+
     return decision
 
 

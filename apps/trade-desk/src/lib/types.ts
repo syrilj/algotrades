@@ -106,6 +106,15 @@ export interface ModelRankRow {
   source?: string;
   code?: string;
   specialist?: string | null;
+  /** Closed live paper-trading trade count backing live_wr/live_avg_R; <10 = not enough evidence. */
+  live_n?: number;
+  /** Fraction (0-1), not percent points — use formatPct, not formatPctPoints. */
+  live_wr?: number | null;
+  /** Fraction (avg R-multiple), not percent points — use formatPct, not formatPctPoints. */
+  live_avg_R?: number | null;
+  live_status?: "none" | "provisional" | "confirming" | "degrading";
+  /** Backtest score nudged by live outcomes (±15%, gated on live_n>=10); used for rank sort. */
+  blended_score?: number;
 }
 
 export interface AnalyzeResponse {
@@ -230,6 +239,32 @@ export interface LiveTicket {
   conviction?: number;
   exit_rules?: Record<string, string>;
   steps?: string[];
+  confidence_state?: "ENTER" | "WATCH" | "ABSTAIN" | string;
+  confidence_size_limit?: number;
+}
+
+export interface LiveConfidence {
+  schema_version?: string;
+  state?: "ENTER" | "WATCH" | "ABSTAIN" | string;
+  raw_probability?: number | null;
+  raw_probability_source?: string | null;
+  calibrated_probability?: number | null;
+  band?: string;
+  size_limit?: number;
+  evidence?: string[];
+  failed_checks?: string[];
+  model_version?: string;
+  calibration_version?: string | null;
+  calibration_available?: boolean;
+  data_freshness?: {
+    available?: boolean;
+    stale?: boolean;
+    asof_utc?: string | null;
+    age_minutes?: number | null;
+    max_age_minutes?: number;
+    error?: string;
+  };
+  reasons?: string[];
 }
 
 export interface LivePlanResponse {
@@ -270,6 +305,9 @@ export interface LivePlanResponse {
     error?: string;
   };
   blended_confidence?: number;
+  confidence?: LiveConfidence;
+  decision_support_ready?: boolean;
+  shadow_event_id?: string | null;
   decision?: {
     mode?: RiskMode;
     vehicle?: string;
@@ -317,6 +355,8 @@ export interface LiveScanRow {
   price?: number;
   go_long?: boolean;
   blended_confidence?: number;
+  confidence_state?: "ENTER" | "WATCH" | "ABSTAIN" | string;
+  calibrated_probability?: number | null;
 }
 
 /** Options desk: live mode + structure pick + playbook */
@@ -726,6 +766,7 @@ export interface GammaResponse {
   spot_source: string;
   source?: string;
   lse_error: string | null;
+  options_asof?: string | null;
   asof_utc: string;
   expiries_used: string[];
   net_dealer_gex: number;
@@ -745,10 +786,10 @@ export interface GammaResponse {
   expected_move_high: number | null;
   max_pain: number | null;
   otm_call_volume: number;
-  otm_call_oi: number;
+  otm_call_oi: number | null;
   otm_put_volume?: number;
-  otm_put_oi?: number;
-  total_oi?: number;
+  otm_put_oi?: number | null;
+  total_oi?: number | null;
   total_volume?: number;
   n_contracts: number;
   weight: string;

@@ -1,0 +1,7 @@
+{
+  "source": "local",
+  "codes": ["TSLA.US", "MU.US", "SPY.US", "IONQ.US", "APLD.US", "XLP.US", "QQQ.US"],
+  "interval": "1H",
+  "commission": 0.001,
+  "strategy": {"name": "v47_causal", "model_version": "v47_causal"}
+}

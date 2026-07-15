@@ -1,0 +1,16 @@
+{
+  "source": "yfinance",
+  "codes": ["TSLA.US", "MU.US", "SPY.US", "IONQ.US", "APLD.US", "XLP.US", "QQQ.US"],
+  "start_date": "2024-08-01",
+  "end_date": "2026-07-11",
+  "initial_cash": 1000000,
+  "commission": 0.001,
+  "engine": "daily",
+  "extra_fields": null,
+  "interval": "1H",
+  "strategy": {
+    "name": "v44_absorption",
+    "model_version": "v44_absorption",
+    "note": "v39b + OHLCV-safe order-flow/absorption/delta features and retrained XGB"
+  }
+}

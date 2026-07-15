@@ -1,0 +1,21 @@
+[
+  {
+    "id": "v47_high_freq_edge",
+    "mode": "daily",
+    "tag": "final",
+    "codes": ["TSLA.US", "MU.US", "SPY.US", "IONQ.US", "APLD.US", "XLP.US", "QQQ.US"],
+    "start": "2024-08-01",
+    "end": "2026-07-11",
+    "cash": 1000.0,
+    "ret": 3.065512017654277,
+    "dd": -0.2183647726614719,
+    "sharpe": 1.6815384205559478,
+    "n": 306,
+    "wr": 0.5522875816993464,
+    "final": 4065.512017654277,
+    "pnl": 3065.512017654277,
+    "source": "local",
+    "interval": "1H",
+    "note": "Default tuned config: 1H Ultimate RSI os=30/ob=70, ATR 2.5 trailing stop, max_hold_bars=8."
+  }
+]

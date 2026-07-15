@@ -1,0 +1,18 @@
+{
+  "source": "yfinance",
+  "codes": ["TSLA.US", "MU.US", "SPY.US", "IONQ.US", "APLD.US", "XLP.US", "QQQ.US"],
+  "start_date": "2024-08-01",
+  "end_date": "2026-07-11",
+  "initial_cash": 1000,
+  "commission": 0.001,
+  "engine": "daily",
+  "interval": "1H",
+  "pivot_length": 10,
+  "signal_tf": null,
+  "strategy_mode": "zigzag",
+  "strategy": {
+    "name": "v46_lux_pivot_ghosts",
+    "model_version": "v46_lux_pivot_ghosts",
+    "note": "LuxAlgo Pivot High/Low & Missed Reversal levels - zig-zag trend follow with optional missed-level S/R confirmation (strategy_mode=zigzag|missed_sr)"
+  }
+}

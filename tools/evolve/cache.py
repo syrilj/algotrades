@@ -68,6 +68,7 @@ def engine_bundle_hash(model: dict[str, Any]) -> str:
         "ROUTING.json",
         "RISK_POLICY.json",
         "config.json",
+        "DEPENDENCIES.json",
     )
     parts: list[str] = [model["id"]]
     for name in names:
@@ -76,6 +77,19 @@ def engine_bundle_hash(model: dict[str, Any]) -> str:
             p = model_dir / name
         if p.exists() and p.is_file():
             parts.append(f"{name}:{_file_digest(p)}")
+    manifest = src / "DEPENDENCIES.json"
+    if not manifest.exists() and model_dir != src:
+        manifest = model_dir / "DEPENDENCIES.json"
+    if manifest.exists():
+        try:
+            for item in json.loads(manifest.read_text()).get("files", []):
+                if not isinstance(item, dict) or not isinstance(item.get("source"), str):
+                    continue
+                dep = (src / item["source"]).resolve()
+                if dep.is_file():
+                    parts.append(f"dep:{item.get('target', dep.name)}:{_file_digest(dep)}")
+        except Exception:
+            parts.append("dependencies:invalid")
     return hashlib.sha256("|".join(parts).encode()).hexdigest()[:20]
 
 

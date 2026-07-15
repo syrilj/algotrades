@@ -1,6 +1,19 @@
 "use client";
 
-import { Check, Minus, X } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowUp,
+  Check,
+  Circle,
+  CircleDot,
+  Minus,
+  Shield,
+  Target,
+  TrendingUp,
+  X,
+  Zap,
+} from "lucide-react";
 import type { AnalyzeState } from "@/lib/types";
 
 function fmt(n: number | null | undefined, digits = 2): string {
@@ -58,6 +71,7 @@ type LadderMark = {
   value: number;
   color: string;
   kind: "zone" | "level" | "price";
+  Icon: LucideIcon;
 };
 
 function zoneCopy(state: AnalyzeState): string {
@@ -92,21 +106,22 @@ export function LevelsPanel({ state }: LevelsPanelProps) {
     value: number | null | undefined,
     color: string,
     kind: LadderMark["kind"],
+    Icon: LucideIcon,
   ) => {
     if (value != null && Number.isFinite(value)) {
-      marks.push({ id, label, value, color, kind });
+      marks.push({ id, label, value, color, kind, Icon });
     }
   };
 
-  push("vah", "VAH", state.vah, "var(--td-overlay-vah)", "zone");
-  push("poc", "POC", state.poc, "var(--td-overlay-poc)", "zone");
-  push("val", "VAL", state.val, "var(--td-overlay-val)", "zone");
-  push("ema22", "EMA22", state.ema22, "var(--td-overlay-ema-22)", "level");
-  push("ema200", "EMA200", state.ema200, "var(--td-overlay-ema-200)", "level");
-  push("bo", "Breakout", state.breakout_level, "var(--td-accent)", "level");
-  push("entry", "Entry", state.entry, "var(--td-action-buy-now)", "level");
-  push("stop", "Stop", state.stop, "var(--td-action-avoid)", "level");
-  push("px", "Price", state.price, "var(--td-ink-50)", "price");
+  push("vah", "VAH", state.vah, "var(--td-overlay-vah)", "zone", ArrowUp);
+  push("poc", "POC", state.poc, "var(--td-overlay-poc)", "zone", Circle);
+  push("val", "VAL", state.val, "var(--td-overlay-val)", "zone", ArrowDown);
+  push("ema22", "EMA22", state.ema22, "var(--td-overlay-ema-22)", "level", TrendingUp);
+  push("ema200", "EMA200", state.ema200, "var(--td-overlay-ema-200)", "level", TrendingUp);
+  push("bo", "Breakout", state.breakout_level, "var(--td-accent)", "level", Zap);
+  push("entry", "Entry", state.entry, "var(--td-action-buy-now)", "level", Target);
+  push("stop", "Stop", state.stop, "var(--td-action-avoid)", "level", Shield);
+  push("px", "Price", state.price, "var(--td-ink-50)", "price", CircleDot);
 
   const values = marks.map((m) => m.value);
   const lo = values.length ? Math.min(...values) : 0;
@@ -194,7 +209,8 @@ export function LevelsPanel({ state }: LevelsPanelProps) {
 
           <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-[12px]">
             {sorted.map((m) => (
-              <span key={m.id} className="inline-flex items-baseline gap-1.5">
+              <span key={m.id} className="inline-flex items-center gap-1.5">
+                <m.Icon size={10} strokeWidth={1.75} aria-hidden style={{ color: m.color }} />
                 <span style={{ color: m.color }} className="text-[11px] font-semibold">
                   {m.label}
                 </span>
@@ -228,7 +244,11 @@ export function LevelsPanel({ state }: LevelsPanelProps) {
                   m.kind === "price" ? "1px dashed var(--td-ink-600)" : undefined,
               }}
             >
-              <span style={{ color: m.color, fontWeight: m.kind === "price" ? 700 : 500 }}>
+              <span
+                className="inline-flex items-center gap-1.5"
+                style={{ color: m.color, fontWeight: m.kind === "price" ? 700 : 500 }}
+              >
+                <m.Icon size={12} strokeWidth={1.75} aria-hidden />
                 {m.label}
               </span>
               <span
@@ -252,14 +272,14 @@ export function LevelsPanel({ state }: LevelsPanelProps) {
         >
           Critical gates
         </h3>
-        <ul className="flex flex-wrap gap-2">
+        <ul className="flex flex-wrap gap-2 list-none p-0">
           {critical.map((g) => (
             <GateChip key={g.key} item={g} />
           ))}
         </ul>
         <details className="td-details mt-3">
           <summary className="td-details__summary">All gates</summary>
-          <ul className="mt-2 flex flex-wrap gap-2">
+          <ul className="mt-2 flex flex-wrap gap-2 list-none p-0">
             {all.map((g) => (
               <GateChip key={`all-${g.key}`} item={g} />
             ))}

@@ -249,8 +249,60 @@ def hist_win_rate(model: str, symbol: str) -> float | None:
     return None
 
 
+def _live_factor(live_n: int, live_avg_R: float | None) -> float:
+    """Bounded nudge from live paper-trading outcomes; never dominates the backtest score."""
+    if live_n < 10 or live_avg_R is None:
+        return 1.0  # not enough live evidence to move the rank
+    r = max(-0.6, min(0.6, float(live_avg_R)))
+    return 1.0 + 0.25 * r  # bounded [0.85, 1.15]
+
+
+def _live_stats_by_model() -> dict[str, dict[str, Any]]:
+    """Aggregate paper_ledger.compute_stats() per-(model,symbol) buckets up to per-model.
+
+    Import-safe: returns {} (no live data) if the ledger file is missing/corrupt
+    or paper_ledger fails to import, so ranking never breaks without it.
+    """
+    try:
+        import paper_ledger as pl
+
+        stats = pl.compute_stats()
+    except Exception:
+        return {}
+
+    agg: dict[str, dict[str, Any]] = {}
+    for row in stats.get("rows") or []:
+        model = str(row.get("model") or "")
+        if not model:
+            continue
+        a = agg.setdefault(model, {"n": 0, "wins": 0, "sum_R": 0.0, "total_pnl": 0.0})
+        a["n"] += int(row.get("n") or 0)
+        a["wins"] += int(row.get("wins") or 0)
+        a["sum_R"] += _safe_float(row.get("sum_R"))
+        a["total_pnl"] += _safe_float(row.get("total_pnl"))
+
+    out: dict[str, dict[str, Any]] = {}
+    for model, a in agg.items():
+        n = a["n"]
+        out[model] = {
+            "live_n": n,
+            # Trade-weighted (sum / n), not a naive mean of per-symbol bucket
+            # averages -- symbols with more closed trades count proportionally more.
+            "live_wr": (a["wins"] / n) if n else None,
+            "live_avg_R": (a["sum_R"] / n) if n else None,
+            "live_pnl": round(a["total_pnl"], 4) if n else None,
+        }
+    return out
+
+
 def rank_models(engines_only: bool = False) -> list[dict[str, Any]]:
-    """Overall ranking by portfolio metrics."""
+    """Overall ranking by portfolio metrics, blended with live paper-trading outcomes.
+
+    Live results can only nudge the rank (bounded ±15%, see `_live_factor`) and are
+    gated on >=10 closed trades before they influence anything; `score` (pure
+    backtest) is kept unchanged alongside the new `blended_score` used for sorting.
+    """
+    live_by_model = _live_stats_by_model()
     ranked = []
     for card in all_model_cards(engines_only=engines_only):
         port = card.get("portfolio") or {}
@@ -260,6 +312,23 @@ def rank_models(engines_only: bool = False) -> list[dict[str, Any]]:
         sh = _safe_float(port.get("sharpe"))
         pf = _safe_float(port.get("profit_factor"), 1.0)
         dd = _safe_float(port.get("max_drawdown"))
+        score = round(score_metrics(wr, sh, pf, dd), 4)
+
+        live = live_by_model.get(card["model"]) or {}
+        live_n = int(live.get("live_n") or 0)
+        live_wr = live.get("live_wr")
+        live_avg_R = live.get("live_avg_R")
+        live_pnl = live.get("live_pnl")
+        if live_n == 0:
+            live_status = "none"
+        elif live_n < 10:
+            live_status = "provisional"
+        elif live_avg_R is not None and live_avg_R > 0:
+            live_status = "confirming"
+        else:
+            live_status = "degrading"
+        blended_score = round(score * _live_factor(live_n, live_avg_R), 4)
+
         ranked.append(
             {
                 "model": card["model"],
@@ -270,11 +339,17 @@ def rank_models(engines_only: bool = False) -> list[dict[str, Any]]:
                 "max_drawdown": dd,
                 "total_return": _safe_float(port.get("total_return")),
                 "trade_count": port.get("trade_count"),
-                "score": round(score_metrics(wr, sh, pf, dd), 4),
+                "score": score,
                 "source": card.get("source"),
+                "live_n": live_n,
+                "live_wr": live_wr,
+                "live_avg_R": live_avg_R,
+                "live_pnl": live_pnl,
+                "live_status": live_status,
+                "blended_score": blended_score,
             }
         )
-    ranked.sort(key=lambda r: r["score"], reverse=True)
+    ranked.sort(key=lambda r: r["blended_score"], reverse=True)
     for i, r in enumerate(ranked, 1):
         r["rank"] = i
     return ranked

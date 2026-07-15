@@ -3,7 +3,9 @@
 import { useRouter } from "next/navigation";
 import { AlertTriangle, Radio } from "lucide-react";
 import { ActionChip, actionRailColor } from "@/components/ui/ActionChip";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { analyzeHref } from "@/lib/routes";
+import { formatNum, formatPct } from "@/lib/format";
 
 export type WatchBoardRow = {
   symbol: string;
@@ -27,20 +29,6 @@ type WatchBoardProps = {
   emptyHint?: string;
   onSelectSymbol?: (sym: string) => void;
 };
-
-function fmtPrice(n: number | undefined): string {
-  if (n == null || Number.isNaN(n)) return "—";
-  return n.toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
-
-function fmtPct(n: number | undefined): string {
-  if (n == null || Number.isNaN(n)) return "—";
-  const v = n <= 1 ? n * 100 : n;
-  return `${Math.round(v)}%`;
-}
 
 function fmtRvol(row: WatchBoardRow): string {
   if (row.volDry) return "dry";
@@ -82,28 +70,15 @@ export function WatchBoard({
   }
 
   if (!rows.length && !loading) {
-    return (
-      <div className="flex flex-col items-center justify-center gap-2 px-4 py-16 text-center">
-        <Radio
-          className="size-8 text-[var(--td-ink-500,#7e7e7e)]"
-          strokeWidth={1.75}
-        />
-        <p className="font-[family-name:var(--td-font-display,Inter,ui-sans-serif,system-ui,sans-serif)] text-xl text-[var(--td-ink-100,#ffffff)]">
-          No ticks yet
-        </p>
-        <p className="max-w-sm text-[13px] text-[var(--td-ink-400,#bbbbbb)]">
-          {emptyHint}
-        </p>
-      </div>
-    );
+    return <EmptyState icon={Radio} title="No ticks yet" hint={emptyHint} />;
   }
 
   return (
     <div className="flex flex-col">
       <div className="overflow-x-auto">
         <table className="w-full min-w-[720px] border-collapse text-left text-[13px]">
-          <thead className="sticky top-0 z-10 bg-[var(--td-ink-700,#3c3c3c)]">
-            <tr className="border-b border-[var(--td-ink-600,#2b2b2b)] text-[11px] font-medium uppercase tracking-wide text-[var(--td-ink-300,#e6e6e6)]">
+          <thead className="sticky top-0 z-10 bg-[var(--td-canvas,#000000)]">
+            <tr className="border-b border-[var(--td-border,#3c3c3c)] text-[11px] font-medium uppercase tracking-wide text-[var(--td-ink-300,#e6e6e6)]">
               <th className="px-3 py-2">Sym</th>
               <th className="px-3 py-2">Action</th>
               <th className="px-3 py-2 text-right">Price</th>
@@ -139,16 +114,16 @@ export function WatchBoard({
                     <ActionChip action={row.action} />
                   </td>
                   <td className="px-3 py-2 text-right font-[family-name:var(--td-font-mono,ui-monospace,Menlo,monospace)] tabular-nums text-[var(--td-ink-200,#ffffff)]">
-                    {fmtPrice(row.price)}
+                    {formatNum(row.price, 2)}
                   </td>
                   <td className="px-3 py-2 text-right font-[family-name:var(--td-font-mono,ui-monospace,Menlo,monospace)] tabular-nums text-[var(--td-ink-200,#ffffff)]">
-                    {fmtPct(row.confidence)}
+                    {formatPct(row.confidence, 0)}
                   </td>
                   <td className="px-3 py-2 text-right font-[family-name:var(--td-font-mono,ui-monospace,Menlo,monospace)] tabular-nums text-[var(--td-ink-200,#ffffff)]">
-                    {fmtPct(row.hitProbability)}
+                    {formatPct(row.hitProbability, 0)}
                   </td>
                   <td className="px-3 py-2 text-right font-[family-name:var(--td-font-mono,ui-monospace,Menlo,monospace)] tabular-nums text-[var(--td-ink-200,#ffffff)]">
-                    {fmtPrice(row.stop)}
+                    {formatNum(row.stop, 2)}
                   </td>
                   <td className="px-3 py-2 text-right font-[family-name:var(--td-font-mono,ui-monospace,Menlo,monospace)] tabular-nums text-[var(--td-ink-200,#ffffff)]">
                     {fmtRvol(row)}

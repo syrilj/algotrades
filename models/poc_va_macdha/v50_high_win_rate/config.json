@@ -1,0 +1,12 @@
+{
+  "source": "local",
+  "codes": ["TSLA.US", "MU.US", "SPY.US", "IONQ.US", "APLD.US", "XLP.US", "QQQ.US"],
+  "interval": "1H",
+  "commission": 0.001,
+  "engine": "daily",
+  "strategy": {
+    "name": "v50_high_win_rate",
+    "model_version": "v50_high_win_rate",
+    "note": "v45 mean-reversion gated by long-term trend filter (price > SMA(250)) and scaled to 22.5% of cash per trade"
+  }
+}

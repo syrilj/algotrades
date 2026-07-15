@@ -1,0 +1,12 @@
+{
+  "source": "local",
+  "codes": ["TSLA.US", "MU.US", "SPY.US", "IONQ.US", "APLD.US", "XLP.US", "QQQ.US"],
+  "interval": "1H",
+  "commission": 0.0005,
+  "strategy": {"name": "v49_precision_trend", "model_version": "v49_precision_trend"},
+  "causal_execution": true,
+  "v49": {
+    "minimum_score": 5,
+    "selection_rule": "fixed_before_evaluation"
+  }
+}

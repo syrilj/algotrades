@@ -10,8 +10,7 @@ Computes dealer gamma exposure (GEX), call/put walls, flip strike, expected
 move, max pain, and a bullish/bearish/neutral squeeze score.
 
 Sign convention (dealer = long calls / short puts, SpotGamma-style):
-  CallGEX = +Γ * weight * 100 * S² * 0.01
-  PutGEX  = -Γ * weight * 100 * S² * 0.01
+  GEX = Γ · OI · 100 · S² · 0.01, calls +, puts −
   NetGEX  = sum(calls) + sum(puts)
   +GEX  → pinning / mean-reversion
   -GEX  → amplification / trend continuation
@@ -135,6 +134,51 @@ def _as_df(obj) -> pd.DataFrame:
     return pd.DataFrame(obj)
 
 
+def _expiry_bound(value: str | None, name: str) -> pd.Timestamp | None:
+    if not value:
+        return None
+    try:
+        ts = pd.Timestamp(value)
+    except Exception as exc:  # noqa: BLE001
+        raise ValueError(f"invalid {name} date: {value}") from exc
+    if ts.tzinfo is not None:
+        ts = ts.tz_convert(None)
+    return ts.normalize()
+
+
+def _zero_gamma_flip(net_by_strike, spot: float):
+    """Strike where cumulative net GEX crosses zero, nearest to spot (linear interp).
+
+    Replaces cum.abs().idxmin(), which picked the near-zero low-strike tail
+    (e.g. APLD flip=10 with spot 31.15). A crossing is only counted where the
+    series demonstrably flips sign between two nonzero values -- an isolated
+    cum==0.0 touch flanked by the SAME sign on both sides (e.g. a leading run
+    of zero-contribution strikes with no OI/volume) is not a genuine flip.
+    """
+    cum = net_by_strike.sort_index().cumsum()
+    strikes = cum.index.to_numpy(dtype=float)
+    vals = cum.to_numpy(dtype=float)
+
+    nonzero = [(i, 1.0 if v > 0 else -1.0) for i, v in enumerate(vals) if v != 0.0]
+
+    crossings: list[float] = []
+    for (i_a, s_a), (i_b, s_b) in zip(nonzero, nonzero[1:]):
+        if s_a == s_b:
+            continue
+        if i_b == i_a + 1:
+            a, b = vals[i_a], vals[i_b]
+            crossing = strikes[i_a] + (strikes[i_b] - strikes[i_a]) * (0.0 - a) / (b - a)
+        else:
+            # One or more exact-zero strikes sit between i_a and i_b; the
+            # cumulative sum is genuinely zero starting at the first of them.
+            crossing = strikes[i_a + 1]
+        crossings.append(float(crossing))
+
+    if not crossings:
+        return None
+    return float(min(crossings, key=lambda k: abs(k - spot)))
+
+
 def _compute_squeeze_score(
     spot: float,
     call_wall: float | None,
@@ -154,6 +198,10 @@ def _compute_squeeze_score(
 
     Returns a dict with squeeze_score (-100..100), squeeze_label, and the
     components that drove the score for transparency.
+
+    WARNING: This is a hand-tuned heuristic with arbitrary thresholds. It has
+    not been validated against historical data and should be treated as
+    experimental.
     """
     total_weight = max(total_weight, 1.0)
     call_wall_gex = 0.0
@@ -296,6 +344,8 @@ def compute_gamma_exposure_oi(
     max_expiries: int = 4,
     max_dte: int = 120,
     near_spot_pct: float = 0.10,
+    expiry_from: str | None = None,
+    expiry_to: str | None = None,
 ) -> dict:
     """OI-weighted GEX from yfinance."""
     sym = _yf_symbol(symbol)
@@ -305,10 +355,19 @@ def compute_gamma_exposure_oi(
         raise RuntimeError(f"no options chain for {sym}")
 
     now = pd.Timestamp.utcnow().tz_localize(None)
+    min_expiry = _expiry_bound(expiry_from, "expiry-from")
+    max_expiry = _expiry_bound(expiry_to, "expiry-to")
+    if min_expiry is not None and max_expiry is not None and min_expiry > max_expiry:
+        raise ValueError("expiry-from must be on or before expiry-to")
     expiries = []
     for exp in expiries_all:
-        dte = (pd.Timestamp(exp) - now).days
+        expiry_date = pd.Timestamp(exp).normalize()
+        dte = (expiry_date - now.normalize()).days
         if dte <= 0 or dte > max_dte:
+            continue
+        if min_expiry is not None and expiry_date < min_expiry:
+            continue
+        if max_expiry is not None and expiry_date > max_expiry:
             continue
         expiries.append(exp)
         if len(expiries) >= max_expiries:
@@ -330,6 +389,7 @@ def compute_gamma_exposure_oi(
             df["volume"] = pd.to_numeric(df.get("volume", 0), errors="coerce").fillna(0)
             df["iv"] = pd.to_numeric(df.get("impliedVolatility", np.nan), errors="coerce")
             df["strike"] = pd.to_numeric(df["strike"], errors="coerce")
+            df["lastTradeDate"] = pd.to_datetime(df.get("lastTradeDate"), errors="coerce", utc=True)
             df = df[(df["iv"] > 0.005) & df["iv"].notna()]
             df = df[(df["oi"] > 0) | (df["volume"] > 0)]
             for r in df.itertuples(index=False):
@@ -337,6 +397,7 @@ def compute_gamma_exposure_oi(
                 iv = float(r.iv)
                 oi = float(r.oi)
                 vol = float(r.volume)
+                last_trade = r.lastTradeDate if hasattr(r, "lastTradeDate") and pd.notna(r.lastTradeDate) else None
                 g = _bs_gamma(spot, K, T, 0.0, iv)
                 dealer = side_sign * g * oi * 100.0 * (spot ** 2) * 0.01
                 cust = -dealer
@@ -348,6 +409,7 @@ def compute_gamma_exposure_oi(
                         "oi": oi,
                         "volume": vol,
                         "iv": iv,
+                        "lastTradeDate": last_trade,
                         "gamma": g,
                         "customer_gex": cust,
                         "dealer_gex": dealer,
@@ -360,6 +422,14 @@ def compute_gamma_exposure_oi(
         raise RuntimeError(f"empty chain after filters for {sym}")
 
     df = pd.DataFrame(rows)
+
+    # Latest option trade timestamp gives the actual freshness of the chain data.
+    if "lastTradeDate" in df.columns:
+        trade_dates = pd.to_datetime(df["lastTradeDate"], errors="coerce", utc=True)
+        options_asof = trade_dates.max().isoformat() if trade_dates.notna().any() else None
+    else:
+        options_asof = None
+
     net_dealer = float(df["dealer_gex"].sum())
 
     call_gex = df[df.side == "call"].groupby("strike")["dealer_gex"].sum()
@@ -379,11 +449,7 @@ def compute_gamma_exposure_oi(
     else:
         regime = "flat"
 
-    flip = None
-    if len(net_by_strike):
-        cum = net_by_strike.cumsum()
-        if (cum > 0).any() and (cum < 0).any():
-            flip = float(cum.abs().idxmin())
+    flip = _zero_gamma_flip(net_by_strike, spot) if len(net_by_strike) else None
 
     by_strike = [
         {
@@ -454,6 +520,7 @@ def compute_gamma_exposure_oi(
         "spot_source": spot_source,
         "source": "oi",
         "lse_error": lse_err,
+        "options_asof": options_asof,
         "asof_utc": datetime.now(timezone.utc).isoformat(),
         "expiries_used": expiries,
         "net_dealer_gex": net_dealer,
@@ -495,8 +562,14 @@ def compute_gamma_exposure_lse(
     lse_err: str | None,
     max_dte: int = 30,
     near_spot_pct: float = 0.10,
+    expiry_from: str | None = None,
+    expiry_to: str | None = None,
 ) -> dict:
-    """Volume/premium-weighted GEX from lse-data."""
+    """Volume/premium-derived GEX from lse-data.
+
+    weight is always stored in contract-equivalent units; premium is converted
+    to contracts via premium / (last_price * 100) when volume is unavailable.
+    """
     sym = _yf_symbol(symbol)
     lse_sym = _lse_symbol(symbol)
     client = _build_lse_client()
@@ -515,19 +588,57 @@ def compute_gamma_exposure_lse(
     if df.empty:
         raise RuntimeError(f"no gamma data in LSE chain for {lse_sym}")
 
-    df["volume_today"] = df.get("volume_today", 0).fillna(0).astype(float)
-    df["premium_today"] = df.get("premium_today", 0).fillna(0).astype(float)
-    df["contract_type"] = df.get("contract_type", "").astype(str).str.lower()
+    min_expiry = _expiry_bound(expiry_from, "expiry-from")
+    max_expiry = _expiry_bound(expiry_to, "expiry-to")
+    if min_expiry is not None and max_expiry is not None and min_expiry > max_expiry:
+        raise ValueError("expiry-from must be on or before expiry-to")
+    today = pd.Timestamp.now(tz="UTC").tz_localize(None).normalize()
+    expiry_col = next((c for c in ["expiry", "expiration", "expiration_date", "expiry_date"] if c in df.columns), None)
+    if expiry_col is not None:
+        dates = pd.to_datetime(df[expiry_col], errors="coerce", utc=True).dt.tz_localize(None).dt.normalize()
+        if min_expiry is not None:
+            df = df[dates.isna() | (dates >= min_expiry)]
+        if max_expiry is not None:
+            df = df[dates.isna() | (dates <= max_expiry)]
+    elif "dte" in df.columns:
+        dte = pd.to_numeric(df["dte"], errors="coerce")
+        if min_expiry is not None:
+            df = df[dte.isna() | (dte >= max(0, (min_expiry - today).days))]
+        if max_expiry is not None:
+            df = df[dte.isna() | (dte <= max(0, (max_expiry - today).days))]
+    if df.empty:
+        raise RuntimeError(f"no LSE options within selected expiry dates for {lse_sym}")
+
+    # Try to extract the latest timestamp from LSE chain for freshness.
+    for ts_col in ["last_trade_time", "timestamp", "updated_at", "last_trade_date"]:
+        if ts_col in chain.columns:
+            try:
+                ts = pd.to_datetime(chain[ts_col], errors="coerce", utc=True)
+                options_asof = ts.max().isoformat() if ts.notna().any() else None
+                break
+            except Exception:  # noqa: BLE001
+                options_asof = None
+    else:
+        options_asof = None
+
+    df["volume_today"] = pd.to_numeric(df.get("volume_today", pd.Series(0.0, index=df.index, dtype=float)), errors="coerce").fillna(0).astype(float)
+    df["premium_today"] = pd.to_numeric(df.get("premium_today", pd.Series(0.0, index=df.index, dtype=float)), errors="coerce").fillna(0).astype(float)
+    df["last_price"] = pd.to_numeric(df.get("last_price", pd.Series(0.0, index=df.index, dtype=float)), errors="coerce").fillna(0).astype(float)
+    df["contract_type"] = df.get("contract_type", pd.Series("", index=df.index, dtype=str)).astype(str).str.lower()
     df["is_call"] = df["contract_type"].eq("call")
     df["side"] = df["is_call"].map({True: "call", False: "put"})
     df["iv"] = pd.to_numeric(df.get("iv", np.nan), errors="coerce")
     df["strike"] = pd.to_numeric(df["strike"], errors="coerce")
 
-    weight = df["volume_today"].clip(lower=0)
-    weight_used = "volume_today"
-    if float(weight.sum()) <= 0:
-        weight = df["premium_today"].clip(lower=0)
-        weight_used = "premium_today"
+    # volume_today is number of contracts; premium_today is dollars. If volume is
+    # not available, derive an estimated contract count from premium / price / 100.
+    volume = df["volume_today"].clip(lower=0)
+    contract_price = (df["last_price"] * 100.0).clip(lower=0)
+    derived_contracts = (
+        df["premium_today"].clip(lower=0) / contract_price.replace(0, np.nan)
+    ).fillna(0)
+    weight = volume.where(volume > 0, derived_contracts)
+    weight_used = "volume_today" if volume.sum() > 0 else "premium_today"
 
     df["weight"] = weight
     df["side_sign"] = df["is_call"].map({True: 1.0, False: -1.0})
@@ -553,11 +664,7 @@ def compute_gamma_exposure_lse(
     else:
         regime = "flat"
 
-    flip = None
-    if len(net_by_strike):
-        cum = net_by_strike.cumsum()
-        if (cum > 0).any() and (cum < 0).any():
-            flip = float(cum.abs().idxmin())
+    flip = _zero_gamma_flip(net_by_strike, spot) if len(net_by_strike) else None
 
     by_strike = [
         {
@@ -589,15 +696,18 @@ def compute_gamma_exposure_lse(
                 expected_move_low = float(spot * (1 - move_pct))
                 expected_move_high = float(spot * (1 + move_pct))
 
-    max_pain = None
-
     otm_calls = df[df["is_call"] & df["otm"]]
     otm_puts = df[(~df["is_call"]) & df["otm"]]
-    otm_call_volume = float(otm_calls["volume_today"].sum())
-    otm_put_volume = float(otm_puts["volume_today"].sum())
-    otm_call_oi = 0.0
-    otm_put_oi = 0.0
+    otm_call_volume = float(otm_calls["weight"].sum())
+    otm_put_volume = float(otm_puts["weight"].sum())
+    otm_call_oi = None
+    otm_put_oi = None
+    total_oi = None
     total_weight = float(weight.sum())
+    # Concentration numerators must use the SAME weight series as total_weight
+    # (which is now always in contract-equivalent units) so the ratio is unitless.
+    otm_call_weight = float(otm_calls["weight"].sum())
+    otm_put_weight = float(otm_puts["weight"].sum())
 
     squeeze = _compute_squeeze_score(
         spot=spot,
@@ -606,8 +716,8 @@ def compute_gamma_exposure_lse(
         flip=flip,
         near_net=near_net,
         net_dealer=net_dealer,
-        otm_call_weight=otm_call_volume,
-        otm_put_weight=otm_put_volume,
+        otm_call_weight=otm_call_weight,
+        otm_put_weight=otm_put_weight,
         total_weight=total_weight,
         by_strike=by_strike,
         expected_move_pct=expected_move_pct,
@@ -615,12 +725,30 @@ def compute_gamma_exposure_lse(
         expected_move_high=expected_move_high,
     )
 
+    # Compute max pain using the contract-equivalent weights for the nearest expiry.
+    if "dte" in df.columns and df["dte"].notna().any():
+        min_dte = int(df["dte"].min())
+        pain_df = df[df["dte"] == min_dte]
+    else:
+        pain_df = df
+    call_df = pain_df[pain_df["is_call"]]
+    put_df = pain_df[~pain_df["is_call"]]
+    if not call_df.empty and not put_df.empty:
+        max_pain = _max_pain(
+            call_df["strike"].values,
+            call_df["weight"].values,
+            put_df["strike"].values,
+            put_df["weight"].values,
+            sorted(pain_df["strike"].unique()),
+        )
+
     return {
         "symbol": sym,
         "spot": spot,
         "spot_source": spot_source,
         "source": "lse",
         "lse_error": lse_err,
+        "options_asof": options_asof,
         "asof_utc": datetime.now(timezone.utc).isoformat(),
         "expiries_used": [lse_sym],
         "net_dealer_gex": net_dealer,
@@ -643,11 +771,11 @@ def compute_gamma_exposure_lse(
         "otm_call_oi": otm_call_oi,
         "otm_put_volume": otm_put_volume,
         "otm_put_oi": otm_put_oi,
-        "total_oi": 0.0,
+        "total_oi": total_oi,
         "total_volume": total_weight,
         "n_contracts": int(len(df)),
         "weight": weight_used,
-        "sign_convention": "call +, put -; dealer assumed long calls / short puts (volume/premium weighted)",
+        "sign_convention": "call +, put -; dealer assumed long calls / short puts (volume/premium-derived contract-equivalent weighted)",
         "by_strike": by_strike,
         "squeeze_score": squeeze["squeeze_score"],
         "squeeze_label": squeeze["squeeze_label"],
@@ -658,25 +786,34 @@ def compute_gamma_exposure_lse(
 def compute_gamma_exposure(
     symbol: str,
     spot_source: str = "auto",
-    source: str = "oi",
+    source: str = "auto",
     max_expiries: int = 4,
     max_dte: int = 120,
     near_spot_pct: float = 0.10,
+    expiry_from: str | None = None,
+    expiry_to: str | None = None,
 ) -> dict:
     sym = _yf_symbol(symbol)
     spot, spot_src, lse_err = _get_spot(sym, spot_source)
     if not np.isfinite(spot) or spot <= 0:
         raise RuntimeError(f"invalid spot for {sym}")
 
-    if source == "lse":
-        return compute_gamma_exposure_lse(
-            symbol,
-            spot,
-            spot_src,
-            lse_err,
-            max_dte=max_dte,
-            near_spot_pct=near_spot_pct,
-        )
+    if source in ("auto", "lse"):
+        try:
+            return compute_gamma_exposure_lse(
+                symbol,
+                spot,
+                spot_src,
+                lse_err,
+                max_dte=max_dte,
+                near_spot_pct=near_spot_pct,
+                expiry_from=expiry_from,
+                expiry_to=expiry_to,
+            )
+        except Exception as exc:  # noqa: BLE001
+            if source == "lse":
+                raise
+            lse_err = f"Live LSE options unavailable; fell back to yfinance OI: {exc}"
 
     return compute_gamma_exposure_oi(
         symbol,
@@ -686,6 +823,8 @@ def compute_gamma_exposure(
         max_expiries=max_expiries,
         max_dte=max_dte,
         near_spot_pct=near_spot_pct,
+        expiry_from=expiry_from,
+        expiry_to=expiry_to,
     )
 
 
@@ -693,10 +832,12 @@ def main():
     ap = argparse.ArgumentParser(description="Gamma exposure snapshot for Trade Desk")
     ap.add_argument("--symbol", required=True)
     ap.add_argument("--spot-source", choices=["auto", "lse", "yfinance"], default="auto")
-    ap.add_argument("--source", choices=["oi", "lse"], default="oi",
-                    help="Gamma source: oi = yfinance open-interest, lse = lse-data volume/premium")
+    ap.add_argument("--source", choices=["auto", "oi", "lse"], default="auto",
+                    help="Gamma source: auto = live LSE then yfinance OI fallback; oi = yfinance open-interest; lse = lse-data volume/premium")
     ap.add_argument("--max-expiries", type=int, default=4)
     ap.add_argument("--max-dte", type=int, default=120)
+    ap.add_argument("--expiry-from", help="Earliest option expiration date to include (YYYY-MM-DD)")
+    ap.add_argument("--expiry-to", help="Latest option expiration date to include (YYYY-MM-DD)")
     ap.add_argument("--json", action="store_true")
     args = ap.parse_args()
 
@@ -705,8 +846,10 @@ def main():
             args.symbol,
             spot_source=args.spot_source,
             source=args.source,
-            max_expiries=args.max_expiries,
-            max_dte=args.max_dte,
+        max_expiries=args.max_expiries,
+        max_dte=args.max_dte,
+        expiry_from=args.expiry_from,
+        expiry_to=args.expiry_to,
         )
     except Exception as e:  # noqa: BLE001
         out = {"ok": False, "error": str(e), "symbol": _yf_symbol(args.symbol)}

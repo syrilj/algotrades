@@ -1,10 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { formatPct, formatNum, formatUsd } from "@/lib/format";
+import { colorVarFor } from "@/lib/actionColors";
 import type { ApiEnvelope, PaperPosition, PortfolioOptimizationResponse } from "@/lib/types";
 
 type BasketItem = { symbol: string; shares: number; mark?: number | null };
+
+type PickRow = {
+  symbol: string;
+  action?: string;
+  setup_kind?: string;
+  score?: number;
+  price?: number;
+  confidence?: number;
+  hit_probability?: number;
+  model?: string;
+  do_next?: string;
+  error?: string;
+};
 
 const DEFAULT_RISK_FREE = 3;
 const DEFAULT_LOOKBACK = 252;
@@ -23,8 +37,14 @@ export function PortfolioBuilder() {
   const [account, setAccount] = useState<number | "">(DEFAULT_ACCOUNT);
   const [loading, setLoading] = useState(false);
   const [loadingPositions, setLoadingPositions] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<PortfolioOptimizationResponse | null>(null);
+  const [analysis, setAnalysis] = useState<PickRow[] | null>(null);
+
+  useEffect(() => {
+    void loadPositions();
+  }, []);
 
   const loadPositions = async () => {
     setLoadingPositions(true);
@@ -56,6 +76,7 @@ export function PortfolioBuilder() {
       }
       setBasket(next);
       setResult(null);
+      setAnalysis(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -77,16 +98,51 @@ export function PortfolioBuilder() {
     setNewSymbol("");
     setNewShares("");
     setResult(null);
+    setAnalysis(null);
   };
 
   const removeSymbol = (symbol: string) => {
     setBasket((prev) => prev.filter((i) => i.symbol !== symbol));
     setResult(null);
+    setAnalysis(null);
   };
 
   const updateShares = (symbol: string, value: number) => {
     setBasket((prev) => prev.map((i) => (i.symbol === symbol ? { ...i, shares: value } : i)));
     setResult(null);
+    setAnalysis(null);
+  };
+
+  const analyzeBasket = async () => {
+    if (basket.length === 0) {
+      setError("Add symbols to analyze");
+      return;
+    }
+    setAnalyzing(true);
+    setError(null);
+    try {
+      const payload: Record<string, unknown> = {
+        symbols: basket.map((i) => i.symbol),
+        horizon: "day",
+        model: "auto",
+        riskPct: 1,
+      };
+      if (account !== "" && account > 0) payload.account = account;
+      const res = await fetch("/api/picks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const json = (await res.json()) as ApiEnvelope<{ picks?: PickRow[] }>;
+      if (!res.ok || json.ok === false || !json.data) {
+        throw new Error(json.error || "Analysis failed");
+      }
+      setAnalysis(json.data.picks || []);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setAnalyzing(false);
+    }
   };
 
   const optimize = async () => {
@@ -259,9 +315,12 @@ export function PortfolioBuilder() {
           </label>
         </div>
 
-        <div className="mt-3">
+        <div className="mt-3 flex flex-wrap gap-2">
           <button className="td-btn td-btn-primary" onClick={optimize} disabled={loading || basket.length < 2}>
             {loading ? "Optimizing…" : "Optimize portfolio"}
+          </button>
+          <button className="td-btn td-btn-ghost" onClick={analyzeBasket} disabled={analyzing || basket.length === 0}>
+            {analyzing ? "Analyzing…" : "Analyze holdings"}
           </button>
         </div>
       </div>
@@ -272,7 +331,61 @@ export function PortfolioBuilder() {
         </div>
       ) : null}
 
+      {analysis ? <PortfolioAnalysis analysis={analysis} /> : null}
+
       {result ? <PortfolioResult result={result} /> : null}
+    </div>
+  );
+}
+
+function suggestionFor(row: PickRow): string {
+  if (row.error) return "Review";
+  const action = (row.action || "").toUpperCase();
+  if (action.includes("AVOID")) return "Let go / avoid";
+  if (action.startsWith("BUY")) return "Keep / add";
+  if (action.includes("WATCH") || action.includes("ALMOST")) return "Watch / keep";
+  return "Trim / wait";
+}
+
+function PortfolioAnalysis({ analysis }: { analysis: PickRow[] }) {
+  const sorted = [...analysis].sort((a, b) => (b.score ?? -1) - (a.score ?? -1));
+  return (
+    <div className="td-panel p-3">
+      <div className="text-[var(--td-ink-400)] text-[11px] uppercase tracking-wide mb-2">
+        Holdings analysis
+      </div>
+      <div className="overflow-x-auto">
+        <table className="scan-table">
+          <thead>
+            <tr>
+              <th>Symbol</th>
+              <th>Signal</th>
+              <th className="text-right">Score</th>
+              <th className="text-right">Price</th>
+              <th className="text-right">Confidence</th>
+              <th>Suggestion</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((row) => {
+              const color = colorVarFor("action", row.action);
+              return (
+                <tr key={row.symbol}>
+                  <td className="font-medium">{row.symbol}</td>
+                  <td className="text-[12px]">{row.action ?? row.error ?? "—"}</td>
+                  <td className="tabular text-right">{formatNum(row.score ?? 0, 3)}</td>
+                  <td className="tabular text-right">{row.price ? formatUsd(row.price) : "—"}</td>
+                  <td className="tabular text-right">{formatPct(row.confidence ?? 0, 0)}</td>
+                  <td className="text-[12px] font-medium" style={{ color }}>{suggestionFor(row)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <div className="mt-2 text-[var(--td-ink-400)] text-[11px]">
+        Sorted by setup score. Strongest = keep/add; weakest = trim/avoid.
+      </div>
     </div>
   );
 }

@@ -1,0 +1,112 @@
+import json
+import sys
+from datetime import timedelta
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "tools"))
+
+from confidence_runtime import assess_data_freshness, evaluate_confidence  # noqa: E402
+from confidence_shadow import ShadowDecisionLedger  # noqa: E402
+from evolve.calibration import (  # noqa: E402
+    build_calibration_artifact,
+    calibration_metrics,
+    load_candidate_files,
+    purge_training_rows,
+    write_artifact,
+)
+
+
+def _candidate_frame(n=90):
+    entry = pd.date_range("2024-01-01", periods=n, freq="6h", tz="UTC")
+    raw = np.linspace(0.15, 0.85, n)
+    labels = (raw > 0.52).astype(float)
+    return pd.DataFrame(
+        {
+            "timestamp": entry,
+            "code": ["TEST.US"] * n,
+            "adj_proba": raw,
+            "exit_timestamp": entry + timedelta(hours=2),
+            "return_pct": np.where(labels > 0, 0.02, -0.01),
+        }
+    )
+
+
+def test_calibration_metrics_and_artifact_are_finite(tmp_path):
+    frame = _candidate_frame()
+    source = tmp_path / "candidates.csv"
+    frame.to_csv(source, index=False)
+    normalized = load_candidate_files([source])
+    artifact = build_calibration_artifact(normalized, model="v39d_confluence")
+    assert artifact["schema_version"] == "confidence-calibration-v1"
+    assert artifact["metrics"]["calibrated_oof"]["n"] > 0
+    assert artifact["metrics"]["raw_final_holdout"]["n"] > 0
+    assert np.isfinite(artifact["metrics"]["calibrated_oof"]["brier"])
+    assert len(artifact["calibrator"]["x"]) == len(artifact["calibrator"]["y"])
+
+
+def test_purge_removes_overlapping_outcomes():
+    frame = pd.DataFrame(
+        {
+            "entry_ts": pd.to_datetime(["2024-01-01", "2024-01-03"], utc=True),
+            "exit_ts": pd.to_datetime(["2024-01-02 00:00", "2024-01-03 12:00"], utc=True),
+        }
+    )
+    kept = purge_training_rows(frame, pd.Timestamp("2024-01-03", tz="UTC"), timedelta(hours=1))
+    assert len(kept) == 1
+    assert kept.iloc[0]["entry_ts"] == pd.Timestamp("2024-01-01", tz="UTC")
+
+
+def test_runtime_abstains_without_active_calibrator(tmp_path):
+    freshness = assess_data_freshness("2026-07-14T15:00:00Z", now=pd.Timestamp("2026-07-14T15:30:00Z").to_pydatetime())
+    result = evaluate_confidence(
+        0.85,
+        model_ok=True,
+        setup_ok=True,
+        freshness=freshness,
+        model="v39d_confluence",
+        calibrator={"available": False, "reason": "calibration_artifact_missing", "path": str(tmp_path / "none.json")},
+    )
+    assert result["state"] == "ABSTAIN"
+    assert result["size_limit"] == 0.0
+    assert "active_calibration" in result["failed_checks"]
+
+
+def test_runtime_enters_only_with_active_gated_calibrator():
+    freshness = assess_data_freshness("2026-07-14T15:00:00Z", now=pd.Timestamp("2026-07-14T15:30:00Z").to_pydatetime())
+    artifact = {
+        "available": True,
+        "path": "test",
+        "artifact": {
+            "status": "active",
+            "schema_version": "confidence-calibration-v1",
+            "model": "v39d_confluence",
+            "promotion": {"all_calibration_gates_pass": True, "all_promotion_gates_pass": True},
+            "thresholds": {"watch": 0.50, "enter": 0.60},
+            "calibrator": {"x": [0.0, 1.0], "y": [0.0, 1.0]},
+        },
+    }
+    result = evaluate_confidence(
+        0.85,
+        model_ok=True,
+        setup_ok=True,
+        freshness=freshness,
+        model="v39d_confluence",
+        calibrator=artifact,
+    )
+    assert result["state"] == "ENTER"
+    assert result["calibrated_probability"] == 0.85
+    assert result["size_limit"] == 1.0
+
+
+def test_shadow_ledger_records_and_settles(tmp_path):
+    ledger = ShadowDecisionLedger(tmp_path / "shadow.jsonl")
+    event_id = ledger.record({"symbol": "TEST", "state": "ABSTAIN"})
+    assert ledger.settle(event_id, outcome=-0.01)
+    summary = ledger.summary()
+    assert summary["events"] == 1
+    assert summary["settled"] == 1
+    assert summary["states"]["ABSTAIN"] == 1

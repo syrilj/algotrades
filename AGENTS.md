@@ -30,6 +30,13 @@
 - `v42` was integrated into the `v41_ensemble_feedback` sweep; every tested combination with `v42` underperforms the `v39b+v39d` baseline.
 - Conclusion: `v42_trend_breakout` is not selected for the current ensemble; keep it as a research artifact for future signal decomposition.
 
+## v44 Absorption (OrderFlow / Delta / Wick)
+- `models/poc_va_macdha/v44_absorption/` adds an OHLCV-safe `order_flow_state` sensor (candle-delta proxy, wick absorption, volume/delta clusters, CVD bias, composite flow score) to `v39d_confluence`.
+- Usage: `.venv/bin/python tools/train_v44_meta.py --seed --retrain`.
+- Final backtest on `EQUITY_WINNER_BAG` ($1,000, source=local, 1H): +262.7% return, -17.8% max drawdown, Sharpe 2.24, 158 trades, final $3,627.
+- This underperforms both `v39b_live_adapt` (+309.7% / -13.1% / Sharpe 2.70) and `v39d_confluence` (+357.5% / -13.4% / Sharpe 2.82).
+- Conclusion: `v44_absorption` is not promoted; keep as a research artifact. The OHLCV approximation is too noisy and the retrained XGB does not match the original v39d model's selection quality.
+
 ## v41 Ensemble Feedback
 - `tools/feedback_loop_v41.py` automates a grid search over `v41_ensemble_feedback` `perf_weighted` variants (now also covers `v42_trend_breakout` combinations and SGD/risk-adjusted metrics).
 - Usage: `.venv/bin/python tools/feedback_loop_v41.py --cash 1000 --quick` or `--focused` for a 144-variant sweep.
@@ -38,6 +45,12 @@
 - `v41` best (359.2% / -13.3% / Sharpe 2.82 / 135 trades, source=yfinance unadjusted) is close to the reconciled `v39d_confluence` (357.5% / -13.4% / Sharpe 2.82 / 135 trades, source=local adjusted); a fair comparison requires re-running `v41` on `source=local`.
 - Risk-adjusted `perf_metric` options (`raw_return`, `sharpe`, `sortino`, `calmar`, `return_per_dd`) are available, but `perf_weighted` averaging of two teachers cannot exceed the best teacher unless the weighting is strongly predictive.
 - Adding `v42_trend_breakout` to the ensemble (as a third teacher) hurts performance: `v39b+v39d+v42` falls to 183.2% / -16.4% / Sharpe 2.09 with 1,254 trades. Pairwise `v39b+v42` and `v39d+v42` also underperform the `v39b+v39d` baseline.
+
+## v50_high_win_rate (high-win-rate candidate)
+- `models/poc_va_macdha/v50_high_win_rate/` is a new wrapper that gates `v45_ultimate_rsi` mean-reversion signals with a `SMA(250)` trend filter (entry-only) and scales target positions to 22.5% of cash (`signal_scale`).
+- Verified result at `$1,000` scale on `EQUITY_WINNER_BAG` (2024-08-01 to 2026-07-11, `source=local`, `interval=1H`): **108.7% return**, **-19.5% max drawdown**, **Sharpe 1.87**, **52 trades**, **86.5% win rate**.
+- Run: `dmr.run_one(dmr.discover_models(['v50_high_win_rate'])[0], mode='daily', codes=EQUITY_WINNER_BAG, start='2024-08-01', end='2026-07-11', tag='final', cash=1000, source='local', interval='1H')`.
+- `v41` was tested as an additional consensus gate but cut trade count to 16 and return to 5.6%; the final model uses `v45` alone.
 
 ## Market Runtime (LSE streaming)
 - `services/market_runtime/` holds contracts, catalog, ranking, state, persistence, LSE adapter, and supervisor.

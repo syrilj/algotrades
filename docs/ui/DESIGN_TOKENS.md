@@ -2,7 +2,32 @@
 
 Canonical CSS/token layer for implementation. **Brand intent and hex values live in [`BRAND.md`](./BRAND.md)** — this file extends them with type scale, spacing, icon rules, and gate/action maps for engineers.
 
-Default theme: **dark** (desk). Optional light via `[data-theme="light"]` (map ink scale inverted; keep action/overlay hues).
+Default theme: **dark** (desk). The 2026 refresh uses a quiet graphite canvas, acid-lime product accent, and reserves semantic green/coral for trade outcomes. The legacy token block below remains for component compatibility; the refresh block is canonical for new UI work.
+
+## 2026 refresh — canonical shell tokens
+
+```css
+:root {
+  --td-canvas: #070A0F;
+  --td-surface-soft: #0B1017;
+  --td-surface-card: #101720;
+  --td-surface-elevated: #17212D;
+  --td-hairline: #253342;
+  --td-hairline-strong: #344354;
+  --td-ink: #F5F7FA;
+  --td-body: #A5B0BE;
+  --td-muted: #687789;
+  --td-brand: #C7F36B;
+  --td-brand-muted: #91C94C;
+  --td-accent: var(--td-brand);
+  --td-radius-sm: 8px;
+  --td-radius-md: 12px;
+  --td-radius-lg: 18px;
+  --td-shadow: 0 18px 50px rgba(0, 0, 0, .28);
+}
+```
+
+Use the accent for focus, selected navigation, primary actions, and system health. Use `--td-action-*` and `--td-gate-*` only for signal semantics. Primary surfaces should use one border and one elevation treatment; avoid nested card stacks.
 
 ## Surfaces & brand (from BRAND.md)
 

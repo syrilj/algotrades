@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, Play, Square } from "lucide-react";
+import { Loader2, Play, Radar, Square } from "lucide-react";
 
 export type WatchControlsValue = {
   symbols: string;
@@ -107,41 +107,45 @@ export function WatchControls({
           </select>
         </label>
 
-        {onMarketScan ? (
-          <button
-            type="button"
-            onClick={onMarketScan}
-            className="td-btn td-btn-ghost"
-            disabled={running || scanning}
-            title="Scan hot sectors + liquid names → rank plays with WINNER model"
-          >
-            {scanning ? (
-              <Loader2 className="size-3.5 animate-spin" strokeWidth={1.75} />
-            ) : null}
-            Market scan
-          </button>
-        ) : null}
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+          {onMarketScan ? (
+            <button
+              type="button"
+              onClick={onMarketScan}
+              className="td-btn td-btn-ghost"
+              disabled={running || scanning}
+              title="Scan hot sectors + liquid names → rank plays with WINNER model"
+            >
+              {scanning ? (
+                <Loader2 className="size-3.5 animate-spin" strokeWidth={1.75} />
+              ) : (
+                <Radar className="size-3.5" strokeWidth={1.75} />
+              )}
+              Market scan
+            </button>
+          ) : null}
 
-        {running ? (
-          <button type="button" onClick={onStop} className="td-btn td-btn-ghost">
-            {loading ? (
-              <Loader2 className="size-3.5 animate-spin" strokeWidth={1.75} />
-            ) : (
-              <Square className="size-3.5" strokeWidth={1.75} />
-            )}
-            Stop
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={onStart}
-            className="td-btn td-btn-primary"
-            disabled={scanning}
-          >
-            <Play className="size-3.5" strokeWidth={1.75} />
-            Start
-          </button>
-        )}
+          {running ? (
+            <button type="button" onClick={onStop} className="td-btn td-btn-ghost">
+              {loading ? (
+                <Loader2 className="size-3.5 animate-spin" strokeWidth={1.75} />
+              ) : (
+                <Square className="size-3.5" strokeWidth={1.75} />
+              )}
+              Stop
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={onStart}
+              className="td-btn td-btn-primary"
+              disabled={scanning}
+            >
+              <Play className="size-3.5" strokeWidth={1.75} />
+              Start
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

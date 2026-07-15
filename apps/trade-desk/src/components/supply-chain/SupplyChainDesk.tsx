@@ -8,6 +8,7 @@ import { actionColorClass, formatPct, formatUsd } from "@/lib/format";
 import { analyzeHref } from "@/lib/routes";
 import type { ApiEnvelope, ModelsCatalog, SupplyChainResponse } from "@/lib/types";
 import Link from "next/link";
+import { confColorVar, scoreRankClass } from "@/lib/actionColors";
 
 export type SupplyChainFormValues = {
   symbol: string;
@@ -19,20 +20,6 @@ export type SupplyChainFormValues = {
 function pct(n: number | null | undefined): string {
   if (n == null || Number.isNaN(n)) return "—";
   return formatPct(n, 1);
-}
-
-function scoreClass(score: number): string {
-  if (score >= 0.75) return "td-rank-gold";
-  if (score >= 0.55) return "td-rank-silver";
-  if (score >= 0.35) return "td-rank-bronze";
-  return "td-rank-plain";
-}
-
-function confColor(conf: string | undefined): string {
-  const c = (conf || "").toLowerCase();
-  if (c === "high") return "var(--td-gate-pass)";
-  if (c === "low") return "var(--td-gate-fail)";
-  return "var(--td-gate-neutral)";
 }
 
 function capLabel(cap: number | null | undefined): string {
@@ -324,7 +311,7 @@ function SupplyChainDeskInner() {
                         {s.product || s.industry || "—"}
                       </div>
                     </td>
-                    <td className="tabular" style={{ color: `var(${scoreClass(s.score ?? 0)})` }}>
+                    <td className="tabular" style={{ color: `var(--${scoreRankClass(s.score ?? 0)})` }}>
                       {(s.score ?? 0).toFixed(2)}
                     </td>
                     <td>
@@ -339,7 +326,7 @@ function SupplyChainDeskInner() {
                     <td className="tabular" style={{ fontSize: "var(--td-text-caption)" }}>
                       {s.source}
                     </td>
-                    <td className="tabular" style={{ fontSize: "var(--td-text-caption)", color: confColor(s.confidence) }}>
+                    <td className="tabular" style={{ fontSize: "var(--td-text-caption)", color: confColorVar(s.confidence) }}>
                       {s.confidence}
                     </td>
                   </tr>

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { BarChart3, Check, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type {
@@ -12,6 +13,10 @@ import type {
 import type { ApiEnvelope } from "@/lib/types";
 import { modelHref } from "@/lib/routes";
 import { PageHeader } from "@/components/shell/PageHeader";
+import { formatNum, formatPct } from "@/lib/format";
+import { Chip } from "@/components/ui/Chip";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { colorVarFor } from "@/lib/actionColors";
 
 type BoardPayload = {
   run: EvolveRunSummary | null;
@@ -31,41 +36,13 @@ async function fetchBoard(run?: string): Promise<BoardPayload> {
   return body.data as BoardPayload;
 }
 
-function claimStyle(level?: string): { bg: string; fg: string } {
-  switch (level) {
-    case "CLAIM":
-      return { bg: "var(--td-badge-winner-bg)", fg: "var(--td-action-buy-now)" };
-    case "RESEARCH":
-      return { bg: "var(--td-ink-800)", fg: "var(--td-action-breakout-watch)" };
-    case "THIN":
-      return { bg: "var(--td-ink-800)", fg: "var(--td-ink-400)" };
-    case "ERROR":
-    case "BLOCKED_DATA":
-      return { bg: "var(--td-ink-800)", fg: "var(--td-action-avoid)" };
-    default:
-      return { bg: "var(--td-ink-800)", fg: "var(--td-ink-300)" };
-  }
-}
-
-function fmtPct(n: number | undefined | null, digits = 1): string {
-  if (n == null || Number.isNaN(n)) return "—";
-  return `${(n * 100).toFixed(digits)}%`;
-}
-
-function fmtNum(n: number | undefined | null, digits = 2): string {
-  if (n == null || Number.isNaN(n)) return "—";
-  return n.toFixed(digits);
-}
-
 function ClaimChip({ level }: { level?: string }) {
-  const s = claimStyle(level);
   return (
-    <span
-      className="inline-flex items-center rounded-sm px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
-      style={{ background: s.bg, color: s.fg }}
-    >
-      {level || "—"}
-    </span>
+    <Chip
+      label={level || "—"}
+      colorVar={colorVarFor("claim", level)}
+      background={level === "CLAIM" ? "var(--td-badge-winner-bg)" : undefined}
+    />
   );
 }
 
@@ -98,7 +75,7 @@ function PhaseStrip() {
           </span>
           <span>{p.label}</span>
           {i < phases.length - 1 ? (
-            <span style={{ color: "var(--td-ink-600)" }} aria-hidden>
+            <span style={{ color: "var(--td-ink-400)" }} aria-hidden>
               →
             </span>
           ) : null}
@@ -342,8 +319,14 @@ export function EvolveDesk() {
                 : "—"}
             </strong>
           </p>
-          <p className="mt-1 text-[11px] tabular-nums" style={{ color: "var(--td-ink-500)" }}>
-            ✓{board?.brain?.accepted ?? 0} / ✗{board?.brain?.rejected ?? 0}
+          <p
+            className="mt-1 flex items-center gap-1 text-[11px] tabular-nums"
+            style={{ color: "var(--td-ink-500)" }}
+            aria-label={`${board?.brain?.accepted ?? 0} accepted, ${board?.brain?.rejected ?? 0} rejected`}
+          >
+            <Check size={12} aria-hidden />
+            {board?.brain?.accepted ?? 0} / <X size={12} aria-hidden />
+            {board?.brain?.rejected ?? 0}
           </p>
           {board?.brain?.lessons?.length ? (
             <p className="mt-2 text-[11px] leading-snug" style={{ color: "var(--td-ink-400)" }}>
@@ -369,7 +352,7 @@ export function EvolveDesk() {
               {finalize?.top_evolve || board?.run?.ranking?.[0]?.id || "—"}
             </span>
             {finalize?.top_utility != null
-              ? ` · util ${fmtNum(finalize.top_utility, 3)}`
+              ? ` · util ${formatNum(finalize.top_utility, 3)}`
               : null}
           </p>
           {finalize?.reasons?.length ? (
@@ -531,12 +514,12 @@ export function EvolveDesk() {
               Loading evolve board…
             </div>
           ) : !ranking.length ? (
-            <div className="p-8 text-[13px]" style={{ color: "var(--td-ink-400)" }}>
-              No ranking rows. Run quick rank or generate via CLI:
-              <pre className="mt-2 overflow-x-auto text-[11px]" style={{ color: "var(--td-ink-300)" }}>
-                {`.venv/bin/python tools/evolve_pipeline.py rank --track equity --cash 10000`}
-              </pre>
-            </div>
+            <EmptyState
+              icon={BarChart3}
+              title="No ranking rows"
+              hint="Run quick rank, or generate via CLI:"
+              code=".venv/bin/python tools/evolve_pipeline.py rank --track equity --cash 10000"
+            />
           ) : (
             <table className="w-full border-collapse text-left text-[12px]">
               <thead>
@@ -615,19 +598,19 @@ export function EvolveDesk() {
                           color: util < 0 ? "var(--td-action-avoid)" : "var(--td-ink-100)",
                         }}
                       >
-                        {fmtNum(util, 3)}
+                        {formatNum(util, 3)}
                       </td>
                       <td className="px-2 py-1.5 font-mono tabular-nums">
-                        {fmtPct(row.ret)}
+                        {formatPct(row.ret)}
                       </td>
                       <td className="px-2 py-1.5 font-mono tabular-nums">
-                        {fmtNum(row.sharpe)}
+                        {formatNum(row.sharpe)}
                       </td>
                       <td
                         className="px-2 py-1.5 font-mono tabular-nums"
                         style={{ color: "var(--td-action-avoid)" }}
                       >
-                        {fmtPct(row.dd)}
+                        {formatPct(row.dd)}
                       </td>
                       <td className="px-2 py-1.5 font-mono tabular-nums">
                         {row.n ?? "—"}
@@ -697,12 +680,12 @@ export function EvolveDesk() {
               </div>
               <dl className="mt-3 space-y-1.5 text-[12px]">
                 {[
-                  ["Utility", fmtNum(selected.utility, 3)],
-                  ["Return", fmtPct(selected.ret)],
-                  ["Sharpe", fmtNum(selected.sharpe)],
-                  ["Max DD", fmtPct(selected.dd)],
+                  ["Utility", formatNum(selected.utility, 3)],
+                  ["Return", formatPct(selected.ret)],
+                  ["Sharpe", formatNum(selected.sharpe)],
+                  ["Max DD", formatPct(selected.dd)],
                   ["Trades", String(selected.n ?? "—")],
-                  ["WR", fmtPct(selected.wr)],
+                  ["WR", formatPct(selected.wr)],
                   ["Track", selected.data_track || "—"],
                   ["Mode", selected.mode || "—"],
                   ["Multi-lock", selected.multi_lock || "—"],

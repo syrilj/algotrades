@@ -9,8 +9,10 @@ import type {
 } from "@/lib/types";
 import { ActionChip, actionStyle } from "@/components/ui/ActionChip";
 import { ConfidenceMeter } from "@/components/ui/ConfidenceMeter";
+import { Stat } from "@/components/ui/Stat";
 import { TradeButton } from "@/components/analyze/TradeButton";
 import { gammaHref, liveHref, optionsHref } from "@/lib/routes";
+import { formatPct } from "@/lib/format";
 
 function fmt(n: number | null | undefined, digits = 2): string {
   if (n == null || !Number.isFinite(n)) return "—";
@@ -19,7 +21,6 @@ function fmt(n: number | null | undefined, digits = 2): string {
     maximumFractionDigits: digits,
   });
 }
-
 function fmtUsd(n: number | null | undefined): string {
   if (n == null || !Number.isFinite(n)) return "—";
   return n.toLocaleString("en-US", {
@@ -27,11 +28,6 @@ function fmtUsd(n: number | null | undefined): string {
     currency: "USD",
     maximumFractionDigits: 0,
   });
-}
-
-function fmtPct(n: number | null | undefined): string {
-  if (n == null || !Number.isFinite(n)) return "—";
-  return `${(n * 100).toFixed(0)}%`;
 }
 
 function buildOperatorSteps(
@@ -61,7 +57,7 @@ function buildOperatorSteps(
     }
     if (size && size.shares > 0) {
       steps.push(
-        `Pre-size: ${size.shares} sh · risk ${fmtUsd(size.dollar_risk)} (${fmt(size.risk_pct, 2)}%).`,
+        `Pre-size: ${size.shares} sh · risk ${fmtUsd(size.dollar_risk)} (${formatPct(size.risk_pct, 2)}).`,
       );
     }
     return steps;
@@ -110,7 +106,6 @@ export function VerdictPanel({
     return (
       <aside
         className="td-panel td-ticket td-ticket--empty"
-        style={{ borderLeft: "3px solid var(--td-ink-600)" }}
         aria-label="Verdict"
       >
         <p className="td-ticker" style={{ fontSize: "1.15rem" }}>
@@ -139,8 +134,8 @@ export function VerdictPanel({
     <aside
       className="td-panel td-ticket"
       style={{
-        borderLeft: `3px solid ${rail.color}`,
         background: `color-mix(in oklch, ${rail.color} 7%, var(--td-ink-900))`,
+        borderColor: `color-mix(in oklch, ${rail.color} 55%, var(--td-hairline))`,
       }}
       aria-label="Verdict"
     >
@@ -150,7 +145,22 @@ export function VerdictPanel({
           <div className="flex flex-wrap items-baseline gap-3">
             <span className="td-ticker">{sym}</span>
             <span className="td-ticker-price">{fmt(state.price)}</span>
+            {model ?? state.model ? (
+              <span
+                className="text-[11px]"
+                style={{ fontFamily: "var(--td-font-mono)", color: "var(--td-ink-400)" }}
+              >
+                {model ?? state.model}
+              </span>
+            ) : null}
           </div>
+          {model ?? state.model ? (
+            <p className="td-ticket__engine">
+              <span>Selected engine</span>
+              <strong>{model ?? state.model}</strong>
+              {selection?.reason ? <small>{selection.reason}</small> : null}
+            </p>
+          ) : null}
         </div>
         <ActionChip action={plan.action} size="lg" />
       </div>
@@ -162,7 +172,7 @@ export function VerdictPanel({
 
       <div>
         <span className="td-label">Steps</span>
-        <ol className="mt-1 flex flex-col gap-1.5">
+        <ol className="mt-1 flex flex-col gap-1.5 list-none p-0">
           {steps.map((s, i) => (
             <li
               key={`${i}-${s.slice(0, 24)}`}
@@ -184,7 +194,7 @@ export function VerdictPanel({
         </ol>
       </div>
 
-      <div className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
         <Stat label="Entry" value={fmt(state.entry)} emphasize />
         <Stat label="Stop" value={fmt(state.stop)} emphasize />
         <Stat label="Shares" value={size ? String(size.shares) : "—"} emphasize />
@@ -229,14 +239,14 @@ export function VerdictPanel({
               </p>
             ) : null}
           </div>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
-            <Stat label="Hit chance" value={fmtPct(state.hit_probability)} />
+          <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
+            <Stat label="Hit chance" value={formatPct(state.hit_probability, 0)} />
             <Stat label="Trail arm" value={fmt(state.trail_arm)} />
             <Stat label="Risk / sh" value={fmt(state.risk_per_share)} />
             {size ? (
               <>
                 <Stat label="Notional" value={fmtUsd(size.notional)} />
-                <Stat label="Risk %" value={`${fmt(size.risk_pct, 2)}%`} />
+                <Stat label="Risk %" value={formatPct(size.risk_pct, 2)} />
                 <Stat label="Account" value={fmtUsd(size.account)} />
               </>
             ) : null}
@@ -261,32 +271,5 @@ export function VerdictPanel({
         </div>
       </details>
     </aside>
-  );
-}
-
-function Stat({
-  label,
-  value,
-  emphasize,
-}: {
-  label: string;
-  value: string;
-  emphasize?: boolean;
-}) {
-  return (
-    <div>
-      <div className="td-label mb-0">{label}</div>
-      <div
-        className="tabular"
-        style={{
-          fontFamily: "var(--td-font-mono)",
-          color: emphasize ? "var(--td-ink-50)" : "var(--td-ink-100)",
-          fontSize: emphasize ? "15px" : "13px",
-          fontWeight: emphasize ? 600 : 400,
-        }}
-      >
-        {value}
-      </div>
-    </div>
   );
 }

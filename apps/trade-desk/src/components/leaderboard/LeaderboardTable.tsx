@@ -1,9 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { Circle, Trophy } from "lucide-react";
 import { ModelBadges } from "./ModelBadges";
 import { ScoreBar } from "./ScoreBar";
 import type { LeaderboardRow } from "./ModelSidePanel";
+import { colorVarFor, rankColorVar } from "@/lib/actionColors";
+import { formatNum, formatPct } from "@/lib/format";
+import { Chip } from "@/components/ui/Chip";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 export type SortKey =
   | "rank"
@@ -14,7 +19,10 @@ export type SortKey =
   | "profit_factor"
   | "max_drawdown"
   | "total_return"
-  | "trade_count";
+  | "trade_count"
+  | "live_wr"
+  | "live_n"
+  | "live_avg_R";
 
 type LeaderboardTableProps = {
   rows: LeaderboardRow[];
@@ -35,23 +43,14 @@ const COLUMNS: { key: SortKey; label: string; align?: "left" | "right" }[] = [
   { key: "max_drawdown", label: "DD" },
   { key: "total_return", label: "Ret" },
   { key: "trade_count", label: "Trades" },
+  { key: "live_wr", label: "Live WR" },
+  { key: "live_n", label: "Live n" },
+  { key: "live_avg_R", label: "Avg R" },
 ];
 
-function medalColor(rank: number): string {
-  if (rank === 1) return "var(--td-rank-gold, #f4b400)";
-  if (rank === 2) return "var(--td-rank-silver, #e6e6e6)";
-  if (rank === 3) return "var(--td-rank-bronze, #b87336)";
-  return "var(--td-rank-plain, var(--td-ink-400, #bbbbbb))";
-}
-
-function fmtPct(n: number | undefined, digits = 1): string {
-  if (n == null || Number.isNaN(n)) return "—";
-  return `${(n * 100).toFixed(digits)}%`;
-}
-
-function fmtNum(n: number | undefined, digits = 2): string {
-  if (n == null || Number.isNaN(n)) return "—";
-  return n.toFixed(digits);
+/** Live paper-trading evidence gate: mirrors model_registry.py's _live_factor threshold. */
+function isLiveProvisional(row: LeaderboardRow): boolean {
+  return row.live_n == null || row.live_n < 10;
 }
 
 function cellValue(row: LeaderboardRow, key: SortKey): number | string {
@@ -74,6 +73,12 @@ function cellValue(row: LeaderboardRow, key: SortKey): number | string {
       return row.total_return ?? Number.NEGATIVE_INFINITY;
     case "trade_count":
       return row.trade_count ?? Number.NEGATIVE_INFINITY;
+    case "live_wr":
+      return row.live_wr ?? Number.NEGATIVE_INFINITY;
+    case "live_n":
+      return row.live_n ?? Number.NEGATIVE_INFINITY;
+    case "live_avg_R":
+      return row.live_avg_R ?? Number.NEGATIVE_INFINITY;
     default: {
       const _exhaustive: never = key;
       return _exhaustive;
@@ -133,12 +138,11 @@ export function LeaderboardTable({
 
   if (!rows.length) {
     return (
-      <div
-        className="p-8 text-center text-[13px]"
-        style={{ color: "var(--td-ink-400, #bbbbbb)" }}
-      >
-        No ranked models for this view.
-      </div>
+      <EmptyState
+        icon={Trophy}
+        title="No ranked models"
+        hint="No ranked models for this view."
+      />
     );
   }
 
@@ -174,6 +178,9 @@ export function LeaderboardTable({
               </th>
             ))}
             <th scope="col" className="py-2 px-2 text-left font-medium">
+              Live status
+            </th>
+            <th scope="col" className="py-2 px-2 text-left font-medium">
               Badges
             </th>
           </tr>
@@ -181,6 +188,7 @@ export function LeaderboardTable({
         <tbody>
           {sorted.map((row) => {
             const selected = selectedModel === row.model;
+            const liveProvisional = isLiveProvisional(row);
             return (
               <tr
                 key={row.model}
@@ -210,15 +218,19 @@ export function LeaderboardTable({
               >
                 <td className="py-2.5 px-2 text-right tabular-nums">
                   <span
-                    className="inline-flex items-center justify-center min-w-[1.5rem] font-medium"
+                    className="inline-flex items-center justify-center gap-0.5 min-w-[1.5rem] font-medium"
                     style={{
-                      color: medalColor(row.rank),
+                      color: rankColorVar(row.rank),
                       fontFamily:
                         "var(--td-font-mono, ui-monospace, Menlo, monospace)",
                     }}
                     aria-label={`Rank ${row.rank}`}
                   >
-                    {row.rank <= 3 ? "●" : "#"}
+                    {row.rank <= 3 ? (
+                      <Circle size={8} fill="currentColor" aria-hidden />
+                    ) : (
+                      "#"
+                    )}
                     {row.rank}
                   </span>
                 </td>
@@ -246,7 +258,7 @@ export function LeaderboardTable({
                       "var(--td-font-mono, ui-monospace, Menlo, monospace)",
                   }}
                 >
-                  {fmtPct(row.win_rate)}
+                  {formatPct(row.win_rate)}
                 </td>
                 <td
                   className="py-2.5 px-2 text-right tabular-nums"
@@ -255,7 +267,7 @@ export function LeaderboardTable({
                       "var(--td-font-mono, ui-monospace, Menlo, monospace)",
                   }}
                 >
-                  {fmtNum(row.sharpe)}
+                  {formatNum(row.sharpe)}
                 </td>
                 <td
                   className="py-2.5 px-2 text-right tabular-nums"
@@ -264,7 +276,7 @@ export function LeaderboardTable({
                       "var(--td-font-mono, ui-monospace, Menlo, monospace)",
                   }}
                 >
-                  {fmtNum(row.profit_factor)}
+                  {formatNum(row.profit_factor)}
                 </td>
                 <td
                   className="py-2.5 px-2 text-right tabular-nums"
@@ -273,7 +285,7 @@ export function LeaderboardTable({
                       "var(--td-font-mono, ui-monospace, Menlo, monospace)",
                   }}
                 >
-                  {fmtPct(row.max_drawdown)}
+                  {formatPct(row.max_drawdown)}
                 </td>
                 <td
                   className="py-2.5 px-2 text-right tabular-nums"
@@ -282,7 +294,7 @@ export function LeaderboardTable({
                       "var(--td-font-mono, ui-monospace, Menlo, monospace)",
                   }}
                 >
-                  {fmtPct(row.total_return)}
+                  {formatPct(row.total_return)}
                 </td>
                 <td
                   className="py-2.5 px-2 text-right tabular-nums"
@@ -292,6 +304,60 @@ export function LeaderboardTable({
                   }}
                 >
                   {row.trade_count != null ? row.trade_count : "—"}
+                </td>
+                <td
+                  className="py-2.5 px-2 text-right tabular-nums"
+                  style={{
+                    fontFamily:
+                      "var(--td-font-mono, ui-monospace, Menlo, monospace)",
+                    color: liveProvisional
+                      ? "var(--td-ink-400, #bbbbbb)"
+                      : undefined,
+                  }}
+                  title={liveProvisional ? "provisional" : undefined}
+                >
+                  {formatPct(row.live_wr)}
+                </td>
+                <td
+                  className="py-2.5 px-2 text-right tabular-nums"
+                  style={{
+                    fontFamily:
+                      "var(--td-font-mono, ui-monospace, Menlo, monospace)",
+                    color: liveProvisional
+                      ? "var(--td-ink-400, #bbbbbb)"
+                      : undefined,
+                  }}
+                  title={liveProvisional ? "provisional" : undefined}
+                >
+                  {row.live_n != null ? row.live_n : "—"}
+                </td>
+                <td
+                  className="py-2.5 px-2 text-right tabular-nums"
+                  style={{
+                    fontFamily:
+                      "var(--td-font-mono, ui-monospace, Menlo, monospace)",
+                    color: liveProvisional
+                      ? "var(--td-ink-400, #bbbbbb)"
+                      : undefined,
+                  }}
+                  title={liveProvisional ? "provisional" : undefined}
+                >
+                  {formatNum(row.live_avg_R, 2)}
+                </td>
+                <td
+                  className="py-2.5 px-2"
+                  title={liveProvisional ? "provisional" : undefined}
+                >
+                  {row.live_status && row.live_status !== "none" ? (
+                    <Chip
+                      label={row.live_status}
+                      colorVar={colorVarFor("live_status", row.live_status)}
+                    />
+                  ) : (
+                    <span style={{ color: "var(--td-ink-400, #bbbbbb)" }}>
+                      —
+                    </span>
+                  )}
                 </td>
                 <td className="py-2.5 px-2">
                   <ModelBadges

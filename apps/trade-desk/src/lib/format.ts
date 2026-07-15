@@ -1,13 +1,33 @@
 /** Display helpers + action CSS-var mapping for Trade Desk UI. */
 
+import { actionColorVarName } from "./actionColors";
+
 export function formatPct(
   value: number | null | undefined,
   digits = 1,
 ): string {
   if (value == null || Number.isNaN(value)) return "—";
-  const pct = Math.abs(value) <= 1 && Math.abs(value) > 0 ? value * 100 : value;
+  const pct = value * 100; // input is ALWAYS a fraction
   const sign = pct > 0 ? "+" : "";
   return `${sign}${pct.toFixed(digits)}%`;
+}
+
+/** Input already in percent points (e.g. gamma dist_*_pct fields). */
+export function formatPctPoints(
+  value: number | null | undefined,
+  digits = 1,
+): string {
+  if (value == null || Number.isNaN(value)) return "—";
+  const sign = value > 0 ? "+" : "";
+  return `${sign}${value.toFixed(digits)}%`;
+}
+
+export function formatPctPointsUnsigned(
+  value: number | null | undefined,
+  digits = 1,
+): string {
+  if (value == null || Number.isNaN(value)) return "—";
+  return `${Math.abs(value).toFixed(digits)}%`;
 }
 
 export function formatUsd(
@@ -34,23 +54,19 @@ export function formatNum(
   }).format(value);
 }
 
-/** Maps plan.action → CSS custom property name (e.g. --td-action-buy-now). */
+/**
+ * Maps plan.action → CSS custom property name (e.g. --td-action-buy-now).
+ * Kept here for backward compat with existing imports; the canonical
+ * mapping now lives in `./actionColors`.
+ */
 export function actionColorVar(action: string | null | undefined): string {
-  const a = (action ?? "").toUpperCase();
-  if (a.includes("BUY NOW")) return "--td-action-buy-now";
-  if (a.includes("BUY BREAKOUT")) return "--td-action-buy-breakout";
-  if (a.includes("BREAKOUT WATCH")) return "--td-action-breakout-watch";
-  if (a.includes("PULLBACK")) return "--td-action-pullback";
-  if (a.includes("AVOID")) return "--td-action-avoid";
-  if (a.includes("WAIT")) return "--td-action-wait";
-  return "--td-action-wait";
+  return actionColorVarName(action);
 }
 
 /** Class string using the action CSS variable for color. */
 export function actionColorClass(action: string | null | undefined): string {
   const v = actionColorVar(action);
-  const slug = v.replace(/^--td-action-/, "");
-  return `td-action-${slug} text-[color:var(${v})]`;
+  return `text-[color:var(${v})]`;
 }
 
 export function sanitizeSymbol(raw: unknown): string | null {

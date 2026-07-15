@@ -1,27 +1,33 @@
 "use client";
 
 import Link from "next/link";
-import { Search } from "lucide-react";
+import {
+  Activity,
+  ChevronDown,
+  LayoutDashboard,
+  Microscope,
+  Radio,
+  ScanSearch,
+  Search,
+  WalletCards,
+} from "lucide-react";
 import { NavLink } from "./NavLink";
 
 const NAV = [
-  { href: "/", label: "Analyze", exact: true },
-  { href: "/scan", label: "Scan" },
-  { href: "/live", label: "Live" },
-  { href: "/positions", label: "Positions" },
-  { href: "/research", label: "Research" },
+  { href: "/", label: "Command", exact: true, icon: LayoutDashboard },
+  { href: "/scan", label: "Radar", icon: ScanSearch },
+  { href: "/live", label: "Execution", icon: Radio },
+  { href: "/positions", label: "Portfolio", icon: WalletCards },
+  { href: "/research", label: "Lab", icon: Microscope },
 ] as const;
 
 const LEGACY_NAV = [
+  { href: "/picks", label: "Picks" },
   { href: "/supply-chain", label: "Supply chain" },
   { href: "/options", label: "Options" },
   { href: "/gamma", label: "Gamma" },
-  { href: "/watch", label: "Watch" },
-  { href: "/picks", label: "Picks" },
-  { href: "/portfolio", label: "Portfolio" },
-  { href: "/leaderboard", label: "Leaderboard" },
   { href: "/evolve", label: "Evolve" },
-  { href: "/models", label: "Models" },
+  { href: "/robust", label: "Backtest" },
 ] as const;
 
 function TickerSearch() {
@@ -59,9 +65,9 @@ function TickerSearch() {
 function LegacyMenu() {
   return (
     <details className="td-legacy-menu">
-      <summary>More</summary>
+      <summary>Systems</summary>
       <div className="td-legacy-menu__list">
-        <span className="td-legacy-menu__label">Legacy desk</span>
+        <span className="td-legacy-menu__label">Specialized surfaces</span>
         {LEGACY_NAV.map((item) => (
           <NavLink key={item.href} href={item.href}>
             {item.label}
@@ -91,7 +97,8 @@ export function DeskShell({ children }: { children: React.ReactNode }) {
               href={item.href}
               exact={"exact" in item && item.exact}
             >
-              {item.label}
+              <item.icon size={15} aria-hidden="true" />
+              <span>{item.label}</span>
             </NavLink>
           ))}
         </nav>
@@ -102,15 +109,25 @@ export function DeskShell({ children }: { children: React.ReactNode }) {
         <div className="td-topbar-status" aria-label="Desk and market status">
           <span className="td-status-item">
             <span className="td-status-dot" aria-hidden="true" />
-            <span className="td-status-label">Desk</span>
-            <strong>Ready</strong>
+            <span className="td-status-label">Mode</span>
+            <strong>Local</strong>
           </span>
           <span className="td-status-divider" aria-hidden="true" />
           <span className="td-status-item">
-            <span className="td-status-label">Market</span>
-            <strong>Check live</strong>
+            <Activity size={13} aria-hidden="true" />
+            <span className="td-status-label">Data</span>
+            <strong>On request</strong>
           </span>
         </div>
+
+        <Link className="td-account" href="/portfolio" aria-label="Open workspace profile" data-auth-slot="clerk-user-button">
+          <span className="td-account__avatar">TD</span>
+          <span className="td-account__copy">
+            <span className="td-account__label">Workspace</span>
+            <strong>Local operator</strong>
+          </span>
+          <ChevronDown size={14} aria-hidden="true" />
+        </Link>
       </header>
 
       <main className="td-main">{children}</main>
@@ -122,7 +139,8 @@ export function DeskShell({ children }: { children: React.ReactNode }) {
               href={item.href}
               exact={"exact" in item && item.exact}
             >
-              {item.label}
+              <item.icon size={16} aria-hidden="true" />
+              <span>{item.label}</span>
             </NavLink>
           </div>
         ))}

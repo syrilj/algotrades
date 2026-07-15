@@ -929,7 +929,11 @@ def _position_math(state: dict, account: float, risk_pct: float) -> dict[str, An
     notional = shares * px
     dollar_risk = shares * rps
     # Reward proxy: trail arm distance as first target
-    reward = max(float(state["trail_arm"]) - px, rps)
+    # state["entry"] is always None or == px today (see _compute_state), so
+    # this is currently equivalent to basis=px; the floor removal is what
+    # actually changes behavior below.
+    basis = float(state.get("entry") or px)
+    reward = float(state["trail_arm"]) - basis  # no floor: a bad setup shows its true R:R
     rr = reward / rps if rps > 0 else 0.0
     return {
         "account": account,

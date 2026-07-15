@@ -3,7 +3,9 @@
 import { useRouter } from "next/navigation";
 import { AlertTriangle, ListFilter } from "lucide-react";
 import { ActionChip, actionRailColor } from "@/components/ui/ActionChip";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { analyzeHref } from "@/lib/routes";
+import { formatPct, formatUsd } from "@/lib/format";
 
 export type PickRow = {
   symbol: string;
@@ -65,20 +67,6 @@ function groupTitle(key: string): string {
   return key;
 }
 
-function fmtPrice(n: number | undefined): string {
-  if (n == null || Number.isNaN(n)) return "—";
-  return `$${n.toLocaleString(undefined, {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  })}`;
-}
-
-function fmtPct(n: number | undefined): string {
-  if (n == null || Number.isNaN(n)) return "—";
-  const v = n <= 1 ? n * 100 : n;
-  return `${Math.round(v)}%`;
-}
-
 export function PicksList({
   rows,
   loading = false,
@@ -110,20 +98,7 @@ export function PicksList({
   }
 
   if (!rows.length && !loading) {
-    return (
-      <div className="flex flex-col items-center justify-center gap-2 px-4 py-16 text-center">
-        <ListFilter
-          className="size-8 text-[var(--td-ink-500,#7e7e7e)]"
-          strokeWidth={1.75}
-        />
-        <p className="font-[family-name:var(--td-font-display,Inter,ui-sans-serif,system-ui,sans-serif)] text-xl text-[var(--td-ink-100,#ffffff)]">
-          No picks
-        </p>
-        <p className="max-w-sm text-[13px] text-[var(--td-ink-400,#bbbbbb)]">
-          {emptyHint}
-        </p>
-      </div>
-    );
+    return <EmptyState icon={ListFilter} title="No picks" hint={emptyHint} />;
   }
 
   const buckets = new Map<string, PickRow[]>();
@@ -204,8 +179,8 @@ export function PicksList({
                         </span>
                       ) : null}
                       <span className="ml-auto flex flex-wrap items-center gap-x-3 gap-y-0.5 font-[family-name:var(--td-font-mono,ui-monospace,Menlo,monospace)] text-[12px] tabular-nums text-[var(--td-ink-300,#e6e6e6)]">
-                        <span>{fmtPrice(row.price)}</span>
-                        <span>conf {fmtPct(row.confidence)}</span>
+                        <span>{formatUsd(row.price)}</span>
+                        <span>conf {formatPct(row.confidence, 0)}</span>
                         {row.dollarRisk != null ? (
                           <span>risk ${Math.round(row.dollarRisk)}</span>
                         ) : null}

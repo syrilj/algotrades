@@ -22,7 +22,9 @@ function envelope<T>(
 type Body = {
   symbol?: string;
   spotSource?: "auto" | "lse" | "yfinance";
-  source?: "oi" | "lse";
+  source?: "auto" | "oi" | "lse";
+  expiryFrom?: string;
+  expiryTo?: string;
   maxExpiries?: number | string;
   maxDte?: number | string;
 };
@@ -46,6 +48,12 @@ export async function POST(req: Request) {
   }
   if (body.source) {
     args.push("--source", body.source);
+  }
+  if (body.expiryFrom && /^\d{4}-\d{2}-\d{2}$/.test(body.expiryFrom)) {
+    args.push("--expiry-from", body.expiryFrom);
+  }
+  if (body.expiryTo && /^\d{4}-\d{2}-\d{2}$/.test(body.expiryTo)) {
+    args.push("--expiry-to", body.expiryTo);
   }
   const maxExpiries = body.maxExpiries != null ? Number(body.maxExpiries) : undefined;
   if (maxExpiries != null && Number.isFinite(maxExpiries) && maxExpiries > 0) {
@@ -85,6 +93,9 @@ export async function GET(req: Request) {
   const body: Body = {
     symbol: url.searchParams.get("symbol") || undefined,
     spotSource: (url.searchParams.get("spotSource") as Body["spotSource"]) || undefined,
+    source: (url.searchParams.get("source") as Body["source"]) || undefined,
+    expiryFrom: url.searchParams.get("expiryFrom") || undefined,
+    expiryTo: url.searchParams.get("expiryTo") || undefined,
     maxExpiries: url.searchParams.get("maxExpiries") || undefined,
     maxDte: url.searchParams.get("maxDte") || undefined,
   };
