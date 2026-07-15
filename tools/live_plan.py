@@ -46,6 +46,12 @@ from risk_manager import (  # noqa: E402
     load_policy,
     plan_entry,
 )
+from confidence_runtime import (  # noqa: E402
+    assess_data_freshness,
+    evaluate_confidence,
+    load_active_calibrator,
+)
+from confidence_shadow import ShadowDecisionLedger  # noqa: E402
 
 
 def _yf_symbol(sym: str) -> str:
@@ -171,13 +177,17 @@ def try_model_confidence(symbol: str, model: str | None = None) -> dict[str, Any
 
         payload = analyze(symbol, account=100_000, risk_pct=0.01, period="60d", model=model)
         state = payload.get("state") or {}
-        conf = state.get("confidence")
-        if conf is None:
-            conf = state.get("hit_probability")
+        raw_probability = state.get("hit_probability")
+        raw_source = "trade_desk_hit_probability"
+        if raw_probability is None:
+            raw_probability = state.get("confidence")
+            raw_source = "trade_desk_confidence_fallback"
         return {
             "ok": True,
             "model": payload.get("model") or model,
-            "confidence": float(conf) if conf is not None else None,
+            "confidence": float(raw_probability) if raw_probability is not None else None,
+            "raw_probability": float(raw_probability) if raw_probability is not None else None,
+            "raw_probability_source": raw_source,
             "setup_ok": state.get("setup_ok"),
             "price": state.get("price"),
             "entry": state.get("entry"),
@@ -233,8 +243,17 @@ def plan_symbol(
             "ok": False,
             "symbol": symbol,
             "error": live.get("error"),
+            "confidence": evaluate_confidence(
+                None,
+                model_ok=False,
+                setup_ok=False,
+                freshness=assess_data_freshness(None),
+                model=model,
+            ),
             "asof_utc": datetime.now(timezone.utc).isoformat(),
         }
+
+    freshness = assess_data_freshness(live.get("timestamp"))
 
     macro = macro_regime(adapter)
     model_info: dict[str, Any] = {"ok": False, "skipped": not use_model}
@@ -265,6 +284,31 @@ def plan_symbol(
         model_conf = model_info.get("confidence")
         conf = blend_confidence(live_conf, model_conf if model_info.get("ok") else None, go_long, trend_ok)
         setup_trend_ok = trend_ok and bool(live.get("macd_positive") or go_long or conf >= 0.65)
+
+    model_probability = model_info.get("raw_probability") if model_info.get("ok") else None
+    setup_for_confidence = bool(
+        setup_trend_ok
+        and (go_long or go_short)
+        and bool(macro.get("macro_ok", True))
+    )
+    confidence = evaluate_confidence(
+        model_probability,
+        model_ok=bool(model_info.get("ok")) and model_probability is not None,
+        setup_ok=setup_for_confidence,
+        freshness=freshness,
+        model=model,
+        calibrator=load_active_calibrator(model),
+        raw_probability_source=model_info.get("raw_probability_source"),
+        evidence=[
+            f"side={side}",
+            f"vol_z={live.get('vol_z')}",
+            f"macd_positive={live.get('macd_positive')}",
+            f"above_vwap={live.get('above_vwap')}",
+            f"swing_uptrend={live.get('swing_uptrend')}",
+            f"macro_ok={macro.get('macro_ok')}",
+        ],
+        failed_checks=list(model_info.get("flags") or []) if isinstance(model_info.get("flags"), list) else [],
+    )
 
     # Options affordability heuristic from research playbook
     ysym = _yf_symbol(symbol)
@@ -314,6 +358,9 @@ def plan_symbol(
     )
     decision = plan_entry(setup, state, pol)
     dec = decision_to_dict(decision)
+    dec["risk_manager_action"] = dec.get("action")
+    dec["confidence_state"] = confidence["state"]
+    dec["confidence_reasons"] = confidence.get("reasons", [])
 
     options_plan = None
     if decision.mode == "OPTIONS_ATTACK" and decision.action == "enter":
@@ -340,6 +387,8 @@ def plan_symbol(
         "conviction": decision.conviction,
         "exit_rules": decision.exit_rules,
         "steps": [],
+        "confidence_state": confidence["state"],
+        "confidence_size_limit": confidence["size_limit"],
     }
     if decision.mode == "OPTIONS_ATTACK" and options_plan and options_plan.get("action") == "buy":
         ticket["steps"] = [
@@ -420,7 +469,17 @@ def plan_symbol(
     except Exception:
         pass
 
-    return {
+    # The confidence layer is fail-closed until an active, gated artifact exists.
+    if confidence["state"] != "ENTER":
+        dec["action"] = confidence["state"].lower()
+        ticket["action"] = confidence["state"].lower()
+        ticket["steps"] = [
+            f"Confidence gate: {confidence['state']}",
+            *[str(reason) for reason in confidence.get("reasons", [])],
+            *ticket.get("steps", []),
+        ]
+
+    out = {
         "ok": True,
         "symbol": ysym,
         "account": account,
@@ -431,6 +490,7 @@ def plan_symbol(
         "model": model_info,
         "gex": gex_data,
         "blended_confidence": round(conf, 4),
+        "confidence": confidence,
         "decision": dec,
         "options": options_plan,
         "ticket": ticket,
@@ -439,11 +499,29 @@ def plan_symbol(
         "policy_version": pol.get("version"),
         "asof_utc": datetime.now(timezone.utc).isoformat(),
         "live_ready": True,
+        "decision_support_ready": confidence["state"] != "ABSTAIN",
         "notes": [
             "SIDE research DNA: v23/v20b macro + vol_z conviction; vehicle from v25 risk",
             "Do not retune primary rules on today's tape; only size/vehicle react",
         ],
     }
+    try:
+        out["shadow_event_id"] = ShadowDecisionLedger().record(
+            {
+                "symbol": ysym,
+                "model": model,
+                "state": confidence["state"],
+                "ticket_action": ticket.get("action"),
+                "raw_probability": confidence.get("raw_probability"),
+                "calibrated_probability": confidence.get("calibrated_probability"),
+                "size_limit": confidence.get("size_limit"),
+                "data_freshness": confidence.get("data_freshness"),
+                "asof_utc": out["asof_utc"],
+            }
+        )
+    except Exception:
+        out["shadow_event_id"] = None
+    return out
 
 
 DEFAULT_SCAN = [
@@ -487,6 +565,8 @@ def scan(
             "price": (plan.get("live") or {}).get("price"),
             "go_long": (plan.get("live") or {}).get("go_long"),
             "blended_confidence": plan.get("blended_confidence"),
+            "confidence_state": (plan.get("confidence") or {}).get("state"),
+            "calibrated_probability": (plan.get("confidence") or {}).get("calibrated_probability"),
         })
     # rank: attack first, then equity, by conviction
     order = {"OPTIONS_ATTACK": 0, "EQUITY_HEDGE": 1, "HALT_NEW": 2, "STAND_ASIDE": 3, "FLATTEN": 4}

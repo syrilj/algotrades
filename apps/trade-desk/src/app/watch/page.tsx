@@ -326,9 +326,16 @@ export default function WatchPage() {
       />
 
       {scanNote ? (
-        <p className="text-[12px] px-1" style={{ color: "var(--td-ink-300)" }}>
+        <div
+          className="td-alert"
+          style={{
+            border: "1px solid var(--td-hairline)",
+            background: "var(--td-surface-soft)",
+            color: "var(--td-ink-300)",
+          }}
+        >
           {scanNote}
-        </p>
+        </div>
       ) : null}
 
       <div className="td-panel overflow-hidden">

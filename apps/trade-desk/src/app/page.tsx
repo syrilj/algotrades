@@ -19,12 +19,8 @@ import {
 } from "@/components/pipeline/PipelineFlow";
 import { RiskAssessmentPanel } from "@/components/risk/RiskAssessmentPanel";
 import { QuickActionRail } from "@/components/command-center/QuickActionRail";
-import { TickerInsightCard } from "@/components/command-center/TickerInsightCard";
 import { PageHeader } from "@/components/shell/PageHeader";
 import type { AnalyzeResponse, ApiEnvelope, ModelMetaConfig } from "@/lib/types";
-
-const STAGE_COUNT = 8;
-const STAGE_MS = 280;
 
 function AnalyzePageInner() {
   const searchParams = useSearchParams();
@@ -35,7 +31,7 @@ function AnalyzePageInner() {
   const autoRanKey = useRef<string | null>(null);
 
   const [phase, setPhase] = useState<PipelinePhase>("idle");
-  const [activeStage, setActiveStage] = useState(0);
+  const [activeStage, setActiveStage] = useState(-1);
   const [result, setResult] = useState<AnalyzeResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [symbol, setSymbol] = useState(qSymbol);
@@ -76,28 +72,13 @@ function AnalyzePageInner() {
     };
   }, [activeModel, result?.model]);
 
-  useEffect(() => {
-    if (phase !== "running") return;
-    setActiveStage(0);
-    let stage = 0;
-    const id = window.setInterval(() => {
-      stage += 1;
-      if (stage >= STAGE_COUNT) {
-        window.clearInterval(id);
-        return;
-      }
-      setActiveStage(stage);
-    }, STAGE_MS);
-    return () => window.clearInterval(id);
-  }, [phase]);
-
   const runAnalyze = useCallback(async (values: AnalyzeFormValues) => {
     setSymbol(values.symbol);
     setActiveModel(values.model);
     setAccount(values.account);
     setError(null);
     setPhase("running");
-    setActiveStage(0);
+    setActiveStage(-1);
     setResult(null);
 
     try {
@@ -118,14 +99,13 @@ function AnalyzePageInner() {
       if (!res.ok || json.ok === false || !json.data) {
         throw new Error(json.error ?? `Analyze failed (${res.status})`);
       }
-      await new Promise((r) => setTimeout(r, STAGE_MS));
       setResult(json.data);
-      setActiveStage(STAGE_COUNT - 1);
+      setActiveStage(7);
       setPhase("done");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Analyze failed");
       setPhase("error");
-      setActiveStage(STAGE_COUNT - 1);
+      setActiveStage(7);
     }
   }, []);
 
@@ -162,8 +142,8 @@ function AnalyzePageInner() {
   return (
     <div className="td-page">
       <PageHeader
-        title="Analyze"
-        description="Operator ticket first: action, do next, entry/stop/size. Pipeline and gates are secondary."
+        title="Command"
+        description="A traceable route from market data to a risk-aware operator decision."
         meta={
           symbol ? (
             <span className="tabular" style={{ fontFamily: "var(--td-font-mono)" }}>
@@ -182,15 +162,22 @@ function AnalyzePageInner() {
       />
 
       {commandCenterIdle ? (
-        <section className="td-panel p-4" aria-labelledby="command-center-title">
-          <p className="td-eyebrow">Command center · ready</p>
-          <h2 id="command-center-title" className="mt-1 text-lg font-semibold text-foreground">
-            Route the next decision from one ticker.
-          </h2>
-          <p className="mt-1 max-w-2xl text-sm text-body">
-            Start with a symbol to build an operator ticket, then use the research desk to validate the
-            setup. No signal is shown until analysis has actually run.
-          </p>
+        <section className="td-command-intro" aria-labelledby="command-center-title">
+          <div className="td-command-intro__copy">
+            <span className="td-command-intro__status">
+              <span className="td-status-dot" aria-hidden="true" />
+              Analysis workspace ready
+            </span>
+            <h2 id="command-center-title">Start with the market, not a conclusion.</h2>
+            <p>
+              Enter a symbol to review the setup, its gates, the relevant levels, and an explicit risk-aware next action.
+            </p>
+          </div>
+          <ol className="td-command-intro__protocol" aria-label="Analysis sequence">
+            <li><span>01</span><div><strong>Read the market</strong><small>price, volume, and session context</small></div></li>
+            <li><span>02</span><div><strong>Test the setup</strong><small>structure, signal, and safety gates</small></div></li>
+            <li><span>03</span><div><strong>Size the decision</strong><small>levels, exposure, and next step</small></div></li>
+          </ol>
         </section>
       ) : null}
 
@@ -204,28 +191,17 @@ function AnalyzePageInner() {
       />
 
       {commandCenterIdle ? (
-        <>
-          <QuickActionRail />
-          <section className="grid grid-cols-1 gap-3 md:grid-cols-3" aria-label="Desk entry points">
-            <TickerInsightCard
-              symbol="TICKET"
-              eyebrow="Next action"
-              insight="Enter a ticker above to generate the full signal ticket with action, levels, and sizing."
-            />
-            <TickerInsightCard
-              symbol="WATCH"
-              eyebrow="Saved context"
-              insight="Open your watch list to choose a name and return here with symbol context."
-              href="/watch"
-            />
-            <TickerInsightCard
-              symbol="PICKS"
-              eyebrow="Research queue"
-              insight="Review existing picks when you want a candidate before running analysis."
-              href="/picks"
-            />
-          </section>
-        </>
+        <div className="td-mission-map td-panel">
+          <PipelineFlow
+            state={null}
+            phase="idle"
+            activeStage={-1}
+          />
+        </div>
+      ) : null}
+
+      {commandCenterIdle ? (
+        <QuickActionRail />
       ) : null}
 
       {error ? (
@@ -234,9 +210,9 @@ function AnalyzePageInner() {
         </div>
       ) : null}
 
-      {/* Running: compact pipeline strip */}
-      {phase === "running" ? (
-        <div className="td-panel p-3">
+      {/* The execution path stays visible; it is the explanation, not a hidden research detail. */}
+      {showPipeline && !commandCenterIdle ? (
+        <div className="td-mission-map td-panel">
           <PipelineFlow
             state={state}
             plan={plan}
@@ -248,46 +224,53 @@ function AnalyzePageInner() {
         </div>
       ) : null}
 
-      {/* Hero: verdict first once a symbol is in the workflow */}
+      {/* Hero: verdict + levels + trace / ranker + tuning side-by-side */}
       {!commandCenterIdle ? (
-        <VerdictPanel
-          symbol={symbol || state?.symbol}
-          state={state}
-          plan={plan}
-          size={size}
-          model={result?.model}
-          selection={result?.model_selection}
-          empty={phase === "idle" || (phase === "running" && !result)}
-        />
-      ) : null}
+        <div className="td-analyze-grid">
+          <div className="td-analyze-main flex flex-col gap-3">
+            <VerdictPanel
+              symbol={symbol || state?.symbol}
+              state={state}
+              plan={plan}
+              size={size}
+              model={result?.model}
+              selection={result?.model_selection}
+              empty={phase === "idle" || (phase === "running" && !result)}
+            />
 
-      {phase === "done" && state ? (
-        <ModelComputeTrace
-          state={state}
-          plan={plan}
-          size={size}
-          model={result?.model}
-          selection={result?.model_selection}
-        />
-      ) : null}
+            {state || (phase === "idle" && !commandCenterIdle) ? (
+              <LevelsPanel state={state} />
+            ) : null}
 
-      {phase === "done" && metaConfig ? (
-        <div className="td-panel p-3">
-          <ModelTuningView id={result?.model || activeModel} metaConfig={metaConfig} />
+            {phase === "done" && state ? (
+              <ModelComputeTrace
+                state={state}
+                plan={plan}
+                size={size}
+                model={result?.model}
+                selection={result?.model_selection}
+              />
+            ) : null}
+          </div>
+
+          <div className="td-analyze-side">
+            {(symbol || state?.symbol || qSymbol) ? (
+              <RankerPanel
+                symbol={symbol || state?.symbol || qSymbol}
+                account={account}
+                activeModel={result?.model}
+                onUseModel={onUseModel}
+              />
+            ) : null}
+
+            {phase === "done" && metaConfig ? (
+              <div className="td-panel p-3">
+                <ModelTuningView id={result?.model || activeModel} metaConfig={metaConfig} />
+              </div>
+            ) : null}
+          </div>
         </div>
       ) : null}
-
-      {(symbol || state?.symbol || qSymbol) ? (
-        <RankerPanel
-          symbol={symbol || state?.symbol || qSymbol}
-          account={account}
-          activeModel={result?.model}
-          onUseModel={onUseModel}
-        />
-      ) : null}
-
-      {/* Levels visual — only when we have state */}
-      {state || (phase === "idle" && !commandCenterIdle) ? <LevelsPanel state={state} /> : null}
 
       {/* Secondary research panels */}
       {phase === "done" || phase === "error" ? (
@@ -296,18 +279,6 @@ function AnalyzePageInner() {
             Research: pipeline · live pulse · model ranks
           </summary>
           <div className="td-analyze-secondary mt-3 flex flex-col gap-3">
-            {showPipeline ? (
-              <div className="td-panel p-3">
-                <PipelineFlow
-                  state={state}
-                  plan={plan}
-                  size={size}
-                  model={result?.model}
-                  phase={phase}
-                  activeStage={activeStage}
-                />
-              </div>
-            ) : null}
             {(symbol || state?.symbol) && phase === "done" ? (
               <LiveSignalPanel symbol={symbol || state?.symbol || ""} />
             ) : null}

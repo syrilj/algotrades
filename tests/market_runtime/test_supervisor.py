@@ -1,6 +1,6 @@
 import time
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from services.market_runtime import (
     CoverageMode,
@@ -37,27 +37,28 @@ class SupervisorTests(unittest.TestCase):
             instrument_from_catalog("C.L", "C", "stock"),
             instrument_from_catalog("UK10Y", "UK 10Y", "bonds"),
         ]
+        tick_time = datetime.now(timezone.utc) - timedelta(seconds=1)
         self.ticks = [
             Tick(
                 instrument_id="A.L",
                 price=100.0,
                 size=1.0,
-                market_asof=datetime(2026, 7, 13, 10, 0, tzinfo=timezone.utc),
-                received_at=datetime(2026, 7, 13, 10, 0, 1, tzinfo=timezone.utc),
+                market_asof=tick_time,
+                received_at=tick_time,
             ),
             Tick(
                 instrument_id="B.L",
                 price=200.0,
                 size=1.0,
-                market_asof=datetime(2026, 7, 13, 10, 0, tzinfo=timezone.utc),
-                received_at=datetime(2026, 7, 13, 10, 0, 1, tzinfo=timezone.utc),
+                market_asof=tick_time,
+                received_at=tick_time,
             ),
             Tick(
                 instrument_id="C.L",
                 price=300.0,
                 size=1.0,
-                market_asof=datetime(2026, 7, 13, 10, 0, tzinfo=timezone.utc),
-                received_at=datetime(2026, 7, 13, 10, 0, 1, tzinfo=timezone.utc),
+                market_asof=tick_time,
+                received_at=tick_time,
             ),
         ]
 

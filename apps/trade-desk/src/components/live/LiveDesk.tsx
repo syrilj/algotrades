@@ -14,6 +14,7 @@ import { PageHeader } from "@/components/shell/PageHeader";
 import { analyzeHref, optionsHref } from "@/lib/routes";
 import { Chip } from "@/components/ui/Chip";
 import { colorVarFor } from "@/lib/actionColors";
+import { Stat } from "@/components/ui/Stat";
 
 function LiveDeskInner({ showHeader = true }: { showHeader?: boolean }) {
   const searchParams = useSearchParams();
@@ -242,8 +243,19 @@ function LiveDeskInner({ showHeader = true }: { showHeader?: boolean }) {
               <Stat label="Max loss" value={formatUsd(ticket.max_loss_dollars, 0)} />
               <Stat label="Vol z" value={formatNum(live?.vol_z, 2)} />
               <Stat label="Blended conf" value={formatPct(plan.blended_confidence ?? 0)} />
+              <Stat label="Confidence gate" value={plan.confidence?.state ?? "ABSTAIN"} />
               <Stat label="QQQ" value={plan.macro?.qqq_trend ?? "—"} />
               <Stat label="Macro" value={plan.macro?.xlp_spy_ratio_state ?? "—"} />
+            </div>
+
+            <div
+              className="mt-3 border-l-2 pl-3 text-[13px] leading-snug"
+              style={{ borderColor: "var(--td-ink-500)", color: "var(--td-ink-300)" }}
+            >
+              Calibrated probability: {plan.confidence?.calibrated_probability != null
+                ? formatPct(plan.confidence.calibrated_probability)
+                : "unavailable"}
+              {plan.confidence?.reasons?.length ? ` · ${plan.confidence.reasons[0]}` : ""}
             </div>
 
             <div>
@@ -475,13 +487,4 @@ export function LiveDesk({ showHeader = true }: { showHeader?: boolean }) {
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex flex-col gap-0.5">
-      <span className="td-label">{label}</span>
-      <span className="text-[14px]" style={{ color: "var(--td-ink-100)" }}>
-        {value}
-      </span>
-    </div>
-  );
-}
+

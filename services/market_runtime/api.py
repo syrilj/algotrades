@@ -40,7 +40,7 @@ def create_app(supervisor: Optional[StreamSupervisor] = None) -> FastAPI:
         if sup is not None and sup.is_running():
             sup.stop()
 
-    app = FastAPI(title="market-runtime", version="0.1.0", lifespan=lifespan)
+    app = FastAPI(title="market-runtime", version="0.2.0", lifespan=lifespan)
     app.state.supervisor = supervisor
 
     @app.get("/health")

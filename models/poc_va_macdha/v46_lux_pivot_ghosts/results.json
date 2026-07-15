@@ -1,0 +1,82 @@
+{
+  "generated_utc": "2026-07-14T00:00:00+00:00",
+  "cash": 1000,
+  "codes": ["TSLA.US", "MU.US", "SPY.US", "IONQ.US", "APLD.US", "XLP.US", "QQQ.US"],
+  "start": "2024-08-01",
+  "end": "2026-07-11",
+  "source": "local",
+  "baseline_interval": "1H",
+  "summary": {
+    "zigzag_best_practical": {
+      "tag": "p10_1h",
+      "ret": 0.4431,
+      "dd": -0.2708,
+      "sharpe": 2.01,
+      "n": 532,
+      "wr": 0.425,
+      "final": 5430.74
+    },
+    "zigzag_best_return": {
+      "tag": "p50_1D",
+      "ret": 9.9713,
+      "dd": -0.3841,
+      "sharpe": 2.42,
+      "n": 3,
+      "wr": 0.667,
+      "final": 10971.31,
+      "note": "3 trades; not robust"
+    },
+    "missed_sr_best_practical": {
+      "tag": "missed_sr_p10_2h",
+      "ret": 0.2016,
+      "dd": -0.2539,
+      "sharpe": 1.50,
+      "n": 38,
+      "wr": 0.5,
+      "final": 3016.29
+    },
+    "screen_best_zigzag": {
+      "tag": "screen_p10",
+      "ret": 0.7513,
+      "dd": -0.2447,
+      "sharpe": 1.32,
+      "n": 90,
+      "wr": 0.511,
+      "final": 17512.69
+    },
+    "screen_best_missed_sr": {
+      "tag": "screen_miss_sr_p50",
+      "ret": 0.1866,
+      "dd": -0.3806,
+      "sharpe": 0.46,
+      "n": 2,
+      "wr": 1.0,
+      "final": 11865.68,
+      "note": "2 trades; not robust"
+    }
+  },
+  "equity_zigzag_top": [
+    {"tag": "p50_1D", "ret": 9.9713, "dd": -0.3841, "sharpe": 2.42, "n": 3, "wr": 0.667, "final": 10971.31},
+    {"tag": "p10_1h", "ret": 0.4431, "dd": -0.2708, "sharpe": 2.01, "n": 532, "wr": 0.425, "final": 5430.74},
+    {"tag": "p50_2h", "ret": 0.4198, "dd": -0.4269, "sharpe": 1.78, "n": 54, "wr": 0.537, "final": 5197.86},
+    {"tag": "p10_1D", "ret": 0.3150, "dd": -0.4695, "sharpe": 1.55, "n": 70, "wr": 0.543, "final": 4150.43},
+    {"tag": "p20_4h", "ret": 0.2725, "dd": -0.4733, "sharpe": 1.47, "n": 68, "wr": 0.515, "final": 3724.85}
+  ],
+  "equity_missed_sr_top": [
+    {"tag": "missed_sr_p20_1D", "ret": 4.5779, "dd": -0.5902, "sharpe": 1.46, "n": 6, "wr": 0.333, "final": 5577.86, "note": "6 trades; outlier"},
+    {"tag": "missed_sr_p10_2h", "ret": 0.2016, "dd": -0.2539, "sharpe": 1.50, "n": 38, "wr": 0.5, "final": 3016.29},
+    {"tag": "missed_sr_p20_1h", "ret": 0.4670, "dd": -0.3191, "sharpe": 0.69, "n": 30, "wr": 0.433, "final": 1467.02},
+    {"tag": "missed_sr_p50_1h", "ret": 1.0171, "dd": -0.3950, "sharpe": 0.98, "n": 20, "wr": 0.6, "final": 2017.05},
+    {"tag": "missed_sr_p10_1D", "ret": 0.3819, "dd": -0.3153, "sharpe": 0.70, "n": 9, "wr": 0.667, "final": 1381.90}
+  ],
+  "screen_zigzag": [
+    {"tag": "screen_p10", "ret": 0.7513, "dd": -0.2447, "sharpe": 1.32, "n": 90, "wr": 0.511, "final": 17512.69},
+    {"tag": "screen_p50", "ret": 0.1100, "dd": -0.2067, "sharpe": 0.40, "n": 12, "wr": 0.917, "final": 11098.70},
+    {"tag": "screen_p20", "ret": -0.0757, "dd": -0.3177, "sharpe": -0.06, "n": 44, "wr": 0.477, "final": 9243.19}
+  ],
+  "screen_missed_sr": [
+    {"tag": "screen_miss_sr_p50", "ret": 0.1866, "dd": -0.3806, "sharpe": 0.46, "n": 2, "wr": 1.0, "final": 11865.68},
+    {"tag": "screen_miss_sr_p10", "ret": -0.0899, "dd": -0.3495, "sharpe": -0.04, "n": 14, "wr": 0.429, "final": 9101.25},
+    {"tag": "screen_miss_sr_p20", "ret": -0.3528, "dd": -0.5706, "sharpe": -0.22, "n": 6, "wr": 0.167, "final": 6472.02}
+  ]
+}

@@ -30,6 +30,8 @@ class CandidateLedger:
             "exit_timestamp",
             "exit_reason",
             "return_pct",
+            "realized_r",
+            "label",
         ]
         self._feat_cols_safe = [
             f"f_{c.strip().replace(' ', '_').replace('/', '_').replace(':', '_')}"
@@ -68,6 +70,8 @@ class CandidateLedger:
             "exit_timestamp": "",
             "exit_reason": "",
             "return_pct": "",
+            "realized_r": "",
+            "label": "",
         }
         for c, v in zip(self._feat_cols_safe, features):
             rec[c] = _coerce(v)
@@ -94,6 +98,8 @@ class CandidateLedger:
         if entry_px not in (None, "", 0) and exit_px:
             try:
                 rec["return_pct"] = (float(exit_px) - float(entry_px)) / float(entry_px)
+                rec["realized_r"] = rec["return_pct"]
+                rec["label"] = 1 if rec["realized_r"] > 0 else 0
             except Exception:
                 rec["return_pct"] = ""
         self._open_by_code.pop(code, None)

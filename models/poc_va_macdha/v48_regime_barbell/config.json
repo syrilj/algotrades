@@ -1,0 +1,8 @@
+{
+  "source": "local",
+  "codes": ["TSLA.US", "MU.US", "SPY.US", "IONQ.US", "APLD.US", "XLP.US", "QQQ.US"],
+  "interval": "1H",
+  "commission": 0.001,
+  "strategy": {"name": "v48_regime_barbell", "model_version": "v48_regime_barbell"},
+  "v48": {"policy": "static_75_25", "strict_regime": false}
+}

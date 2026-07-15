@@ -6,7 +6,7 @@ import { ModelBadges } from "./ModelBadges";
 import { ScoreBar } from "./ScoreBar";
 import type { LeaderboardRow } from "./ModelSidePanel";
 import { colorVarFor, rankColorVar } from "@/lib/actionColors";
-import { formatPct } from "@/lib/format";
+import { formatNum, formatPct } from "@/lib/format";
 import { Chip } from "@/components/ui/Chip";
 import { EmptyState } from "@/components/ui/EmptyState";
 
@@ -51,16 +51,6 @@ const COLUMNS: { key: SortKey; label: string; align?: "left" | "right" }[] = [
 /** Live paper-trading evidence gate: mirrors model_registry.py's _live_factor threshold. */
 function isLiveProvisional(row: LeaderboardRow): boolean {
   return row.live_n == null || row.live_n < 10;
-}
-
-function fmtPct(n: number | undefined, digits = 1): string {
-  if (n == null || Number.isNaN(n)) return "—";
-  return `${(n * 100).toFixed(digits)}%`;
-}
-
-function fmtNum(n: number | undefined, digits = 2): string {
-  if (n == null || Number.isNaN(n)) return "—";
-  return n.toFixed(digits);
 }
 
 function cellValue(row: LeaderboardRow, key: SortKey): number | string {
@@ -268,7 +258,7 @@ export function LeaderboardTable({
                       "var(--td-font-mono, ui-monospace, Menlo, monospace)",
                   }}
                 >
-                  {fmtPct(row.win_rate)}
+                  {formatPct(row.win_rate)}
                 </td>
                 <td
                   className="py-2.5 px-2 text-right tabular-nums"
@@ -277,7 +267,7 @@ export function LeaderboardTable({
                       "var(--td-font-mono, ui-monospace, Menlo, monospace)",
                   }}
                 >
-                  {fmtNum(row.sharpe)}
+                  {formatNum(row.sharpe)}
                 </td>
                 <td
                   className="py-2.5 px-2 text-right tabular-nums"
@@ -286,7 +276,7 @@ export function LeaderboardTable({
                       "var(--td-font-mono, ui-monospace, Menlo, monospace)",
                   }}
                 >
-                  {fmtNum(row.profit_factor)}
+                  {formatNum(row.profit_factor)}
                 </td>
                 <td
                   className="py-2.5 px-2 text-right tabular-nums"
@@ -295,7 +285,7 @@ export function LeaderboardTable({
                       "var(--td-font-mono, ui-monospace, Menlo, monospace)",
                   }}
                 >
-                  {fmtPct(row.max_drawdown)}
+                  {formatPct(row.max_drawdown)}
                 </td>
                 <td
                   className="py-2.5 px-2 text-right tabular-nums"
@@ -304,7 +294,7 @@ export function LeaderboardTable({
                       "var(--td-font-mono, ui-monospace, Menlo, monospace)",
                   }}
                 >
-                  {fmtPct(row.total_return)}
+                  {formatPct(row.total_return)}
                 </td>
                 <td
                   className="py-2.5 px-2 text-right tabular-nums"
@@ -352,7 +342,7 @@ export function LeaderboardTable({
                   }}
                   title={liveProvisional ? "provisional" : undefined}
                 >
-                  {formatPct(row.live_avg_R)}
+                  {formatNum(row.live_avg_R, 2)}
                 </td>
                 <td
                   className="py-2.5 px-2"

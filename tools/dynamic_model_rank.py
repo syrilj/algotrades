@@ -32,6 +32,7 @@ from typing import Any
 from backtest.runner import main as bt_main
 import backtest.runner as _runner
 from backtest.engines.global_equity import GlobalEquityEngine
+from evolve.v48_execution import CausalGlobalEquityEngine
 
 # backtest.runner routes unknown sources to CryptoEngine. source="local" uses
 # LocalLoader (data_cache) but should still get the US/HK equity engine for
@@ -62,6 +63,9 @@ def _create_market_engine_for_local(source: str, config: dict, codes: list[str])
         markets = {_runner._detect_market(c) for c in codes}
         if len(markets) == 1 and markets & {"us_equity", "hk_equity"}:
             market = _runner._detect_submarket(codes)
+            version = str((config.get("strategy") or {}).get("model_version", ""))
+            if config.get("causal_execution") or version in {"v39d_causal", "v47_causal", "v48_regime_barbell", "v49_precision_trend"}:
+                return CausalGlobalEquityEngine(config, market=market)
             return GlobalEquityEngine(config, market=market)
     return _original_create_market_engine(source, config, codes)
 
@@ -270,6 +274,8 @@ def _copy_model_code(model: dict[str, Any], run_code: Path) -> None:
     # core
     for name in (
         "signal_engine.py",
+        "config.json",
+        "DEPENDENCIES.json",
         "candidate_ledger.py",
         "_base_engine.py",  # train-loop genome wrapper dependency
         "GENOME.json",
@@ -287,6 +293,30 @@ def _copy_model_code(model: dict[str, Any], run_code: Path) -> None:
             p = model["model_dir"] / name
         if p.exists():
             shutil.copy2(p, run_code / name)
+
+    # A model may declare immutable, vendored runtime dependencies.  This keeps
+    # ensembles reproducible instead of importing mutable sibling models.
+    manifest = src / "DEPENDENCIES.json"
+    if not manifest.exists() and model["model_dir"] != src:
+        manifest = model["model_dir"] / "DEPENDENCIES.json"
+    if manifest.exists():
+        try:
+            dependencies = json.loads(manifest.read_text()).get("files", [])
+        except Exception:
+            dependencies = []
+        for item in dependencies:
+            if not isinstance(item, dict):
+                continue
+            source_name = item.get("source")
+            target_name = item.get("target")
+            if not isinstance(source_name, str) or not isinstance(target_name, str):
+                continue
+            source_path = (src / source_name).resolve()
+            target_path = (run_code / target_name).resolve()
+            if not source_path.is_file() or run_code.resolve() not in target_path.parents:
+                raise ValueError(f"invalid model dependency: {item}")
+            target_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source_path, target_path)
 
 
 def run_one(
@@ -390,6 +420,12 @@ def run_one(
             "cash": cash,
         },
     }
+    if mid in {"v39d_causal", "v47_causal", "v48_regime_barbell", "v49_precision_trend"}:
+        cfg["causal_execution"] = True
+        # Ten basis points total per side: five bps fill impact + five bps fee.
+        cfg["slippage_us"] = 0.0005
+        cfg["commission"] = 0.0005
+        cfg["causal_commission_rate"] = 0.0005
     if extra_cfg:
         cfg.update(extra_cfg)
     run_dir.mkdir(parents=True, exist_ok=True)

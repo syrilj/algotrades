@@ -1,5 +1,14 @@
 "use client";
 
+import type { LucideIcon } from "lucide-react";
+import {
+  Clock,
+  CornerDownLeft,
+  Eye,
+  Rocket,
+  ShieldAlert,
+  Zap,
+} from "lucide-react";
 import type { ActionLabel } from "@/lib/types";
 import { matchActionVarName } from "@/lib/actionColors";
 
@@ -8,6 +17,17 @@ type ActionStyle = {
   soft: string;
   dashed: boolean;
 };
+
+function actionIconFor(action: string | undefined | null): LucideIcon | null {
+  const a = (action ?? "").toUpperCase();
+  if (a.includes("BUY NOW") || a.includes("RISK_OK")) return Rocket;
+  if (a.includes("BUY BREAKOUT")) return Zap;
+  if (a.includes("BREAKOUT WATCH") || a.includes("SIZE_DOWN")) return Eye;
+  if (a.includes("PULLBACK")) return CornerDownLeft;
+  if (a.includes("AVOID") || a.includes("FLATTEN")) return ShieldAlert;
+  if (a.includes("WAIT") || a.includes("HALT_NEW") || a.includes("EQUITY_HEDGE")) return Clock;
+  return null;
+}
 
 function softOf(token: string): string {
   return `color-mix(in oklch, ${token} 22%, transparent)`;
@@ -41,6 +61,8 @@ type ActionChipProps = {
 
 export function ActionChip({ action, size = "md", className = "" }: ActionChipProps) {
   const style = actionStyle(action);
+  const Icon = actionIconFor(action);
+  const iconSize = size === "lg" ? 14 : size === "sm" ? 10 : 12;
   const sizeClass =
     size === "lg"
       ? "td-action-chip--lg"
@@ -55,8 +77,10 @@ export function ActionChip({ action, size = "md", className = "" }: ActionChipPr
         color: style.color,
         background: style.soft,
         border: `1px ${style.dashed ? "dashed" : "solid"} ${style.color}`,
+        gap: "0.35rem",
       }}
     >
+      {Icon ? <Icon size={iconSize} strokeWidth={1.75} aria-hidden /> : null}
       {action}
     </span>
   );

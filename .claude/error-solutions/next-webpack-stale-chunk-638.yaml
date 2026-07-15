@@ -1,0 +1,28 @@
+id: "next-webpack-stale-chunk-638"
+created: "2026-07-14"
+
+error:
+  type: "build-cache"
+  category: "ModuleNotFound"
+  language: "nodejs"
+  framework: "nextjs"
+  pattern: "Cannot find module './<chunk>.js' from .next/server/webpack-runtime.js"
+
+diagnosis:
+  root_cause: "The generated .next manifest referenced a server chunk that was absent from the generated cache."
+  contributing_factors:
+    - "Development and production builds share the .next directory."
+    - "An interrupted or overlapping build can leave generated manifests and chunks out of sync."
+
+solution:
+  immediate:
+    - "Stop any running Next server using this app directory."
+    - "Remove apps/trade-desk/.next."
+    - "Run npm run build from apps/trade-desk."
+  prevention:
+    - "Do not run next dev and next build concurrently in the same checkout."
+    - "Treat .next as disposable generated output; never commit it."
+
+verification:
+  - "test -f .next/server/chunks/638.js"
+  - "Use the project-supported Node version to require .next/server/app/scan/page.js."

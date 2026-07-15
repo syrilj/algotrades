@@ -17,22 +17,7 @@ import { GammaScene } from "@/components/gamma/GammaScene";
 import { analyzeHref, liveHref, optionsHref } from "@/lib/routes";
 import { Chip } from "@/components/ui/Chip";
 import { colorVarFor } from "@/lib/actionColors";
-
-function Stat({ label, value, emphasize }: { label: string; value: React.ReactNode; emphasize?: boolean }) {
-  return (
-    <div className="flex flex-col">
-      <span className="text-[10px] uppercase tracking-wider" style={{ color: "var(--td-ink-500)" }}>
-        {label}
-      </span>
-      <span
-        className={`tabular ${emphasize ? "text-[15px] font-medium" : "text-[13px]"}`}
-        style={{ color: emphasize ? "var(--td-ink-100)" : "var(--td-ink-300)" }}
-      >
-        {value}
-      </span>
-    </div>
-  );
-}
+import { Stat } from "@/components/ui/Stat";
 
 function RegimeChip({ regime }: { regime: string }) {
   const isPin = regime === "positive_gex_pin";
@@ -41,47 +26,135 @@ function RegimeChip({ regime }: { regime: string }) {
   return <Chip label={label} colorVar={colorVarFor("regime", regime)} />;
 }
 
-function SqueezeChip({ label }: { label: string | undefined }) {
-  const text =
-    label === "bullish_squeeze"
-      ? "BULL SQUEEZE"
-      : label === "bearish_squeeze"
-        ? "BEAR SQUEEZE"
-        : "NEUTRAL";
+function SqueezeChip({ label }: { label: GammaResponse["squeeze_label"] }) {
+  const text = label === "bullish_squeeze" ? "UPSIDE SQUEEZE" : label === "bearish_squeeze" ? "DOWNSIDE SQUEEZE" : "NO SQUEEZE";
   return <Chip label={text} colorVar={colorVarFor("regime", label)} />;
 }
 
-function SqueezeGauge({ score }: { score: number | undefined }) {
-  if (score == null) return <span className="tabular">—</span>;
-  const val = Math.max(-100, Math.min(100, score));
-  const pos = (val + 100) / 2;
-  const markerColor =
-    val >= 20 ? "var(--td-action-buy-now)" : val <= -20 ? "var(--td-action-avoid)" : "var(--td-ink-100)";
+const SQUEEZE_DRIVER_COPY: Record<string, string> = {
+  regime_score: "Negative gamma near spot can amplify a move.",
+  call_prox_score: "Price is close enough to the call wall for an upside break to matter.",
+  put_prox_score: "Price is close enough to the put wall for a downside break to matter.",
+  call_conc_score: "More call positioning sits above spot than put positioning below it.",
+  put_conc_score: "More put positioning sits below spot than call positioning above it.",
+  wall_asym_score: "One wall is materially larger than the opposing wall.",
+  em_score: "The relevant wall is inside the expected move for the selected expiries.",
+  flip_score: "Spot is close to the gamma-flip level, so the regime can change quickly.",
+};
+
+function SqueezeSummary({ gamma }: { gamma: GammaResponse }) {
+  const score = gamma.squeeze_score ?? 0;
+  const label = gamma.squeeze_label ?? "neutral";
+  const direction = label === "bullish_squeeze" ? "Upside acceleration is possible if price clears the call wall." : label === "bearish_squeeze" ? "Downside acceleration is possible if price loses the put wall." : "The selected options book does not show a directional squeeze setup.";
+  const drivers = Object.entries(gamma.squeeze_components ?? {})
+    .filter(([, value]) => Number.isFinite(value) && Math.abs(value) >= 0.25)
+    .sort(([, a], [, b]) => Math.abs(b) - Math.abs(a))
+    .slice(0, 3);
+  const color = label === "bullish_squeeze" ? "var(--td-action-buy-now)" : label === "bearish_squeeze" ? "var(--td-action-avoid)" : "var(--td-ink-300)";
 
   return (
-    <div className="flex flex-col gap-2" style={{ minWidth: 220 }}>
-      <div className="relative h-3 w-full">
-        <div className="absolute inset-0 flex">
-          <div className="h-full" style={{ width: "40%", background: "color-mix(in oklch, var(--td-action-avoid) 28%, transparent)" }} />
-          <div className="h-full" style={{ width: "20%", background: "var(--td-surface-soft)" }} />
-          <div className="h-full" style={{ width: "40%", background: "color-mix(in oklch, var(--td-brand) 28%, transparent)" }} />
+    <div className="td-panel p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <span className="td-eyebrow">Squeeze read</span>
+          <div className="mt-2"><SqueezeChip label={label} /></div>
         </div>
-        <div className="absolute inset-y-0" style={{ left: "50%", width: 1, background: "var(--td-hairline)" }} />
-        <div
-          className="absolute"
-          style={{ left: `calc(${pos}% - 1px)`, top: -3, width: 2, height: 18, background: markerColor }}
-        />
+        <div className="text-right">
+          <div className="td-label">Pressure score</div>
+          <div className="tabular text-[22px] font-semibold" style={{ color, fontFamily: "var(--td-font-mono)" }}>
+            {score > 0 ? "+" : ""}{formatNum(score, 1)}
+          </div>
+        </div>
       </div>
-      <div className="flex justify-between text-[9px] tabular" style={{ color: "var(--td-ink-500)" }}>
-        <span>BEAR −100</span>
-        <span>−20</span>
-        <span>0</span>
-        <span>+20</span>
-        <span>+100 BULL</span>
+      <p className="mt-3 text-[13px] leading-snug" style={{ color: "var(--td-ink-300)" }}>{direction}</p>
+      <p className="mt-1 text-[11px] leading-snug" style={{ color: "var(--td-ink-500)" }}>
+        This is an options-structure heuristic, not an entry signal. It updates with the selected expiry dates.
+      </p>
+      {drivers.length > 0 ? (
+        <div className="mt-3 border-t pt-3" style={{ borderColor: "var(--td-hairline)" }}>
+          <div className="td-label mb-2">Why it reads this way</div>
+          <ul className="flex flex-col gap-1.5 text-[12px] leading-snug" style={{ color: "var(--td-ink-300)" }}>
+            {drivers.map(([key]) => <li key={key}>{SQUEEZE_DRIVER_COPY[key] ?? key.replace(/_/g, " ")}</li>)}
+          </ul>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function wallDistanceCopy(distance: number | null | undefined, side: "call" | "put"): string {
+  if (distance == null) return "distance unavailable";
+  if (Math.abs(distance) <= 0.25) return "at spot";
+  if (side === "call") {
+    return distance > 0 ? `${formatPctPointsUnsigned(distance)} overhead` : `${formatPctPointsUnsigned(distance)} reclaimed`;
+  }
+  return distance < 0 ? `${formatPctPointsUnsigned(distance)} below spot` : `${formatPctPointsUnsigned(distance)} broken`;
+}
+
+function ReadoutTile({
+  label,
+  value,
+  detail,
+  color,
+}: {
+  label: string;
+  value: React.ReactNode;
+  detail?: React.ReactNode;
+  color?: string;
+}) {
+  return (
+    <div className="border p-3" style={{ borderColor: "var(--td-hairline)", background: "var(--td-canvas)" }}>
+      <div className="td-label">{label}</div>
+      <div
+        className="mt-1 tabular text-[15px] font-semibold"
+        style={{ color: color ?? "var(--td-ink-100)", fontFamily: "var(--td-font-mono)" }}
+      >
+        {value}
       </div>
-      <div className="tabular text-[12px]" style={{ color: markerColor }}>
-        {val > 0 ? "+" : ""}
-        {formatNum(val, 1)}
+      {detail ? (
+        <div className="mt-1 text-[11px] leading-snug" style={{ color: "var(--td-ink-500)" }}>
+          {detail}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function WallCard({
+  title,
+  value,
+  distance,
+  gex,
+  side,
+}: {
+  title: string;
+  value: number | null | undefined;
+  distance: number | null | undefined;
+  gex: number | null | undefined;
+  side: "call" | "put";
+}) {
+  const color = side === "call" ? "var(--td-action-buy-now)" : "var(--td-action-avoid)";
+  const isLive = distance != null && Math.abs(distance) <= 1;
+  return (
+    <div
+      className="border p-3"
+      style={{
+        borderColor: isLive ? color : "var(--td-hairline)",
+        background: isLive ? `color-mix(in oklch, ${color} 9%, var(--td-canvas))` : "var(--td-canvas)",
+      }}
+    >
+      <div className="flex items-center justify-between gap-2">
+        <span className="td-label">{title}</span>
+        <span className="text-[10px] uppercase tracking-[1.4px]" style={{ color: isLive ? color : "var(--td-ink-500)" }}>
+          {isLive ? "active" : "watch"}
+        </span>
+      </div>
+      <div className="mt-2 tabular text-[20px] font-semibold leading-none" style={{ color, fontFamily: "var(--td-font-mono)" }}>
+        {value != null ? formatNum(value) : "—"}
+      </div>
+      <div className="mt-2 flex items-center justify-between gap-3 text-[11px] tabular" style={{ color: "var(--td-ink-500)" }}>
+        <span>{wallDistanceCopy(distance, side)}</span>
+        <span>{gex != null ? `${formatNum(gex, 0)} GEX` : "GEX —"}</span>
       </div>
     </div>
   );
@@ -100,7 +173,6 @@ function useVerdict(gamma: GammaResponse | null, live: LivePlanResponse | null) 
     const regime = gamma?.regime ?? "flat";
     const squeezeLabel = gamma?.squeeze_label ?? "neutral";
     const squeezeScore = gamma?.squeeze_score ?? 0;
-
     let consensus = "WAIT";
     let note = "No model signal. Use Gamma as a standalone read or run Analyze first.";
 
@@ -148,13 +220,17 @@ function useVerdict(gamma: GammaResponse | null, live: LivePlanResponse | null) 
     } else if (gamma) {
       if (squeezeLabel === "bullish_squeeze") {
         consensus = "BREAKOUT WATCH";
-        note = `Gamma squeeze score +${formatNum(squeezeScore, 1)}. Bullish breakout risk if spot reclaims the call wall.`;
+        note = `Upside squeeze pressure is ${formatNum(squeezeScore, 1)}. Watch the call wall; the heuristic matters only if price actually clears it.`;
       } else if (squeezeLabel === "bearish_squeeze") {
         consensus = "AVOID";
-        note = `Gamma squeeze score ${formatNum(squeezeScore, 1)}. Bearish cascade risk if support breaks.`;
+        note = `Downside squeeze pressure is ${formatNum(squeezeScore, 1)}. Watch the put wall; the heuristic matters only if price actually loses it.`;
       } else {
-        consensus = "WAIT";
-        note = "Gamma is neutral. No directional squeeze edge.";
+        consensus = gexSign < 0 ? "BREAKOUT WATCH" : "WAIT";
+        note = gexSign < 0
+          ? "Near-spot dealer gamma is negative. A level break can expand volatility."
+          : gexSign > 0
+            ? "Near-spot dealer gamma is positive. Expect more pinning around the strongest strikes."
+            : "Dealer gamma is balanced. Wait for a price-level break.";
       }
     }
 
@@ -179,24 +255,16 @@ function useVerdict(gamma: GammaResponse | null, live: LivePlanResponse | null) 
       note += " Price at put wall — support risk.";
     }
 
-    if (gamma?.squeeze_label) {
-      note += ` Squeeze: ${gamma.squeeze_label.replace(/_/g, " ")} (${formatNum(gamma.squeeze_score, 1)}).`;
-    }
-
     return { modelAction, gexSign, regime, consensus, note, squeezeLabel, squeezeScore };
   }, [gamma, live]);
 }
 
 function buildNotes(gamma: GammaResponse): string[] {
   const notes: string[] = [];
-  if (gamma.squeeze_label != null) {
-    const s = gamma.squeeze_label.replace(/_/g, " ").toUpperCase();
-    notes.push(`Squeeze read: ${s} (${formatNum(gamma.squeeze_score, 1)}).`);
-  }
   if (gamma.call_wall != null) {
     const d = gamma.dist_call_wall_pct;
     if (d != null && d > 0) {
-      notes.push(`Call wall at ${formatNum(gamma.call_wall)} is ${formatPctPoints(d)} above spot — reclaim to squeeze.`);
+      notes.push(`Call wall at ${formatNum(gamma.call_wall)} is ${formatPctPoints(d)} above spot — resistance until price clears it.`);
     } else {
       notes.push(`Call wall at ${formatNum(gamma.call_wall)} is near or inside spot.`);
     }
@@ -220,8 +288,8 @@ function buildNotes(gamma: GammaResponse): string[] {
   if (gamma.approx_flip_strike != null) {
     notes.push(`Flip strike at ${formatNum(gamma.approx_flip_strike)} — regime changes there.`);
   }
-  if (gamma.otm_call_oi > 0) {
-    notes.push(`OTM call OI ${formatNum(gamma.otm_call_oi, 0)} — watch for participation / squeeze fuel.`);
+  if ((gamma.otm_call_oi ?? 0) > 0) {
+    notes.push(`OTM call OI ${formatNum(gamma.otm_call_oi, 0)} — participation above spot.`);
   }
   if ((gamma.otm_put_oi ?? 0) > 0) {
     notes.push(`OTM put OI ${formatNum(gamma.otm_put_oi, 0)} — downside protection / bearish fuel.`);
@@ -229,14 +297,28 @@ function buildNotes(gamma: GammaResponse): string[] {
   return notes;
 }
 
+function gammaFreshness(gamma: GammaResponse) {
+  const dataAsof = gamma.options_asof ?? null;
+  const dataDate = new Date(dataAsof ?? 0);
+  const hasTimestamp = dataAsof != null && Number.isFinite(dataDate.getTime());
+  const ageMs = hasTimestamp ? Date.now() - dataDate.getTime() : Number.POSITIVE_INFINITY;
+  const isStale = ageMs > 90 * 60 * 60 * 1000;
+  const staleHours = Math.max(0, Math.round(ageMs / (60 * 60 * 1000)));
+  return { dataAsof, dataDate, hasTimestamp, isStale, staleHours, isCurrent: hasTimestamp && !isStale };
+}
+
+function isoDateDaysAhead(days: number): string {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
 export function GammaExposureDesk() {
   const searchParams = useSearchParams();
   const qSymbol = searchParams.get("symbol")?.toUpperCase() ?? "";
   const [symbol, setSymbol] = useState(qSymbol || "APLD");
-  const [spotSource, setSpotSource] = useState<"auto" | "lse" | "yfinance">("auto");
-  const [source, setSource] = useState<"oi" | "lse">("oi");
-  const [maxExpiries, setMaxExpiries] = useState<number | "">(4);
-  const [maxDte, setMaxDte] = useState<number | "">(45);
+  const [expiryFrom, setExpiryFrom] = useState(() => isoDateDaysAhead(0));
+  const [expiryTo, setExpiryTo] = useState(() => isoDateDaysAhead(45));
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [gamma, setGamma] = useState<GammaResponse | null>(null);
@@ -266,13 +348,7 @@ export function GammaExposureDesk() {
           fetch("/api/gamma", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              symbol: sym,
-              spotSource,
-              source,
-              maxExpiries: maxExpiries === "" ? undefined : maxExpiries,
-              maxDte: maxDte === "" ? undefined : maxDte,
-            }),
+            body: JSON.stringify({ symbol: sym, source: "auto", expiryFrom: expiryFrom || undefined, expiryTo: expiryTo || undefined }),
             signal: gammaController.signal,
           }),
           fetch("/api/live-plan", {
@@ -311,7 +387,7 @@ export function GammaExposureDesk() {
         setLoading(false);
       }
     },
-    [symbol, spotSource, source, maxExpiries, maxDte],
+    [symbol, expiryFrom, expiryTo],
   );
 
   useEffect(() => {
@@ -322,6 +398,8 @@ export function GammaExposureDesk() {
 
   const verdict = useVerdict(gamma, live);
   const notes = useMemo(() => (gamma ? buildNotes(gamma) : []), [gamma]);
+  const freshness = useMemo(() => (gamma ? gammaFreshness(gamma) : null), [gamma]);
+  const showLevels = Boolean(gamma && freshness?.isCurrent);
 
   return (
     <div className="td-page">
@@ -334,11 +412,12 @@ export function GammaExposureDesk() {
               className="tabular"
               style={{
                 fontFamily: "var(--td-font-mono)",
-                color: "var(--td-ink-500)",
+                color: freshness?.isStale ? "var(--td-action-avoid)" : "var(--td-ink-500)",
                 fontSize: "var(--td-text-caption)",
               }}
             >
-              {symbol} · {new Date(gamma.asof_utc).toLocaleString()}
+              {symbol} · options {freshness?.hasTimestamp ? freshness.dataDate.toLocaleString() : "timestamp unavailable"}
+              {!freshness?.isCurrent ? " · not live" : ""}
             </span>
           ) : null
         }
@@ -371,49 +450,12 @@ export function GammaExposureDesk() {
             />
           </label>
           <label className="td-field">
-            <span className="td-label">Spot source</span>
-            <select
-              value={spotSource}
-              onChange={(e) => setSpotSource(e.target.value as typeof spotSource)}
-              className="td-input"
-            >
-              <option value="auto">Auto (LSE → yfinance)</option>
-              <option value="lse">LSE</option>
-              <option value="yfinance">yfinance</option>
-            </select>
+            <span className="td-label">Expiry from</span>
+            <input type="date" value={expiryFrom} max={expiryTo || undefined} onChange={(e) => setExpiryFrom(e.target.value)} className="td-input" />
           </label>
           <label className="td-field">
-            <span className="td-label">Gamma source</span>
-            <select
-              value={source}
-              onChange={(e) => setSource(e.target.value as typeof source)}
-              className="td-input"
-            >
-              <option value="oi">OI (yfinance)</option>
-              <option value="lse">LSE volume</option>
-            </select>
-          </label>
-          <label className="td-field td-field--risk">
-            <span className="td-label">Max expiries</span>
-            <input
-              type="number"
-              min={1}
-              value={maxExpiries}
-              onChange={(e) => setMaxExpiries(e.target.value === "" ? "" : Number(e.target.value))}
-              className="td-input"
-              style={{ fontFamily: "var(--td-font-mono)" }}
-            />
-          </label>
-          <label className="td-field td-field--risk">
-            <span className="td-label">Max DTE</span>
-            <input
-              type="number"
-              min={1}
-              value={maxDte}
-              onChange={(e) => setMaxDte(e.target.value === "" ? "" : Number(e.target.value))}
-              className="td-input"
-              style={{ fontFamily: "var(--td-font-mono)" }}
-            />
+            <span className="td-label">Expiry to</span>
+            <input type="date" value={expiryTo} min={expiryFrom || undefined} onChange={(e) => setExpiryTo(e.target.value)} className="td-input" />
           </label>
           <button
             type="button"
@@ -421,11 +463,11 @@ export function GammaExposureDesk() {
             disabled={loading || !symbol.trim()}
             className="td-btn td-btn-primary"
           >
-            {loading ? "Loading…" : "Run gamma"}
+            {loading ? "Refreshing…" : "Refresh levels"}
           </button>
         </div>
         <p className="text-[11px]" style={{ color: "var(--td-ink-500)" }}>
-          Spot prefers LSE candles; options chain from {source === "lse" ? "LSE volume/premium" : "yfinance open interest"}. GEX = Γ · OI · 100 · S² · 0.01, calls +, puts −.
+          Live LSE options are preferred automatically. The selected dates filter the option expiries used for levels and the squeeze read. Levels are shown only when the chain carries a timestamp from the last 90 minutes.
         </p>
       </section>
 
@@ -439,6 +481,21 @@ export function GammaExposureDesk() {
           Model signal unavailable: {liveError}
         </div>
       ) : null}
+      {gamma && !freshness?.isCurrent ? (
+        <div
+          className="td-alert"
+          role="alert"
+          style={{
+            border: "1px solid var(--td-action-avoid)",
+            color: "var(--td-action-avoid)",
+            background: "color-mix(in oklch, var(--td-action-avoid) 10%, transparent)",
+          }}
+        >
+          {freshness?.hasTimestamp
+            ? `The latest options update is ${freshness.staleHours} hours old, so levels are hidden rather than presented as live.`
+            : "The options provider did not return a usable update time, so levels are hidden rather than presented as live."}
+        </div>
+      ) : null}
 
       {!gamma && !loading && !error ? (
         <section className="td-panel p-5">
@@ -449,15 +506,15 @@ export function GammaExposureDesk() {
             No gamma snapshot yet
           </p>
           <ol className="mt-2 flex flex-col gap-1 text-[13px]" style={{ color: "var(--td-ink-300)" }}>
-            <li>1. Enter a symbol (start with APLD or IONQ)</li>
-            <li>2. Run gamma → read regime, walls, and squeeze</li>
-            <li>3. Compare the gamma view with the model signal</li>
+            <li>1. Enter a symbol</li>
+            <li>2. Refresh live levels</li>
+            <li>3. Filter the strike board by range and exposure side</li>
           </ol>
         </section>
       ) : null}
 
       <AnimatePresence mode="wait">
-        {gamma ? (
+        {showLevels && gamma ? (
           <motion.div
             key="gamma"
             className="flex flex-col gap-4"
@@ -466,63 +523,83 @@ export function GammaExposureDesk() {
             exit={{ opacity: 0, y: -8 }}
             transition={{ duration: 0.45, ease: "easeOut" }}
           >
-          {/* Verdict comparison */}
+          {/* Command readout */}
           <section
-            className="td-panel p-4"
+            className="td-panel overflow-hidden"
             style={{ borderLeft: `3px solid ${actionStyle(verdict.consensus).color}` }}
           >
-            <div className="flex flex-col gap-3">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <span className="td-eyebrow">Model vs Gamma</span>
-                <ActionChip action={verdict.consensus} size="lg" />
-              </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2" style={{ borderColor: "var(--td-hairline)" }}>
-                <div className="flex flex-col gap-1">
-                  <span className="td-label">Model</span>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <ActionChip action={verdict.modelAction} size="sm" />
-                    <span
-                      className="text-[12px] tabular"
-                      style={{ color: "var(--td-ink-500)", fontFamily: "var(--td-font-mono)" }}
+            <div className="grid gap-0 lg:grid-cols-[0.95fr_1.05fr]">
+              <div className="flex flex-col justify-between gap-4 p-4" style={{ background: "var(--td-canvas)" }}>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <span className="td-eyebrow">Gamma command read</span>
+                    <div
+                      className="mt-1 text-[28px] font-semibold leading-none tracking-[-0.02em]"
+                      style={{ color: "var(--td-ink-100)", fontFamily: "var(--td-font-display)" }}
                     >
-                      {live?.model?.model ?? live?.model?.model ?? "—"} · {live?.model?.confidence != null ? formatPct(live.model.confidence, 0) : "—"}
-                    </span>
+                      {gamma.symbol} {formatNum(gamma.spot)}
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <RegimeChip regime={verdict.regime} />
+                      <SqueezeChip label={verdict.squeezeLabel} />
+                    </div>
                   </div>
+                  <ActionChip action={verdict.consensus} size="lg" />
                 </div>
-                <div className="flex flex-col gap-1">
-                  <span className="td-label">Gamma</span>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <RegimeChip regime={verdict.regime} />
-                    <span
-                      className="text-[12px] tabular"
-                      style={{ color: "var(--td-ink-500)", fontFamily: "var(--td-font-mono)" }}
-                    >
-                      {formatNum(gamma.net_dealer_gex, 0)} GEX
-                    </span>
-                  </div>
-                </div>
-              </div>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div className="flex flex-col gap-1">
-                  <span className="td-label">Squeeze</span>
-                  <div className="flex flex-wrap items-start gap-2">
-                    <SqueezeChip label={verdict.squeezeLabel} />
-                    <SqueezeGauge score={verdict.squeezeScore} />
-                  </div>
-                </div>
-                <div className="flex flex-col gap-1">
-                  <span className="td-label">Source</span>
-                  <span
-                    className="text-[12px] tabular"
-                    style={{ color: "var(--td-ink-500)", fontFamily: "var(--td-font-mono)" }}
-                  >
-                    {gamma.weight === "volume_today" ? "LSE volume" : "yfinance OI"} · {gamma.n_contracts} contracts
+
+                <p className="max-w-2xl text-[13px] leading-snug" style={{ color: "var(--td-ink-300)" }}>
+                  {verdict.note}
+                </p>
+
+                <div className="flex flex-wrap gap-x-5 gap-y-2 text-[11px] tabular" style={{ color: "var(--td-ink-500)" }}>
+                  <span>
+                    Model: {live?.model?.model ?? "—"} · {live?.model?.confidence != null ? formatPct(live.model.confidence, 0) : "—"}
+                  </span>
+                  <span>
+                    Source:{" "}
+                    {gamma.weight === "volume_today"
+                      ? "LSE volume"
+                      : gamma.weight === "premium_today"
+                        ? "LSE premium"
+                        : "yfinance OI"}{" "}
+                    · {gamma.n_contracts} contracts
                   </span>
                 </div>
               </div>
-              <p className="text-[13px] leading-snug" style={{ color: "var(--td-ink-300)" }}>
-                {verdict.note}
-              </p>
+
+              <div className="grid gap-3 border-t p-4 lg:border-l lg:border-t-0" style={{ borderColor: "var(--td-hairline)" }}>
+                <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  <ReadoutTile
+                    label="Net dealer GEX"
+                    value={formatNum(gamma.net_dealer_gex, 0)}
+                    detail={gamma.gex_sign < 0 ? "Short gamma: range can expand." : gamma.gex_sign > 0 ? "Long gamma: pinning risk." : "Flat dealer book."}
+                    color={gamma.gex_sign < 0 ? "var(--td-action-avoid)" : gamma.gex_sign > 0 ? "var(--td-brand)" : "var(--td-ink-300)"}
+                  />
+                  <ReadoutTile
+                    label="Near-spot GEX"
+                    value={formatNum(gamma.near_spot_dealer_gex, 0)}
+                    detail="Fuel closest to live price."
+                    color={gamma.near_spot_dealer_gex < 0 ? "var(--td-action-avoid)" : "var(--td-brand)"}
+                  />
+                  <ReadoutTile
+                    label="Expected move"
+                    value={gamma.expected_move_pct != null ? `±${formatPctPointsUnsigned(gamma.expected_move_pct)}` : "—"}
+                    detail={`${formatNum(gamma.expected_move_low)} - ${formatNum(gamma.expected_move_high)}`}
+                  />
+                  <ReadoutTile
+                    label="Flip distance"
+                    value={gamma.dist_flip_pct != null ? formatPctPoints(gamma.dist_flip_pct) : "—"}
+                    detail={gamma.approx_flip_strike != null ? `Flip ${formatNum(gamma.approx_flip_strike)}` : "No flip strike."}
+                    color={gamma.dist_flip_pct != null && Math.abs(gamma.dist_flip_pct) <= 3 ? "var(--td-action-breakout-watch)" : undefined}
+                  />
+                  <ReadoutTile
+                    label="Squeeze"
+                    value={verdict.squeezeLabel === "bullish_squeeze" ? "Upside" : verdict.squeezeLabel === "bearish_squeeze" ? "Downside" : "None"}
+                    detail={`Pressure ${verdict.squeezeScore > 0 ? "+" : ""}${formatNum(verdict.squeezeScore, 1)}`}
+                    color={verdict.squeezeLabel === "bullish_squeeze" ? "var(--td-action-buy-now)" : verdict.squeezeLabel === "bearish_squeeze" ? "var(--td-action-avoid)" : undefined}
+                  />
+                </div>
+              </div>
             </div>
           </section>
 
@@ -535,57 +612,53 @@ export function GammaExposureDesk() {
                 </span>
               </div>
               <GammaScene data={gamma} />
-              <div className="mt-2 flex flex-wrap gap-4 text-[11px]" style={{ color: "var(--td-ink-500)" }}>
-                <span className="inline-flex items-center gap-1">
-                  <span className="inline-block h-2 w-3" style={{ background: "var(--td-brand)" }} />
-                  Positive net GEX
-                </span>
-                <span className="inline-flex items-center gap-1">
-                  <span className="inline-block h-2 w-3" style={{ background: "var(--td-action-avoid)" }} />
-                  Negative net GEX
-                </span>
-                <span className="inline-flex items-center gap-1">
-                  <span className="inline-block h-2 w-3" style={{ background: "var(--td-ink-100)" }} />
-                  Spot
-                </span>
-                <span className="inline-flex items-center gap-1">
-                  <span className="inline-block h-2 w-3" style={{ background: "var(--td-brand-soft)", opacity: 0.6 }} />
-                  Expected move
-                </span>
-                <span className="inline-flex items-center gap-1">
-                  <span className="inline-block h-2 w-3" style={{ background: "var(--td-action-buy-now)" }} />
-                  Call wall
-                </span>
-                <span className="inline-flex items-center gap-1">
-                  <span className="inline-block h-2 w-3" style={{ background: "var(--td-action-avoid)" }} />
-                  Put wall
-                </span>
-              </div>
+              <p className="mt-2 text-[11px]" style={{ color: "var(--td-ink-500)" }}>
+                Choose Net, Calls, or Puts, then limit the board to strikes around spot. Dashed lines mark spot and the relevant walls.
+              </p>
             </section>
 
             <section className="flex flex-col gap-4">
               <div className="td-panel p-4">
-                <span className="td-eyebrow">Gamma summary</span>
-                <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <span className="td-eyebrow">Wall board</span>
+                  <span className="text-[10px] uppercase tracking-[1.4px]" style={{ color: "var(--td-ink-500)" }}>
+                    spot-relative
+                  </span>
+                </div>
+                <div className="grid gap-3">
+                  <WallCard
+                    title="Call wall"
+                    value={gamma.call_wall}
+                    distance={gamma.dist_call_wall_pct}
+                    gex={gamma.call_wall_gex}
+                    side="call"
+                  />
+                  <WallCard
+                    title="Put wall"
+                    value={gamma.put_wall}
+                    distance={gamma.dist_put_wall_pct}
+                    gex={gamma.put_wall_gex}
+                    side="put"
+                  />
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <ReadoutTile label="Max pain" value={gamma.max_pain != null ? formatNum(gamma.max_pain) : "—"} />
+                  <ReadoutTile label="Flip strike" value={gamma.approx_flip_strike != null ? formatNum(gamma.approx_flip_strike) : "—"} />
+                </div>
+              </div>
+
+              <SqueezeSummary gamma={gamma} />
+
+              <div className="td-panel p-4">
+                <span className="td-eyebrow">Book inventory</span>
+                <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-3">
                   <Stat label="Spot" value={`${formatNum(gamma.spot)} (${gamma.spot_source})`} emphasize />
                   <Stat label="Regime" value={<RegimeChip regime={gamma.regime} />} emphasize />
-                  <Stat label="Squeeze" value={<SqueezeChip label={gamma.squeeze_label} />} emphasize />
-                  <Stat label="Net dealer GEX" value={formatNum(gamma.net_dealer_gex, 0)} />
-                  <Stat label="Near-spot GEX" value={formatNum(gamma.near_spot_dealer_gex, 0)} />
-                  <Stat label="Squeeze score" value={formatNum(gamma.squeeze_score, 1)} />
-                  <Stat label="Call wall" value={gamma.call_wall != null ? formatNum(gamma.call_wall) : "—"} />
-                  <Stat label="Put wall" value={gamma.put_wall != null ? formatNum(gamma.put_wall) : "—"} />
-                  <Stat
-                    label="Expected move"
-                    value={gamma.expected_move_pct != null ? `±${formatPctPointsUnsigned(gamma.expected_move_pct)}` : "—"}
-                  />
-                  <Stat label="Max pain" value={gamma.max_pain != null ? formatNum(gamma.max_pain) : "—"} />
-                  <Stat label="Flip" value={gamma.approx_flip_strike != null ? formatNum(gamma.approx_flip_strike) : "—"} />
                   <Stat label="OTM call vol" value={formatNum(gamma.otm_call_volume, 0)} />
                   <Stat label="OTM call OI" value={formatNum(gamma.otm_call_oi, 0)} />
                   <Stat label="OTM put vol" value={formatNum(gamma.otm_put_volume, 0)} />
                   <Stat label="OTM put OI" value={formatNum(gamma.otm_put_oi, 0)} />
-                  <Stat label="Asof" value={new Date(gamma.asof_utc).toLocaleString()} />
+                  <Stat label="Options updated" value={freshness?.hasTimestamp ? freshness.dataDate.toLocaleString() : "—"} />
                 </div>
               </div>
 

@@ -1,0 +1,6 @@
+{
+  "files": [
+    {"source": "../_shared/v48_teachers.py", "target": "v48_teachers.py"}
+  ],
+  "purpose": "Immutable causal trend teacher snapshot used by v49_precision_trend"
+}
