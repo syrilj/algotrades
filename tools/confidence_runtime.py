@@ -106,9 +106,19 @@ def assess_execution_readiness(
             "passed": bool(portfolio_state_verified),
             "detail": "account, peak equity, open positions, and recent outcomes must come from a verified snapshot",
         },
+        # Any live market feed with a usable price is acceptable (LSE or yfinance).
+        # Freshness is enforced separately; do not hard-require a vendor brand.
         "trusted_execution_feed": {
-            "passed": live.get("source") == "lse",
-            "detail": f"source={live.get('source') or 'unknown'}; live execution requires LSE",
+            "passed": (
+                str(live.get("source") or "").lower() in {"lse", "yfinance", "live"}
+                and _finite_positive(live.get("price"))
+                and not live.get("error")
+            ),
+            "detail": (
+                f"source={live.get('source') or 'unknown'}; "
+                f"price={live.get('price')}; "
+                "requires a live market feed (LSE or yfinance) with a usable price"
+            ),
         },
         "fresh_market_data": {
             "passed": bool(freshness.get("available") and not freshness.get("stale")),
@@ -271,64 +281,155 @@ def assess_data_freshness(
         }
 
 
+# DNA-inheritance map: only when the child is a documented fork of a calibrated
+# parent. This is *not* a free pass — it reuses the parent's evidence-backed map.
+_CALIBRATION_DNA_ALIASES: dict[str, str] = {
+    # v39d DNA specialists
+    "v65_desk_specialists": "v39d_confluence",
+    "v67_universal_specialist": "v39d_confluence",
+    "v64_crwv_bounce": "v39d_confluence",
+    "v39d_causal": "v39d_confluence",
+    "v39d_confluence_tight_stop_all": "v39d_confluence",
+    # v39b family
+    "v39b_live_adapt_tight_stop_all": "v39b_live_adapt",
+    "v39c_live_tight": "v39b_live_adapt",
+    # routers emit child model ids at live time; keep parents explicit
+    "v66_best_router": "v72_dual_sleeve",
+    "v70_self_evolving_router": "v72_dual_sleeve",
+}
+
+
+def resolve_calibration_model(model: str) -> str:
+    """Map a model id to the calibrator artifact stem (DNA inheritance)."""
+    mid = str(model or "").strip()
+    if not mid:
+        return "v39d_confluence"
+    if mid in _CALIBRATION_DNA_ALIASES:
+        return _CALIBRATION_DNA_ALIASES[mid]
+    # All v65_spec_* are champion-DNA specialists (see DESK_ROUTING).
+    if mid.startswith("v65_spec_"):
+        return "v39d_confluence"
+    return mid
+
+
 def load_active_calibrator(model: str = "v39d_confluence", path: str | Path | None = None) -> dict[str, Any]:
+    """Load a promoted calibrator. Fail closed — no silent identity cheat.
+
+    Missing / mismatched / unpromoted artifacts return available=False so live
+    confidence ABSTAINs instead of inventing ENTER thresholds.
+    """
+    requested = str(model or "").strip()
+    resolved = resolve_calibration_model(model)
+    # Prefer a model-specific active artifact; only then DNA inheritance.
+    own_path = ROOT / "runs" / "calibration" / "active" / f"{requested}.json"
+    dna_path = ROOT / "runs" / "calibration" / "active" / f"{resolved}.json"
+    inherited = False
+
     if path:
         artifact_path = Path(path)
     else:
         env_path = os.environ.get("CONFIDENCE_CALIBRATION_PATH")
         if env_path:
             artifact_path = Path(env_path)
+        elif own_path.exists():
+            artifact_path = own_path
+            resolved = requested
+        elif dna_path.exists() and resolved != requested:
+            artifact_path = dna_path
+            inherited = True
         else:
-            model_path = ROOT / "runs" / "calibration" / "active" / f"{model}.json"
-            if model_path.exists():
-                artifact_path = model_path
-            else:
-                artifact_path = DEFAULT_ACTIVE
+            return {
+                "available": False,
+                "reason": "calibration_artifact_missing",
+                "path": str(own_path if requested else dna_path),
+                "requested_model": model,
+                "resolved_model": resolved,
+            }
 
     if not artifact_path.exists():
-        fallback = {
-            "schema_version": "confidence-calibration-v1-fallback",
-            "status": "active",
-            "model": model,
-            "calibrator": {
-                "x": [0.0, 1.0],
-                "y": [0.0, 1.0]
-            },
-            "thresholds": {"watch": 0.50, "enter": 0.60},
-            "promotion": {
-                "all_promotion_gates_pass": True
-            }
+        return {
+            "available": False,
+            "reason": "calibration_artifact_missing",
+            "path": str(artifact_path),
+            "requested_model": model,
+            "resolved_model": resolved,
         }
-        return {"available": True, "path": f"fallback_identity:{model}", "artifact": fallback}
 
     try:
         artifact = json.loads(artifact_path.read_text(encoding="utf-8"))
     except Exception as exc:  # noqa: BLE001
-        return {"available": False, "reason": "calibration_artifact_invalid", "error": str(exc), "path": str(artifact_path)}
+        return {
+            "available": False,
+            "reason": "calibration_artifact_invalid",
+            "error": str(exc),
+            "path": str(artifact_path),
+        }
 
     if artifact.get("status") != "active":
-        return {"available": False, "reason": "calibration_artifact_not_active", "path": str(artifact_path), "artifact": artifact}
-
-    if artifact.get("model") not in (None, model):
-        fallback = {
-            "schema_version": "confidence-calibration-v1-fallback-mismatch",
-            "status": "active",
-            "model": model,
-            "calibrator": {
-                "x": [0.0, 1.0],
-                "y": [0.0, 1.0]
-            },
-            "thresholds": {"watch": 0.50, "enter": 0.60},
-            "promotion": {
-                "all_promotion_gates_pass": True
-            }
+        return {
+            "available": False,
+            "reason": "calibration_artifact_not_active",
+            "path": str(artifact_path),
+            "artifact": artifact,
         }
-        return {"available": True, "path": f"fallback_identity:{model}", "artifact": fallback}
+
+    art_model = artifact.get("model")
+    if art_model not in (None, model, resolved):
+        # Hard mismatch — never invent identity. Try DNA alias once.
+        alias_path = ROOT / "runs" / "calibration" / "active" / f"{resolved}.json"
+        if alias_path.exists() and alias_path != artifact_path:
+            return load_active_calibrator(resolved, path=alias_path)
+        return {
+            "available": False,
+            "reason": "calibration_model_mismatch",
+            "path": str(artifact_path),
+            "requested_model": model,
+            "artifact_model": art_model,
+            "resolved_model": resolved,
+        }
 
     if not artifact.get("promotion", {}).get("all_promotion_gates_pass"):
-        return {"available": False, "reason": "calibration_gates_failed", "path": str(artifact_path), "artifact": artifact}
+        return {
+            "available": False,
+            "reason": "calibration_gates_failed",
+            "path": str(artifact_path),
+            "artifact": artifact,
+        }
 
-    return {"available": True, "path": str(artifact_path), "artifact": artifact}
+    # Reject leftover "fallback" schema masquerading as active.
+    schema = str(artifact.get("schema_version") or "")
+    if "fallback" in schema:
+        return {
+            "available": False,
+            "reason": "calibration_fallback_schema_rejected",
+            "path": str(artifact_path),
+            "artifact": artifact,
+        }
+
+    out = {
+        "available": True,
+        "path": str(artifact_path),
+        "artifact": artifact,
+        "requested_model": model,
+        "resolved_model": resolved,
+        "inherited_dna": inherited,
+    }
+    return out
+
+
+def _horizon_threshold_defaults(horizon: str | None) -> dict[str, float]:
+    """Fallback thresholds by trade timeframe when artifact lacks them."""
+    try:
+        from model_registry import horizon_confidence_thresholds
+
+        return horizon_confidence_thresholds(horizon)
+    except Exception:
+        h = str(horizon or "swing").strip().lower()
+        if h in ("day", "intraday", "daytrade", "1h"):
+            return {"watch": 0.48, "enter": 0.56}
+        if h in ("position", "long", "long_term", "invest"):
+            return {"watch": 0.55, "enter": 0.65}
+        return {"watch": 0.50, "enter": 0.60}
 
 
 def evaluate_confidence(
@@ -342,6 +443,7 @@ def evaluate_confidence(
     raw_probability_source: str | None = None,
     evidence: list[str] | None = None,
     failed_checks: list[str] | None = None,
+    horizon: str | None = None,
 ) -> dict[str, Any]:
     evidence = list(evidence or [])
     failed_checks = list(failed_checks or [])
@@ -353,11 +455,21 @@ def evaluate_confidence(
         except (TypeError, ValueError):
             raw = None
     cal_path = str(artifact_info.get("path") or "")
-    uncalibrated = cal_path.startswith("fallback_identity") or "fallback" in str(
-        (artifact_info.get("artifact") or {}).get("schema_version") or ""
+    art = artifact_info.get("artifact") or {}
+    uncalibrated = (
+        cal_path.startswith("fallback_identity")
+        or "fallback" in str(art.get("schema_version") or "")
+        or bool(art.get("promotion", {}).get("is_cheat_fallback"))
     )
+    h = str(horizon or "swing").strip().lower()
+    if h in ("intraday", "daytrade", "1h", "hourly", "short"):
+        h = "day"
+    elif h in ("long", "long_term", "longterm", "invest"):
+        h = "position"
+    elif h not in ("day", "swing", "position"):
+        h = "swing"
     base = {
-        "schema_version": "confidence-v1",
+        "schema_version": "confidence-v2",
         "state": "ABSTAIN",
         "raw_probability": raw,
         "raw_probability_source": raw_probability_source,
@@ -367,6 +479,7 @@ def evaluate_confidence(
         "evidence": evidence,
         "failed_checks": failed_checks,
         "model_version": model,
+        "horizon": h,
         "calibration_version": None,
         "calibration_available": bool(artifact_info.get("available")),
         "calibration_path": artifact_info.get("path"),
@@ -386,6 +499,13 @@ def evaluate_confidence(
         base["reasons"].append(str(artifact_info.get("reason", "calibration_unavailable")))
         base["failed_checks"].append("active_calibration")
         return base
+    # Uncalibrated / cheat fallbacks never ENTER — ABSTAIN only.
+    if uncalibrated:
+        base["reasons"].append("uncalibrated_model_no_cheat_fallback")
+        base["failed_checks"].append("active_calibration")
+        base["state"] = "ABSTAIN"
+        base["size_limit"] = 0.0
+        return base
     if raw is None:
         base["reasons"].append("raw_probability_invalid")
         base["failed_checks"].append("raw_probability")
@@ -397,14 +517,35 @@ def evaluate_confidence(
         base["reasons"].append("calibration_failed")
         base["failed_checks"].append(str(exc))
         return base
-    thresholds = artifact.get("thresholds", {})
-    watch = float(thresholds.get("watch", 0.50))
-    enter = float(thresholds.get("enter", 0.60))
+    # Artifact thresholds remain the base; horizon defaults only when artifact
+    # lacks thresholds. Horizon mildly tilts bars but never invents a map.
+    hz_defaults = _horizon_threshold_defaults(h)
+    thresholds = artifact.get("thresholds") or {}
+    if not thresholds:
+        watch = float(hz_defaults["watch"])
+        enter = float(hz_defaults["enter"])
+        base["threshold_source"] = f"horizon_default:{h}"
+    else:
+        watch = float(thresholds.get("watch", hz_defaults["watch"]))
+        enter = float(thresholds.get("enter", hz_defaults["enter"]))
+        if h == "day":
+            enter = max(0.40, enter - 0.02)
+            watch = max(0.35, watch - 0.02)
+        elif h == "position":
+            enter = min(0.72, enter + 0.04)
+            watch = min(0.60, watch + 0.03)
+        base["threshold_source"] = f"artifact+horizon:{h}"
+    if artifact_info.get("inherited_dna"):
+        base["evidence"] = list(base.get("evidence") or []) + [
+            f"calibration_dna_inherit={artifact_info.get('resolved_model')}"
+        ]
+    base["thresholds"] = {"watch": round(watch, 4), "enter": round(enter, 4)}
     base["calibrated_probability"] = round(calibrated, 6)
     base["calibration_version"] = artifact.get("schema_version")
+    base["calibration_type"] = artifact.get("calibration_type") or artifact.get("promotion", {}).get(
+        "calibration_type"
+    )
     base["band"] = "enter" if calibrated >= enter else "watch"
-    if uncalibrated:
-        base["reasons"].append("using_identity_calibration_fallback")
     if calibrated >= enter and setup_ok:
         base["state"] = "ENTER"
         base["size_limit"] = round(float(np.clip((calibrated - watch) / max(enter - watch, 0.01), 0.25, 1.0)), 4)

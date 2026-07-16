@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { ListChecks } from "lucide-react";
-import type { ApiEnvelope, OptionsPlanResponse } from "@/lib/types";
+import type { ApiEnvelope, OptionsPlanResponse, UnusualOptionsFlag } from "@/lib/types";
 import { formatNum, formatUsd } from "@/lib/format";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { analyzeHref, liveHref } from "@/lib/routes";
@@ -12,6 +12,140 @@ import { Chip } from "@/components/ui/Chip";
 import { EmptyState } from "@/components/ui/EmptyState";
 import { Stat } from "@/components/ui/Stat";
 import { colorVarFor } from "@/lib/actionColors";
+
+function severityColor(severity: string | undefined): string {
+  if (severity === "high") return "var(--td-action-avoid)";
+  if (severity === "watch") return "var(--td-action-breakout-watch)";
+  return "var(--td-ink-500)";
+}
+
+function UnusualFlowPanel({
+  flags,
+  error,
+  note,
+  nScanned,
+  asof,
+}: {
+  flags: UnusualOptionsFlag[];
+  error?: string | null;
+  note?: string | null;
+  nScanned?: number;
+  asof?: string | null;
+}) {
+  return (
+    <section className="td-panel flex flex-col gap-3 p-5">
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <span className="td-label">Unusual options flow · same day</span>
+          <p className="text-[12px]" style={{ color: "var(--td-ink-500)" }}>
+            Chain volume / OI / premium pressure (not OPRA prints). Flags contracts that look
+            unusually active vs open interest or size.
+          </p>
+        </div>
+        <Chip
+          label={
+            flags.length > 0
+              ? `${flags.length} flag${flags.length === 1 ? "" : "s"}`
+              : "no flags"
+          }
+          colorVar={
+            flags.length > 0
+              ? colorVarFor("mode", "WAIT")
+              : colorVarFor("mode", "STAND_ASIDE")
+          }
+        />
+      </div>
+
+      {error ? (
+        <p className="text-[12px]" style={{ color: "var(--td-action-breakout-watch)" }}>
+          Flow scanner partial: {error.slice(0, 180)}
+        </p>
+      ) : null}
+
+      {flags.length === 0 && !error ? (
+        <p className="text-[13px]" style={{ color: "var(--td-ink-400)" }}>
+          No unusual flow on the latest chain snapshot
+          {nScanned != null ? ` (${nScanned} contracts scanned)` : ""}.
+        </p>
+      ) : null}
+
+      {flags.length > 0 ? (
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-[12px]">
+            <thead>
+              <tr style={{ color: "var(--td-ink-500)" }}>
+                <th className="py-1 pr-3 font-medium">Contract</th>
+                <th className="py-1 pr-3 font-medium">Vol / OI</th>
+                <th className="py-1 pr-3 font-medium">Premium</th>
+                <th className="py-1 pr-3 font-medium">Score</th>
+                <th className="py-1 font-medium">Why unusual</th>
+              </tr>
+            </thead>
+            <tbody>
+              {flags.map((f) => {
+                const key = `${f.expiry}-${f.right}-${f.strike}-${f.score}`;
+                const border = severityColor(f.severity);
+                return (
+                  <tr
+                    key={key}
+                    style={{
+                      color: "var(--td-ink-100)",
+                      borderTop: "1px solid var(--td-line)",
+                    }}
+                  >
+                    <td
+                      className="py-1.5 pr-3 tabular"
+                      style={{ fontFamily: "var(--td-font-mono)" }}
+                    >
+                      <span style={{ color: border, fontWeight: 600 }}>
+                        {f.right}
+                        {formatNum(f.strike)}
+                      </span>{" "}
+                      <span style={{ color: "var(--td-ink-500)" }}>
+                        {f.expiry}
+                        {f.dte != null ? ` · ${f.dte}d` : ""}
+                      </span>
+                    </td>
+                    <td className="py-1.5 pr-3 tabular">
+                      {formatNum(f.volume, 0)}
+                      {f.open_interest != null
+                        ? ` / ${formatNum(f.open_interest, 0)}`
+                        : ""}
+                      {f.vol_oi != null ? (
+                        <span style={{ color: "var(--td-ink-500)" }}>
+                          {" "}
+                          ({formatNum(f.vol_oi, 1)}x)
+                        </span>
+                      ) : null}
+                    </td>
+                    <td className="py-1.5 pr-3 tabular">
+                      {f.premium != null ? formatUsd(f.premium, 0) : "—"}
+                    </td>
+                    <td
+                      className="py-1.5 pr-3 tabular"
+                      style={{ color: border, fontFamily: "var(--td-font-mono)" }}
+                    >
+                      {formatNum(f.score, 1)}
+                    </td>
+                    <td className="py-1.5" style={{ color: "var(--td-ink-400)" }}>
+                      {f.reason || (f.reasons ?? []).slice(0, 3).join(" · ")}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+
+      <p className="text-[11px]" style={{ color: "var(--td-ink-500)" }}>
+        {note ||
+          "Proxy from listed chain aggregates — not multi-exchange sweeps or dark-pool tape."}
+        {asof ? ` · as-of ${asof}` : ""}
+      </p>
+    </section>
+  );
+}
 
 function OptionsDeskInner({ showHeader = true }: { showHeader?: boolean }) {
   const searchParams = useSearchParams();
@@ -64,8 +198,8 @@ function OptionsDeskInner({ showHeader = true }: { showHeader?: boolean }) {
   );
 
   useEffect(() => {
-    if (!qSymbol) return;
-    void run(qSymbol);
+    // Deep-link or default symbol — always pull the live chain so the board is not empty.
+    void run(qSymbol || symbol);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [qSymbol]);
 
@@ -78,7 +212,7 @@ function OptionsDeskInner({ showHeader = true }: { showHeader?: boolean }) {
     <>
       {showHeader && <PageHeader
         title="Options"
-        description="Structure + risk mode + what to do. Live strikes from the picker; v22 robust is research only."
+        description="Unusual same-day flow flags + defined-risk structure ticket. Flow is chain-proxy research; never auto-trades."
         actions={
           symbol ? (
             <div className="flex flex-wrap gap-2">
@@ -90,6 +224,9 @@ function OptionsDeskInner({ showHeader = true }: { showHeader?: boolean }) {
               </Link>
               <Link href={liveHref(symbol, "ticket", account)} className="td-btn td-btn-ghost no-underline">
                 Live
+              </Link>
+              <Link href={liveHref(symbol, "gamma", account)} className="td-btn td-btn-ghost no-underline">
+                Gamma
               </Link>
             </div>
           ) : null
@@ -133,12 +270,12 @@ function OptionsDeskInner({ showHeader = true }: { showHeader?: boolean }) {
             disabled={loading || !symbol.trim()}
             className="td-btn td-btn-primary"
           >
-            {loading ? "Planning…" : "Plan options"}
+            {loading ? "Loading live feed…" : "Load live options feed"}
           </button>
         </div>
         <p className="text-[11px]" style={{ color: "var(--td-ink-500)" }}>
-          Prefer APLD / IONQ on small books · avoid MU ATM weeklies · default bull call debit
-          spread 14–45 DTE
+          Pulls the live chain + risk mode + a defined-risk structure. Prefer APLD / IONQ on small
+          books · avoid MU ATM weeklies · default bull call debit spread 14–45 DTE
         </p>
       </section>
 
@@ -152,14 +289,24 @@ function OptionsDeskInner({ showHeader = true }: { showHeader?: boolean }) {
         <section className="td-panel p-5">
           <EmptyState
             icon={ListChecks}
-            title="No structure yet"
+            title="No live options feed yet"
             steps={[
-              "Enter symbol (start with APLD or IONQ)",
-              "Plan options → read mode + do next",
-              "Only size when mode is OPTIONS_ATTACK and structure is buy",
+              "Enter a symbol (start with APLD or IONQ)",
+              "Press Load live options feed",
+              "Read risk mode + structure — only size when mode is OPTIONS_ATTACK and structure is buy",
             ]}
           />
         </section>
+      ) : null}
+
+      {plan ? (
+        <UnusualFlowPanel
+          flags={plan.unusual_flow?.flags ?? plan.unusual_flow?.unusual ?? []}
+          error={plan.unusual_flow_error ?? plan.unusual_flow?.error}
+          note={plan.unusual_flow?.methodology_note}
+          nScanned={plan.unusual_flow?.n_scanned}
+          asof={plan.unusual_flow?.asof_utc ?? plan.asof_utc}
+        />
       ) : null}
 
       {plan ? (
@@ -193,9 +340,22 @@ function OptionsDeskInner({ showHeader = true }: { showHeader?: boolean }) {
               <Stat label="Vehicle" value={plan.vehicle} />
               <Stat
                 label="Go long"
-                value={plan.live?.go_long == null ? "—" : String(plan.live.go_long)}
+                value={
+                  plan.live?.go_long == null
+                    ? "—"
+                    : plan.live.go_long
+                      ? "yes"
+                      : "no"
+                }
               />
-              <Stat label="Vol z" value={formatNum(plan.live?.vol_z, 2)} />
+              <Stat
+                label="Risk budget"
+                value={
+                  structure?.budget != null
+                    ? formatUsd(structure.budget, 0)
+                    : formatUsd((plan.account ?? account) * (riskPct / 100), 0)
+                }
+              />
               <Stat
                 label="Macro"
                 value={
@@ -267,25 +427,59 @@ function OptionsDeskInner({ showHeader = true }: { showHeader?: boolean }) {
                     Attack mode + buy structure — defined-risk size within budget.
                   </p>
                 )}
-                <div
-                  className="grid grid-cols-2 gap-2 text-[13px]"
-                  style={{ color: "var(--td-ink-200)" }}
-                >
-                  <span>
-                    Expiry {structure?.expiry} ({structure?.dte}d)
-                  </span>
-                  <span>Δ {formatNum(structure?.long_delta, 2)}</span>
-                  <span>Long {structure?.long_strike}</span>
-                  <span>Short {structure?.short_strike ?? "—"}</span>
-                  <span>Debit {formatUsd(structure?.debit_per_share)}</span>
-                  <span>Max loss {formatUsd(structure?.max_loss_1_contract, 0)}</span>
-                  <span>Budget {formatUsd(structure?.budget, 0)}</span>
-                  <span>
-                    IV{" "}
-                    {structure?.iv_long != null
-                      ? `${(structure.iv_long * 100).toFixed(0)}%`
-                      : "—"}
-                  </span>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-2">
+                  <Stat
+                    label="Expiry (chain)"
+                    value={
+                      structure?.expiry
+                        ? `${structure.expiry}${structure.dte != null ? ` · ${structure.dte}d` : ""}`
+                        : "—"
+                    }
+                    emphasize
+                  />
+                  <Stat
+                    label="Max loss / 1"
+                    value={formatUsd(structure?.max_loss_1_contract, 0)}
+                    emphasize
+                  />
+                  <Stat label="Long strike" value={structure?.long_strike != null ? formatNum(structure.long_strike) : "—"} />
+                  <Stat
+                    label="Short strike"
+                    value={
+                      structure?.short_strike != null
+                        ? formatNum(structure.short_strike)
+                        : "—"
+                    }
+                  />
+                  <Stat label="Debit / sh" value={formatUsd(structure?.debit_per_share)} />
+                  <Stat
+                    label="Contracts fit"
+                    value={
+                      structure?.contracts != null
+                        ? String(structure.contracts)
+                        : structure?.budget != null &&
+                            structure?.max_loss_1_contract != null &&
+                            structure.max_loss_1_contract > 0
+                          ? String(
+                              Math.max(
+                                0,
+                                Math.floor(
+                                  structure.budget / structure.max_loss_1_contract,
+                                ),
+                              ),
+                            )
+                          : "—"
+                    }
+                  />
+                  <Stat label="Long Δ" value={formatNum(structure?.long_delta, 2)} />
+                  <Stat
+                    label="Long IV"
+                    value={
+                      structure?.iv_long != null
+                        ? `${(structure.iv_long * 100).toFixed(0)}%`
+                        : "—"
+                    }
+                  />
                 </div>
                 {(structure?.warnings ?? []).map((w) => (
                   <p
@@ -327,13 +521,210 @@ function OptionsDeskInner({ showHeader = true }: { showHeader?: boolean }) {
       ) : null}
 
       {plan ? (
+        <section className="td-panel flex flex-col gap-3 p-5">
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <span className="td-label">Live options insights · research only</span>
+              <p className="text-[12px]" style={{ color: "var(--td-ink-500)" }}>
+                Live chain flow + ATM IV vs realized vol. Warnings only — never sets OPTIONS_ATTACK alone.
+              </p>
+            </div>
+            {plan.vol_package?.recommended ? (
+              <Chip
+                label={`${plan.vol_package.recommended.template} · ${plan.vol_package.recommended.action}`}
+                colorVar={
+                  plan.vol_package.recommended.action === "consider"
+                    ? colorVarFor("mode", "WAIT")
+                    : colorVarFor("mode", "STAND_ASIDE")
+                }
+              />
+            ) : null}
+          </div>
+
+          {plan.vol_package_error ? (
+            <p className="text-[12px]" style={{ color: "var(--td-action-breakout-watch)" }}>
+              Vol scorer partial: {plan.vol_package_error.slice(0, 180)}
+            </p>
+          ) : null}
+
+          {(plan.vol_package?.warnings ?? []).length > 0 ? (
+            <div className="flex flex-col gap-2">
+              {(plan.vol_package?.warnings ?? []).map((w) => {
+                const border =
+                  w.severity === "danger"
+                    ? "var(--td-action-avoid)"
+                    : w.severity === "watch"
+                      ? "var(--td-action-breakout-watch)"
+                      : "var(--td-line)";
+                const bg =
+                  w.severity === "danger"
+                    ? "color-mix(in srgb, var(--td-action-avoid) 12%, transparent)"
+                    : w.severity === "watch"
+                      ? "color-mix(in srgb, var(--td-action-breakout-watch) 10%, transparent)"
+                      : "transparent";
+                return (
+                  <div
+                    key={`${w.code}-${w.message.slice(0, 24)}`}
+                    className="rounded px-3 py-2 text-[13px] leading-snug"
+                    style={{
+                      borderLeft: `3px solid ${border}`,
+                      background: bg,
+                      color: "var(--td-ink-100)",
+                    }}
+                    role={w.severity === "danger" ? "alert" : "status"}
+                  >
+                    <span
+                      className="mr-2 text-[10px] font-semibold uppercase tracking-wide"
+                      style={{
+                        color: border,
+                        fontFamily: "var(--td-font-mono)",
+                      }}
+                    >
+                      {w.severity}
+                    </span>
+                    {w.message}
+                  </div>
+                );
+              })}
+            </div>
+          ) : null}
+
+          {plan.vol_package?.features ? (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <Stat
+                label="ATM IV"
+                value={
+                  plan.vol_package.features.atm_iv != null &&
+                  Number.isFinite(plan.vol_package.features.atm_iv)
+                    ? `${(plan.vol_package.features.atm_iv * 100).toFixed(1)}%`
+                    : "—"
+                }
+              />
+              <Stat
+                label="Realized vol"
+                value={
+                  plan.vol_package.features.rv_har_ann != null &&
+                  Number.isFinite(plan.vol_package.features.rv_har_ann)
+                    ? `${(plan.vol_package.features.rv_har_ann * 100).toFixed(1)}%`
+                    : "—"
+                }
+              />
+              <Stat
+                label="IV vs RV"
+                value={
+                  plan.vol_package.features.iv_rv_spread != null &&
+                  Number.isFinite(plan.vol_package.features.iv_rv_spread)
+                    ? `${plan.vol_package.features.iv_rv_spread > 0 ? "rich +" : "cheap "}${(Math.abs(plan.vol_package.features.iv_rv_spread) * 100).toFixed(1)} pts`
+                    : "—"
+                }
+              />
+              <Stat
+                label="Spot 5d"
+                value={
+                  plan.vol_package.features.spot_ret_5d != null &&
+                  Number.isFinite(plan.vol_package.features.spot_ret_5d)
+                    ? `${plan.vol_package.features.spot_ret_5d >= 0 ? "+" : ""}${(plan.vol_package.features.spot_ret_5d * 100).toFixed(1)}%`
+                    : "—"
+                }
+              />
+              <Stat
+                label="Put/Call vol"
+                value={
+                  plan.vol_package.features.put_call_vol_ratio != null &&
+                  Number.isFinite(plan.vol_package.features.put_call_vol_ratio)
+                    ? `${plan.vol_package.features.put_call_vol_ratio.toFixed(2)}x`
+                    : "—"
+                }
+              />
+              <Stat
+                label="Put/Call OI"
+                value={
+                  plan.vol_package.features.put_call_oi_ratio != null &&
+                  Number.isFinite(plan.vol_package.features.put_call_oi_ratio)
+                    ? `${plan.vol_package.features.put_call_oi_ratio.toFixed(2)}x`
+                    : "—"
+                }
+              />
+              <Stat
+                label="Put vol"
+                value={
+                  plan.vol_package.features.put_volume != null
+                    ? formatNum(plan.vol_package.features.put_volume, 0)
+                    : "—"
+                }
+              />
+              <Stat
+                label="Call vol"
+                value={
+                  plan.vol_package.features.call_volume != null
+                    ? formatNum(plan.vol_package.features.call_volume, 0)
+                    : "—"
+                }
+              />
+            </div>
+          ) : !plan.vol_package_error ? (
+            <p className="text-[13px]" style={{ color: "var(--td-ink-400)" }}>
+              No live chain insights yet.
+            </p>
+          ) : null}
+
+          {(plan.vol_package?.packages ?? []).length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-[12px]">
+                <thead>
+                  <tr style={{ color: "var(--td-ink-500)" }}>
+                    <th className="py-1 pr-3 font-medium">Template</th>
+                    <th className="py-1 pr-3 font-medium">Action</th>
+                    <th className="py-1 pr-3 font-medium">Score</th>
+                    <th className="py-1 pr-3 font-medium">Edge−cost</th>
+                    <th className="py-1 font-medium">Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(plan.vol_package?.packages ?? []).map((pkg) => (
+                    <tr
+                      key={pkg.template}
+                      style={{
+                        color:
+                          pkg.action === "consider"
+                            ? "var(--td-ink-100)"
+                            : "var(--td-ink-300)",
+                        borderTop: "1px solid var(--td-line)",
+                      }}
+                    >
+                      <td
+                        className="py-1.5 pr-3 tabular"
+                        style={{ fontFamily: "var(--td-font-mono)" }}
+                      >
+                        {pkg.template}
+                      </td>
+                      <td className="py-1.5 pr-3">{pkg.action}</td>
+                      <td className="py-1.5 pr-3 tabular">
+                        {formatNum(pkg.score, 2)}
+                      </td>
+                      <td className="py-1.5 pr-3 tabular">
+                        {formatNum(pkg.edge_after_cost_proxy ?? null, 3)}
+                      </td>
+                      <td className="py-1.5" style={{ color: "var(--td-ink-500)" }}>
+                        {(pkg.reasons ?? []).slice(0, 2).join(" · ")}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
+      {plan ? (
         <div className="grid gap-4 lg:grid-cols-2">
           <section className="td-panel p-4">
             <h2
               className="mb-2 text-[14px] font-medium"
               style={{ color: "var(--td-ink-100)" }}
             >
-              Playbook ($1k)
+              Operator rules
             </h2>
             <p className="mb-2 text-[12px]" style={{ color: "var(--td-ink-400)" }}>
               {plan.playbook.account_fit}
@@ -347,8 +738,8 @@ function OptionsDeskInner({ showHeader = true }: { showHeader?: boolean }) {
               ))}
             </ul>
             <p className="mt-3 text-[11px]" style={{ color: "var(--td-ink-500)" }}>
-              Preferred: {plan.playbook.preferred.join(", ")} · Avoid ATM:{" "}
-              {plan.playbook.avoid_atm.join(", ")}
+              Preferred names: {plan.playbook.preferred.join(", ")} · Avoid ATM weeklies:{" "}
+              {plan.playbook.avoid_atm.join(", ") || "—"}
             </p>
           </section>
 
@@ -357,13 +748,18 @@ function OptionsDeskInner({ showHeader = true }: { showHeader?: boolean }) {
               className="mb-2 text-[14px] font-medium"
               style={{ color: "var(--td-ink-100)" }}
             >
-              Research · v22
+              How this ticket is built
             </h2>
             <p className="text-[13px] leading-snug" style={{ color: "var(--td-ink-300)" }}>
               {plan.research.note}
             </p>
             <p className="mt-2 text-[12px]" style={{ color: "var(--td-ink-400)" }}>
-              Recommended research variant:{" "}
+              OPTIONS_WINNER:{" "}
+              <strong style={{ color: "var(--td-ink-200)" }}>
+                {plan.research.options_winner ?? "v35_softstruct_bag8"}
+              </strong>
+              {" · "}
+              robust:{" "}
               <strong style={{ color: "var(--td-ink-200)" }}>
                 {plan.research.v22_variant}
               </strong>

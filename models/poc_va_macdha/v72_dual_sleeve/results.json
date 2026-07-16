@@ -1,0 +1,30 @@
+{
+  "portfolio": {
+    "total_return": 5.130840257116102,
+    "max_drawdown": -0.19374013561049352,
+    "sharpe": 3.077910101661029,
+    "trade_count": 179,
+    "win_rate": 0.7206703910614525,
+    "final_value": 6130.840257116101
+  },
+  "holdout": {
+    "total_return": 0.8161378708307736,
+    "max_drawdown": -0.19590204740623737,
+    "sharpe": 2.1988207636383037,
+    "trade_count": 84,
+    "win_rate": 0.6547619047619048,
+    "final_value": 1816.1378708307736
+  },
+  "promoted": true,
+  "codes": [
+    "TSLA.US",
+    "MU.US",
+    "SPY.US",
+    "IONQ.US",
+    "APLD.US",
+    "XLP.US",
+    "QQQ.US"
+  ],
+  "start": "2024-08-01",
+  "end": "2026-07-11"
+}

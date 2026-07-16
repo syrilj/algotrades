@@ -1,31 +1,44 @@
 import { NextResponse } from "next/server";
 
 import { sanitizeSymbol } from "@/lib/format";
-import { runLivePlan, runOptionsPicker } from "@/lib/tradeDesk";
-import type { ApiEnvelope, LivePlanResponse, OptionsPlanResponse } from "@/lib/types";
+import {
+  runLivePlan,
+  runOptionsPicker,
+  runOptionsUnusualFlow,
+  runVolPackageScore,
+} from "@/lib/tradeDesk";
+import type {
+  ApiEnvelope,
+  LivePlanResponse,
+  OptionsPlanResponse,
+  UnusualOptionsFlow,
+  VolPackageScore,
+} from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
 const PLAYBOOK = {
-  account_fit: "$1k-style book: max risk ~10–15% premium per idea, prefer 1 structure at a time.",
-  default_structure: "ATM long call ~21 DTE (OOS default). Spreads if capital / IV requires.",
-  preferred: ["IONQ", "AVGO", "HOOD", "MU", "APLD"],
-  avoid_atm: [] as string[],
+  account_fit:
+    "Small book: risk only the debit you can lose on one structure. Prefer 1 defined-risk spread at a time.",
+  default_structure:
+    "Default: bull call debit spread, ~14–45 DTE. Single long call only if max loss fits the risk budget.",
+  preferred: ["IONQ", "APLD", "AVGO", "HOOD", "TSLA"],
+  avoid_atm: ["MU"],
   rules: [
-    "Equity SIDE / size = WINNER (v39b_live_adapt) via live_plan — react to nodes + VPA.",
-    "Options structure = OPTIONS_WINNER (v29/v32 path) + options_picker — never naked short premium.",
-    "Skip 0–3 DTE lottery; prefer ~21 DTE ATM so theta/side DNA can work.",
-    "FOMC day + elevated VIX → no new risk.",
-    "Paper closes feed live_adapt size mult for next tickets (IB-ready LAST_TICKET.json).",
-    "Live structure still goes through options_picker + risk_manager gates.",
+    "Only size when mode is OPTIONS_ATTACK and structure action is buy.",
+    "Defined risk only — never naked short premium on a small account.",
+    "Skip 0–3 DTE lottery tickets; target ~2–6 weeks so the trade has time to work.",
+    "Cut losers early (−30% of premium). Trail after +40%. Flat by ~5 DTE.",
+    "No new risk on FOMC day or when VIX is elevated and the book is already hot.",
+    "Vol package scores are research context only — they never green-light a trade alone.",
   ],
-  live_variant: "v29_coldstart_opts",
-  equity_winner: "v39b_live_adapt",
+  live_variant: "v35_softstruct_bag8",
+  equity_winner: "v72_dual_sleeve",
   live_engine_note:
-    "Equity: WINNER v39b_live_adapt. Options OOS champion: v29_coldstart_opts / OPTIONS_WINNER.json. Desk does not auto-route to IB.",
-  oos_artifact: "runs/poc_va_v29_oos_challenge/REPORT.md",
+    "Side and size still come from the live equity ticket. Options structure is a defined-risk proposal from the options picker. Desk does not auto-send to IB.",
+  oos_artifact: "models/poc_va_macdha/OPTIONS_WINNER.json",
   ib_ticket_path: "runs/live_adapt/LAST_TICKET.json",
 };
 
@@ -131,6 +144,30 @@ export async function POST(req: Request) {
     );
   }
 
+  // Research-only vol package scores (partial failure OK).
+  let volPackage: VolPackageScore | null = null;
+  let volPackageError: string | null = null;
+  try {
+    volPackage = (await runVolPackageScore(
+      ["--symbol", symbol],
+      90_000,
+    )) as VolPackageScore;
+  } catch (e) {
+    volPackageError = e instanceof Error ? e.message : String(e);
+  }
+
+  // Same-day unusual options flags from chain aggregates (partial failure OK).
+  let unusualFlow: UnusualOptionsFlow | null = null;
+  let unusualFlowError: string | null = null;
+  try {
+    unusualFlow = (await runOptionsUnusualFlow(
+      ["--symbol", symbol, "--max-expiries", "6", "--max-dte", "45", "--top", "20"],
+      90_000,
+    )) as UnusualOptionsFlow;
+  } catch (e) {
+    unusualFlowError = e instanceof Error ? e.message : String(e);
+  }
+
   const ticket = live?.ticket;
   const mode = ticket?.mode ?? live?.decision?.mode ?? "STAND_ASIDE";
   const vehicle = ticket?.vehicle ?? live?.decision?.vehicle ?? "none";
@@ -173,6 +210,33 @@ export async function POST(req: Request) {
     doNext.push("Re-scan Live book or pick a preferred options name (APLD / IONQ).");
   }
 
+  const rec = volPackage?.recommended;
+  const dangerWarnings = (volPackage?.warnings ?? []).filter(
+    (w) => w.severity === "danger" || w.severity === "watch",
+  );
+  for (const w of dangerWarnings.slice(0, 3)) {
+    doNext.push(`WARN: ${w.message}`);
+  }
+  if (rec && rec.action === "consider" && rec.template) {
+    doNext.push(
+      `Vol research: ${rec.template} scored consider (edge proxy ${rec.edge_after_cost_proxy ?? "—"}) — not a live attack signal.`,
+    );
+  } else if (volPackageError) {
+    doNext.push("Vol package scorer unavailable — directional structure path still valid.");
+  }
+
+  const topFlags = unusualFlow?.flags ?? unusualFlow?.unusual ?? [];
+  if (topFlags.length > 0) {
+    const head = topFlags[0];
+    doNext.push(
+      `Unusual flow: ${topFlags.length} flag(s) — top ${head.right}${head.strike} ${head.expiry} (${head.reason || head.reasons?.slice(0, 2).join("; ") || "chain pressure"}).`,
+    );
+  } else if (unusualFlow && unusualFlow.ok && topFlags.length === 0) {
+    doNext.push("No unusual options flow flagged on the latest chain snapshot.");
+  } else if (unusualFlowError) {
+    doNext.push("Unusual flow scanner unavailable — structure ticket still valid.");
+  }
+
   const data: OptionsPlanResponse = {
     ok: true,
     symbol,
@@ -187,11 +251,17 @@ export async function POST(req: Request) {
     structure,
     structure_error: structureError,
     live_error: liveError,
+    vol_package: volPackage,
+    vol_package_error: volPackageError,
+    unusual_flow: unusualFlow,
+    unusual_flow_error: unusualFlowError,
     playbook: PLAYBOOK,
     research: {
       v22_variant: "v22_robust_conservative",
       robust_path: "/robust",
       note: PLAYBOOK.live_engine_note,
+      options_winner: "v35_softstruct_bag8",
+      vol_program: "docs/plans/2026-07-15-options-vol-research-to-production.md",
     },
     asof_utc: live?.asof_utc ?? new Date().toISOString(),
   };

@@ -544,6 +544,8 @@ def compute_gamma_exposure_oi(
         "lse_error": lse_err,
         "options_asof": options_asof,
         "asof_utc": datetime.now(timezone.utc).isoformat(),
+        # Full listed chain dates from the provider (for desk date pickers).
+        "available_expiries": list(expiries_all),
         "expiries_used": expiries,
         "net_dealer_gex": net_dealer,
         "near_spot_dealer_gex": near_net,
@@ -768,6 +770,7 @@ def compute_gamma_exposure_lse(
     )
 
     # Compute max pain using the contract-equivalent weights for the nearest expiry.
+    max_pain = None
     if "dte" in df.columns and df["dte"].notna().any():
         min_dte = int(df["dte"].min())
         pain_df = df[df["dte"] == min_dte]
@@ -784,6 +787,19 @@ def compute_gamma_exposure_lse(
             sorted(pain_df["strike"].unique()),
         )
 
+    # Listed expiries from the live chain (provider field names vary).
+    available_expiries: list[str] = []
+    if expiry_col is not None and expiry_col in chain.columns:
+        exp_dates = (
+            pd.to_datetime(chain[expiry_col], errors="coerce", utc=True)
+            .dt.tz_localize(None)
+            .dt.normalize()
+            .dropna()
+            .sort_values()
+            .unique()
+        )
+        available_expiries = [pd.Timestamp(x).strftime("%Y-%m-%d") for x in exp_dates]
+
     return {
         "symbol": sym,
         "spot": spot,
@@ -792,7 +808,8 @@ def compute_gamma_exposure_lse(
         "lse_error": lse_err,
         "options_asof": options_asof,
         "asof_utc": datetime.now(timezone.utc).isoformat(),
-        "expiries_used": [lse_sym],
+        "available_expiries": available_expiries,
+        "expiries_used": available_expiries[:4] if available_expiries else ([lse_sym] if lse_sym else []),
         "net_dealer_gex": net_dealer,
         "near_spot_dealer_gex": near_net,
         "gex_sign": gex_sign,

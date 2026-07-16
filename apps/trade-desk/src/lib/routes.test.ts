@@ -59,10 +59,14 @@ check("live modes resolve + preserve deep links", () => {
   assert.equal(gammaHref("tsla"), "/live?mode=gamma&symbol=TSLA");
   assert.equal(liveHref("nvda", "bias"), "/live?mode=bias&symbol=NVDA");
   assert.equal(liveHref(undefined, "picks"), "/live?mode=picks");
-  assert.equal(liveHubTabs("TSLA", 1000).length, 7);
+  assert.equal(resolveLiveMode("flow"), "flow");
+  assert.equal(resolveLiveMode("money-flow"), "flow");
+  assert.equal(resolveLiveMode("rotation"), "flow");
+  assert.equal(liveHref(undefined, "flow"), "/live?mode=flow");
+  assert.equal(liveHubTabs("TSLA", 1000).length, 8);
   assert.equal(
     liveHubTabs().map((t) => t.key).join(","),
-    "bias,picks,supply-chain,watch,ticket,options,gamma",
+    "bias,flow,picks,supply-chain,watch,ticket,options,gamma",
   );
 });
 

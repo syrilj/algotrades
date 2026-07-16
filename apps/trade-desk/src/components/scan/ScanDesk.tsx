@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import { analyzeHref, optionsHref } from "@/lib/routes";
+import { analyzeHref, moneyFlowHref, optionsHref } from "@/lib/routes";
 import Link from "next/link";
 
 export type ScanFlagMap = Record<string, boolean | undefined>;
@@ -223,6 +223,9 @@ function SectorPanel({ sectors }: { sectors: SectorBlock }) {
     <section className="scan-sectors">
       <header className="scan-panel__head">
         <h2 className="scan-panel__title">Weekly sector RS vs SPY</h2>
+        <Link href={moneyFlowHref()} className="scan-sym" style={{ fontSize: "0.75rem" }}>
+          Full money flow →
+        </Link>
       </header>
       {sectors.narrative?.length ? (
         <ul className="scan-narrative">

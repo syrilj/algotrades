@@ -498,6 +498,106 @@ export interface RiskAssessmentResponse {
   asof_utc: string;
 }
 
+/** Research-only vol package score from tools/vol_package_score.py */
+export interface VolPackageTemplate {
+  template: string;
+  score: number;
+  edge_after_cost_proxy?: number | null;
+  action: "consider" | "stand_aside" | "avoid" | string;
+  reasons?: string[];
+}
+
+export interface VolPackageWarning {
+  severity: "info" | "watch" | "danger" | string;
+  code: string;
+  message: string;
+}
+
+export interface VolPackageScore {
+  ok: boolean;
+  symbol?: string;
+  features?: {
+    symbol?: string;
+    spot?: number;
+    rv_har_ann?: number;
+    rv_5d_ann?: number;
+    rv_21d_ann?: number;
+    atm_iv?: number;
+    iv_rv_spread?: number;
+    term_slope?: number;
+    skew_25d?: number;
+    near_dte?: number | null;
+    next_dte?: number | null;
+    call_volume?: number;
+    put_volume?: number;
+    call_oi?: number;
+    put_oi?: number;
+    put_call_vol_ratio?: number;
+    put_call_oi_ratio?: number;
+    spot_ret_1d?: number;
+    spot_ret_5d?: number;
+    data_quality?: string;
+    reasons?: string[];
+  };
+  packages?: VolPackageTemplate[];
+  recommended?: {
+    template: string;
+    action: string;
+    score?: number;
+    edge_after_cost_proxy?: number | null;
+    reasons?: string[];
+  };
+  warnings?: VolPackageWarning[];
+  guardrails?: {
+    max_risk_pct?: number;
+    cost_proxy_vol?: number;
+    research_only?: boolean;
+    auto_trade?: boolean;
+    does_not_set_options_attack?: boolean;
+  };
+  asof_utc?: string;
+  error?: string;
+}
+
+/** Single unusual options print/flag from chain-aggregate proxy (not OPRA tape). */
+export interface UnusualOptionsFlag {
+  symbol: string;
+  expiry: string;
+  dte: number;
+  right: "C" | "P" | string;
+  strike: number;
+  spot?: number;
+  volume: number;
+  open_interest?: number;
+  vol_oi?: number | null;
+  mid?: number | null;
+  premium?: number | null;
+  iv?: number | null;
+  moneyness_pct?: number | null;
+  score: number;
+  severity?: "high" | "watch" | "info" | string;
+  reasons: string[];
+  reason?: string;
+  unusual?: boolean;
+  methodology?: string;
+}
+
+export interface UnusualOptionsFlow {
+  ok: boolean;
+  symbol: string;
+  spot?: number;
+  n_scanned?: number;
+  n_flagged?: number;
+  flags: UnusualOptionsFlag[];
+  unusual?: UnusualOptionsFlag[];
+  methodology?: string;
+  methodology_note?: string;
+  asof_utc?: string;
+  session_label?: string;
+  error?: string;
+  expiries_used?: string[];
+}
+
 export interface OptionsPlanResponse {
   ok: boolean;
   symbol: string;
@@ -512,11 +612,19 @@ export interface OptionsPlanResponse {
   structure?: OptionsStructure | null;
   structure_error?: string | null;
   live_error?: string | null;
+  /** IV–RV package scores; null if scorer failed (directional plan still valid). */
+  vol_package?: VolPackageScore | null;
+  vol_package_error?: string | null;
+  /** Same-day unusual options activity (chain proxy); partial failure OK. */
+  unusual_flow?: UnusualOptionsFlow | null;
+  unusual_flow_error?: string | null;
   playbook: OptionsPlaybook;
   research: {
     v22_variant: string;
     robust_path: string;
     note: string;
+    options_winner?: string;
+    vol_program?: string;
   };
   asof_utc?: string;
 }
@@ -821,6 +929,8 @@ export interface GammaResponse {
   lse_error: string | null;
   options_asof?: string | null;
   asof_utc: string;
+  /** Full listed option expiries from the provider (for desk date pickers). */
+  available_expiries?: string[];
   expiries_used: string[];
   net_dealer_gex: number;
   near_spot_dealer_gex: number;
@@ -891,6 +1001,7 @@ export interface AnalysisSuggestion {
     debit_per_share?: number | null;
     max_loss_1_contract?: number | null;
     budget?: number | null;
+    long_delta?: number | null;
     reason?: string;
   } | null;
   rationale: string;

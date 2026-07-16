@@ -1,0 +1,15 @@
+{
+  "source": "local",
+  "codes": ["TSLA.US", "MU.US", "SPY.US", "IONQ.US", "APLD.US", "XLP.US", "QQQ.US"],
+  "start_date": "2025-01-20",
+  "end_date": "2026-07-11",
+  "initial_cash": 1000,
+  "commission": 0.001,
+  "engine": "daily",
+  "interval": "1H",
+  "strategy": {
+    "name": "v73_trump_beat",
+    "model_version": "v73_trump_beat",
+    "note": "Beat v39b on Trump window: non-identity agree+risk-on blend over v39b/v39d"
+  }
+}

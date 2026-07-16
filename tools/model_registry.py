@@ -17,6 +17,97 @@ OPTIONS_WINNER_PATH = MODELS_ROOT / "OPTIONS_WINNER.json"
 EQUITY_WINNER_PATH = MODELS_ROOT / "WINNER.json"
 DESK_ROUTING_PATH = MODELS_ROOT / "DESK_ROUTING.json"
 
+# Trade timeframes used by ranking, confidence, and desk auto-routing.
+HORIZONS: tuple[str, ...] = ("day", "swing", "position")
+DEFAULT_HORIZON = "swing"
+
+# Model affinity per horizon (how well each DNA fits hold period).
+# day = intraday/1H, swing = multi-day/1D, position = weeks–months.
+_MODEL_HORIZON_AFFINITY: dict[str, dict[str, float]] = {
+    "v71_live_confidence": {"day": 0.95, "swing": 0.72, "position": 0.40},
+    "v72_dual_sleeve": {"day": 0.92, "swing": 0.88, "position": 0.55},
+    "v50_high_win_rate": {"day": 0.55, "swing": 0.95, "position": 0.75},
+    "v39d_confluence": {"day": 0.85, "swing": 0.92, "position": 0.78},
+    "v39b_live_adapt": {"day": 0.82, "swing": 0.88, "position": 0.72},
+    "v63_spy_prune": {"day": 0.70, "swing": 0.80, "position": 0.70},
+    "v45_ultimate_rsi": {"day": 0.50, "swing": 0.90, "position": 0.65},
+    "v60_microstructure": {"day": 0.90, "swing": 0.55, "position": 0.30},
+    "v61_institutional_flow": {"day": 0.88, "swing": 0.60, "position": 0.35},
+    "v48_regime_barbell": {"day": 0.65, "swing": 0.85, "position": 0.80},
+    "v49_precision_trend": {"day": 0.60, "swing": 0.88, "position": 0.82},
+}
+
+# Prefix affinities (specialists lean swing; routers inherit child mix).
+_PREFIX_HORIZON_AFFINITY: tuple[tuple[str, dict[str, float]], ...] = (
+    ("v65_spec_", {"day": 0.70, "swing": 0.92, "position": 0.70}),
+    ("v64_", {"day": 0.65, "swing": 0.90, "position": 0.65}),
+    ("v67_universal", {"day": 0.68, "swing": 0.85, "position": 0.68}),
+    ("v66_best", {"day": 0.80, "swing": 0.85, "position": 0.70}),
+    ("v70_self", {"day": 0.80, "swing": 0.85, "position": 0.70}),
+)
+
+_DEFAULT_HORIZON_AFFINITY: dict[str, float] = {
+    "day": 0.70,
+    "swing": 0.75,
+    "position": 0.60,
+}
+
+
+def normalize_horizon(horizon: str | None) -> str:
+    """Map aliases to day | swing | position."""
+    raw = str(horizon or DEFAULT_HORIZON).strip().lower()
+    aliases = {
+        "intraday": "day",
+        "daytrade": "day",
+        "day_trade": "day",
+        "scalp": "day",
+        "1h": "day",
+        "hourly": "day",
+        "short": "day",
+        "swing": "swing",
+        "multiday": "swing",
+        "multi_day": "swing",
+        "week": "swing",
+        "weekly": "swing",
+        "1d": "swing",
+        "daily": "swing",
+        "position": "position",
+        "invest": "position",
+        "long": "position",
+        "long_term": "position",
+        "longterm": "position",
+        "buy_hold": "position",
+        "buyandhold": "position",
+    }
+    h = aliases.get(raw, raw)
+    return h if h in HORIZONS else DEFAULT_HORIZON
+
+
+def model_horizon_affinity(model: str, horizon: str | None = None) -> float:
+    """Return 0–1 affinity of ``model`` to a trade horizon."""
+    h = normalize_horizon(horizon)
+    mid = str(model or "")
+    if mid in _MODEL_HORIZON_AFFINITY:
+        return float(_MODEL_HORIZON_AFFINITY[mid].get(h, _DEFAULT_HORIZON_AFFINITY[h]))
+    for prefix, aff in _PREFIX_HORIZON_AFFINITY:
+        if mid.startswith(prefix):
+            return float(aff.get(h, _DEFAULT_HORIZON_AFFINITY[h]))
+    return float(_DEFAULT_HORIZON_AFFINITY[h])
+
+
+def horizon_confidence_thresholds(horizon: str | None = None) -> dict[str, float]:
+    """Default watch/enter thresholds by horizon (calibrated probability).
+
+    Day is slightly more responsive (short hold, more signals).
+    Position demands higher conviction (capital tied longer).
+    """
+    h = normalize_horizon(horizon)
+    if h == "day":
+        return {"watch": 0.48, "enter": 0.56}
+    if h == "position":
+        return {"watch": 0.55, "enter": 0.65}
+    return {"watch": 0.50, "enter": 0.60}
+
 
 def equity_default_model() -> str:
     """Current equity WINNER for desk/auto; falls back to DEFAULT_MODEL."""
@@ -112,14 +203,18 @@ def standard_equity_model() -> str:
     return equity_default_model()
 
 
-def equity_model_for_symbol(symbol: str | None = None) -> str:
+def equity_model_for_symbol(
+    symbol: str | None = None,
+    *,
+    horizon: str | None = None,
+) -> str:
     """Best-model router for a symbol (specialist vs standard competition).
 
     Delegates to ``route_best_model`` so analysis / live always get the winner
     of specialist DNA vs bag champions (v39d etc.), not a hard-coded track.
     """
     if symbol:
-        hit = route_best_model(symbol)
+        hit = route_best_model(symbol, horizon=horizon)
         if hit and hit.get("model"):
             return str(hit["model"])
     return standard_equity_model()
@@ -131,10 +226,63 @@ _STANDARD_CANDIDATES: tuple[str, ...] = (
     "v39b_live_adapt",
     "v63_spy_prune",
     "v50_high_win_rate",
+    "v71_live_confidence",
+    "v72_dual_sleeve",
 )
 
+# Horizon-aware base priors for standards (before evidence blend).
+_STANDARD_PRIORS: dict[str, float] = {
+    "v39d_confluence": 0.74,
+    "v39b_live_adapt": 0.68,
+    "v72_dual_sleeve": 0.72,
+    "v71_live_confidence": 0.70,
+    "v50_high_win_rate": 0.69,
+    "v63_spy_prune": 0.66,
+}
 
-def route_best_model(symbol: str, *, desk_only: bool = True) -> dict[str, Any]:
+
+def _router_confidence(
+    best: dict[str, Any],
+    runner_up: dict[str, Any] | None,
+    *,
+    horizon: str,
+    ranker_relative: bool = False,
+) -> dict[str, Any]:
+    """How much we trust the router pick (not trade ENTER confidence)."""
+    score = float(best.get("final_score") or 0.0)
+    gap = score - float(runner_up.get("final_score") or 0.0) if runner_up else score
+    has_hist = best.get("hist_score") is not None
+    has_ranker = best.get("ranker_score") is not None
+    evidence_n = sum(1 for flag in (has_hist, has_ranker) if flag)
+    # Base from score level + margin + evidence depth.
+    conf = 0.35 + 0.35 * min(max(score, 0.0), 1.0) + 0.20 * min(max(gap, 0.0) / 0.12, 1.0)
+    conf += 0.05 * evidence_n
+    conf *= 0.55 + 0.45 * model_horizon_affinity(str(best.get("model") or ""), horizon)
+    if ranker_relative and has_ranker:
+        # Ranker only said "best of a weak set" — discount trust.
+        conf *= 0.85
+    if not has_hist and not has_ranker:
+        conf *= 0.80  # prior-only pick
+    conf = max(0.05, min(0.98, conf))
+    band = "high" if conf >= 0.70 else "medium" if conf >= 0.50 else "low"
+    return {
+        "value": round(conf, 4),
+        "band": band,
+        "score_gap": round(gap, 4),
+        "evidence_depth": evidence_n,
+        "horizon": horizon,
+        "note": (
+            "router trust for model selection — not trade ENTER probability"
+        ),
+    }
+
+
+def route_best_model(
+    symbol: str,
+    *,
+    desk_only: bool = True,
+    horizon: str | None = None,
+) -> dict[str, Any]:
     """Compete specialist vs standard models; return the best for ``symbol``.
 
     This is the legitimate router: specialists are *candidates*, not automatic
@@ -144,7 +292,9 @@ def route_best_model(symbol: str, *, desk_only: bool = True) -> dict[str, Any]:
       - prior (specialist DNA prior, standard champion prior)
       - historical per-symbol card score when present
       - fresh symbol_ranker score when present
+      - horizon affinity (day / swing / position)
     """
+    h = normalize_horizon(horizon)
     code = resolve_desk_symbol(symbol) or _normalize_symbol_code(symbol)
     desk = set(list_desk_engines()) if desk_only else None
 
@@ -168,6 +318,7 @@ def route_best_model(symbol: str, *, desk_only: bool = True) -> dict[str, Any]:
             "meta": meta or {},
             "hist_score": None,
             "ranker_score": None,
+            "horizon_affinity": model_horizon_affinity(model, h),
             "final_score": float(prior),
             "evidence": [],
         }
@@ -215,6 +366,7 @@ def route_best_model(symbol: str, *, desk_only: bool = True) -> dict[str, Any]:
                 },
                 "hist_score": None,
                 "ranker_score": None,
+                "horizon_affinity": model_horizon_affinity(mid, h),
                 "final_score": prior_s,
                 "evidence": [f"desk specialist prior {prior_s:.2f} (force-added)"],
             }
@@ -244,9 +396,16 @@ def route_best_model(symbol: str, *, desk_only: bool = True) -> dict[str, Any]:
             )
 
     for m in _STANDARD_CANDIDATES:
-        prior = 0.74 if m == "v39d_confluence" else 0.68 if m == "v39b_live_adapt" else 0.66
+        prior = float(_STANDARD_PRIORS.get(m, 0.66))
         if m == standard_equity_model():
             prior = max(prior, 0.74)
+        # Day book: lift high-WR / dual-sleeve; position book: lift confluence / high WR.
+        if h == "day" and m in ("v71_live_confidence", "v72_dual_sleeve"):
+            prior = max(prior, 0.73)
+        if h == "position" and m in ("v39d_confluence", "v50_high_win_rate"):
+            prior = max(prior, 0.73)
+        if h == "swing" and m == "v50_high_win_rate":
+            prior = max(prior, 0.71)
         _add(m, prior=prior, kind="standard")
         if m in candidates:
             candidates[m]["evidence"].append(f"standard prior {candidates[m]['prior']:.2f}")
@@ -279,18 +438,27 @@ def route_best_model(symbol: str, *, desk_only: bool = True) -> dict[str, Any]:
             if row.get("sharpe") is not None:
                 candidates[model]["sharpe"] = row.get("sharpe")
 
-    # Fresh symbol ranker (strong evidence when present).
-    ranker = ranker_best_model(code, desk_only=desk_only) if code else None
+    # Fresh symbol ranker (strong evidence when present; relative ok if all weak).
+    ranker = ranker_best_model(code, desk_only=desk_only, horizon=h) if code else None
+    ranker_relative = bool(ranker and ranker.get("relative_only"))
     if ranker and ranker.get("model"):
         rm = str(ranker["model"])
         rscore = float(ranker.get("score") or 0.0)
-        # normalize loose ranker scores into ~[0,1]
-        r_norm = max(0.0, min(rscore / 2.0, 1.0)) if rscore > 1.0 else max(0.0, min(rscore, 1.0))
+        # Absolute positive scores map to [0,1]; relative (all-negative) still
+        # contributes but is capped lower so priors/hist can override weak wins.
+        if rscore > 0:
+            r_norm = max(0.0, min(rscore / 2.0, 1.0)) if rscore > 1.0 else max(0.0, min(rscore, 1.0))
+        else:
+            # Softmap negative utility into (0.25, 0.55] so best-of-weak still votes.
+            r_norm = max(0.25, min(0.55, 0.55 + rscore * 0.15))
+        if ranker_relative:
+            r_norm *= 0.85
         if rm not in candidates:
             _add(rm, prior=0.60, kind="ranker")
         if rm in candidates:
             candidates[rm]["ranker_score"] = r_norm
-            candidates[rm]["evidence"].append(f"symbol_ranker {r_norm:.3f}")
+            tag = "relative" if ranker_relative else "absolute"
+            candidates[rm]["evidence"].append(f"symbol_ranker({tag}/{h}) {r_norm:.3f}")
             candidates[rm]["win_rate"] = ranker.get("win_rate")
             candidates[rm]["sharpe"] = ranker.get("sharpe")
 
@@ -303,37 +471,53 @@ def route_best_model(symbol: str, *, desk_only: bool = True) -> dict[str, Any]:
             "track": "standard",
             "code": code or None,
             "score": None,
+            "horizon": h,
+            "router_confidence": {
+                "value": 0.2,
+                "band": "low",
+                "score_gap": 0.0,
+                "evidence_depth": 0,
+                "horizon": h,
+                "note": "no candidates",
+            },
             "candidates": [],
             "kind": engine_kind(std),
         }
 
-    # Final blend.
+    # Final blend with horizon affinity.
     scored_rows: list[dict[str, Any]] = []
     for model, c in candidates.items():
         prior = float(c["prior"])
         hist = c.get("hist_score")
         ranker_s = c.get("ranker_score")
+        aff = float(c.get("horizon_affinity") or model_horizon_affinity(model, h))
         if hist is not None and ranker_s is not None:
-            final = 0.25 * prior + 0.35 * float(hist) + 0.40 * float(ranker_s)
+            base = 0.25 * prior + 0.35 * float(hist) + 0.40 * float(ranker_s)
         elif hist is not None:
-            final = 0.40 * prior + 0.60 * float(hist)
+            base = 0.40 * prior + 0.60 * float(hist)
         elif ranker_s is not None:
-            final = 0.35 * prior + 0.65 * float(ranker_s)
+            base = 0.35 * prior + 0.65 * float(ranker_s)
         else:
-            final = prior
+            base = prior
+        # Horizon affinity reweights: strong mismatch cannot win on prior alone.
+        final = base * (0.55 + 0.45 * aff)
         # Tiny tie-break: prefer specialist DNA when essentially tied.
         if c["kind"] == "specialist":
             final += 0.01
+        c["horizon_affinity"] = round(aff, 4)
         c["final_score"] = round(final, 4)
         scored_rows.append(c)
 
     scored_rows.sort(key=lambda r: r["final_score"], reverse=True)
     best = scored_rows[0]
     runner_up = scored_rows[1] if len(scored_rows) > 1 else None
+    rconf = _router_confidence(best, runner_up, horizon=h, ranker_relative=ranker_relative)
     reason = (
-        f"best_router: {best['model']} score={best['final_score']:.3f} "
+        f"best_router[{h}]: {best['model']} score={best['final_score']:.3f} "
         f"({best['kind']}"
         + (f", beats {runner_up['model']} {runner_up['final_score']:.3f}" if runner_up else "")
+        + f", aff={best.get('horizon_affinity', 0):.2f}"
+        + f", router_conf={rconf['value']:.2f}/{rconf['band']}"
         + ")"
     )
     if best.get("evidence"):
@@ -347,6 +531,9 @@ def route_best_model(symbol: str, *, desk_only: bool = True) -> dict[str, Any]:
         "kind": engine_kind(best["model"]),
         "code": code or None,
         "score": best["final_score"],
+        "horizon": h,
+        "horizon_affinity": best.get("horizon_affinity"),
+        "router_confidence": rconf,
         "win_rate": best.get("win_rate"),
         "sharpe": best.get("sharpe"),
         "specialist": (best.get("meta") or {}).get("specialist"),
@@ -358,6 +545,7 @@ def route_best_model(symbol: str, *, desk_only: bool = True) -> dict[str, Any]:
                 "prior": r["prior"],
                 "hist_score": r.get("hist_score"),
                 "ranker_score": r.get("ranker_score"),
+                "horizon_affinity": r.get("horizon_affinity"),
                 "final_score": r["final_score"],
             }
             for r in scored_rows[:8]
@@ -456,10 +644,13 @@ FEATURED_DESK_MODELS: tuple[str, ...] = (
     "v70_self_evolving_router",
     # Universal family-DNA specialist (any symbol)
     "v67_universal_specialist",
-    # Track B — standard bag champions
+    # Track B — standard bag champions + live sleeves
+    "v72_dual_sleeve",
+    "v71_live_confidence",
     "v39d_confluence",
     "v39b_live_adapt",
     "v63_spy_prune",
+    "v50_high_win_rate",
     # Track A — multi + core specialists
     "v65_desk_specialists",
     "v65_spec_tsla",
@@ -473,7 +664,6 @@ FEATURED_DESK_MODELS: tuple[str, ...] = (
     "v65_spec_apld",
     "v64_crwv_bounce",
     # Research / alt sleeves
-    "v50_high_win_rate",
     "v51_vpa_reflexivity",
     "v60_microstructure",
     "v61_institutional_flow",
@@ -805,24 +995,53 @@ def rank_models_for_symbol(symbol: str, engines_only: bool = False) -> list[dict
     return ranked
 
 
-def load_symbol_ranker(symbol: str) -> dict[str, Any] | None:
-    """Read runs/symbol_ranker/<SYM>/RANKER.json; None on missing/corrupt."""
+def load_symbol_ranker(
+    symbol: str,
+    *,
+    horizon: str | None = None,
+) -> dict[str, Any] | None:
+    """Read RANKER artifact for a symbol (horizon-specific when present).
+
+    Lookup order for horizon H:
+      1. runs/symbol_ranker/<SYM>/RANKER_<H>.json
+      2. runs/symbol_ranker/<SYM>/RANKER.json  (legacy / swing default)
+    """
     sym = str(symbol).strip().upper().replace(".US", "")
-    path = RANKER_ROOT / sym / "RANKER.json"
-    if not path.exists():
-        return None
-    try:
-        data = json.loads(path.read_text())
-    except Exception:
-        return None
-    return data if isinstance(data, dict) else None
+    h = normalize_horizon(horizon)
+    candidates = [
+        RANKER_ROOT / sym / f"RANKER_{h}.json",
+        RANKER_ROOT / sym / "RANKER.json",
+    ]
+    for path in candidates:
+        if not path.exists():
+            continue
+        try:
+            data = json.loads(path.read_text())
+        except Exception:
+            continue
+        if isinstance(data, dict):
+            data.setdefault("horizon", h if path.name != "RANKER.json" else data.get("horizon") or "swing")
+            return data
+    return None
 
 
-def ranker_best_model(symbol: str, *, desk_only: bool = True) -> dict[str, Any] | None:
-    """Fresh (≤7d) RANKER.json top desk-eligible row, or None."""
+def ranker_best_model(
+    symbol: str,
+    *,
+    desk_only: bool = True,
+    horizon: str | None = None,
+) -> dict[str, Any] | None:
+    """Fresh (≤7d) RANKER top desk-eligible row, or None.
+
+    Prefers absolute positive-score winners. If every score is ≤0 (common on
+    single-name 1D windows), falls back to the *relative* best among ok rows
+    with RESEARCH/CLAIM sample size — marked ``relative_only=True`` so the
+    router can discount trust.
+    """
     from datetime import datetime, timezone
 
-    art = load_symbol_ranker(symbol)
+    h = normalize_horizon(horizon)
+    art = load_symbol_ranker(symbol, horizon=h)
     if not art:
         return None
     asof = art.get("asof")
@@ -835,33 +1054,79 @@ def ranker_best_model(symbol: str, *, desk_only: bool = True) -> dict[str, Any] 
         return None
     if age_days > RANKER_MAX_AGE_DAYS:
         return None
+
+    eligible: list[dict[str, Any]] = []
     for row in art.get("rows") or []:
         if not isinstance(row, dict):
             continue
         if row.get("status") != "ok":
             continue
-        if float(row.get("score") or 0) <= 0:
-            continue
-        if row.get("claim_level") not in ("RESEARCH", "CLAIM"):
+        if row.get("claim_level") not in ("RESEARCH", "CLAIM", "THIN"):
             continue
         if desk_only and not row.get("desk_runnable"):
             continue
-        return {
-            "model": row["model"],
-            "score": float(row.get("score") or 0),
-            "win_rate": row.get("win_rate"),
-            "sharpe": row.get("sharpe"),
-            "code": art.get("code") or f"{str(symbol).upper().replace('.US', '')}.US",
-            "asof": str(asof),
-            "claim_level": row.get("claim_level"),
-        }
-    return None
+        # Skip error-only / empty trade shells.
+        n = int(row.get("trade_count") or 0)
+        if n <= 0 and float(row.get("reliability") or 0) <= 0:
+            continue
+        eligible.append(row)
+
+    if not eligible:
+        return None
+
+    # Prefer absolute positive scores first.
+    positive = [
+        r
+        for r in eligible
+        if float(r.get("score") or 0) > 0 and r.get("claim_level") in ("RESEARCH", "CLAIM")
+    ]
+    if positive:
+        pool = positive
+        relative_only = False
+    else:
+        # Relative best of a weak set: prefer RESEARCH/CLAIM over THIN so a
+        # 8-trade THIN curiosity does not outrank a fuller RESEARCH window.
+        solid = [r for r in eligible if r.get("claim_level") in ("RESEARCH", "CLAIM")]
+        pool = solid if solid else [r for r in eligible if r.get("claim_level") == "THIN"]
+        relative_only = True
+    if not pool:
+        return None
+
+    champions = set(_STANDARD_CANDIDATES)
+
+    def _rank_key(r: dict[str, Any]) -> tuple:
+        claim_rank = 0 if r.get("claim_level") == "CLAIM" else 1 if r.get("claim_level") == "RESEARCH" else 2
+        champ = 0 if r.get("model") in champions else 1
+        return (
+            claim_rank,
+            champ,
+            -float(r.get("score") or -999),
+            -float(r.get("reliability") or 0),
+            -(int(r.get("trade_count") or 0)),
+        )
+
+    pool.sort(key=_rank_key)
+    row = pool[0]
+    return {
+        "model": row["model"],
+        "score": float(row.get("score") or 0),
+        "win_rate": row.get("win_rate"),
+        "sharpe": row.get("sharpe"),
+        "code": art.get("code") or f"{str(symbol).upper().replace('.US', '')}.US",
+        "asof": str(asof),
+        "claim_level": row.get("claim_level"),
+        "horizon": art.get("horizon") or h,
+        "relative_only": relative_only,
+        "reliability": row.get("reliability"),
+        "trade_count": row.get("trade_count"),
+    }
 
 
 def recommend_model(
     symbol: str | None = None,
     *,
     desk_only: bool = True,
+    horizon: str | None = None,
 ) -> dict[str, Any]:
     """Pick best runnable model overall, or best for a symbol.
 
@@ -869,6 +1134,7 @@ def recommend_model(
     vs v39d/generics). Overall (no symbol): standard equity champion.
     """
     desk = set(list_desk_engines()) if desk_only else None
+    h = normalize_horizon(horizon)
 
     def _ok(row: dict[str, Any]) -> bool:
         if not row.get("has_engine"):
@@ -878,7 +1144,7 @@ def recommend_model(
         return True
 
     if symbol:
-        routed = route_best_model(symbol, desk_only=desk_only)
+        routed = route_best_model(symbol, desk_only=desk_only, horizon=h)
         # Prefer returning the child model (what analysis should run), not the
         # meta engine id — callers want the actual signal DNA.
         return routed
@@ -911,6 +1177,7 @@ def recommend_model(
                 "kind": engine_kind(top["model"]),
                 "source": "portfolio_rank",
                 "track": "standard",
+                "horizon": h,
             }
     fallback = equity_default_model()
     if desk is not None and fallback not in desk:
@@ -924,6 +1191,121 @@ def recommend_model(
         "kind": engine_kind(fallback),
         "source": "fallback",
         "track": "standard",
+        "horizon": h,
+    }
+
+
+def select_model_for_confidence(
+    symbol: str,
+    *,
+    horizon: str | None = None,
+    desk_only: bool = True,
+    max_probe: int = 4,
+    probe_fn: Any | None = None,
+) -> dict[str, Any]:
+    """Pick the model expected to yield the highest live confidence for a symbol.
+
+    1. Route horizon-aware candidates via ``route_best_model``.
+    2. Optionally probe top-N models for live raw probability / setup_ok.
+    3. Return the max-confidence model with a full audit trail.
+
+    ``probe_fn(symbol, model) -> dict`` should match live_plan.try_model_confidence
+    shape (ok, raw_probability, setup_ok, ...). When omitted, uses router scores
+    only (fast path for scans).
+    """
+    h = normalize_horizon(horizon)
+    routed = route_best_model(symbol, desk_only=desk_only, horizon=h)
+    cands = [str(routed.get("model") or "")]
+    for row in routed.get("candidates") or []:
+        mid = str(row.get("model") or "")
+        if mid and mid not in cands:
+            cands.append(mid)
+    cands = [m for m in cands if m][: max(1, int(max_probe))]
+
+    probes: list[dict[str, Any]] = []
+    best: dict[str, Any] | None = None
+
+    for mid in cands:
+        aff = model_horizon_affinity(mid, h)
+        row_base = next(
+            (r for r in (routed.get("candidates") or []) if r.get("model") == mid),
+            {"final_score": routed.get("score"), "model": mid},
+        )
+        probe: dict[str, Any] = {
+            "model": mid,
+            "horizon_affinity": aff,
+            "router_score": row_base.get("final_score"),
+            "probed": False,
+        }
+        if probe_fn is not None:
+            try:
+                info = probe_fn(symbol, mid) or {}
+            except Exception as exc:  # noqa: BLE001
+                info = {"ok": False, "error": str(exc)}
+            probe["probed"] = True
+            probe["ok"] = bool(info.get("ok"))
+            probe["raw_probability"] = info.get("raw_probability")
+            probe["setup_ok"] = info.get("setup_ok")
+            probe["action_hint"] = info.get("action_hint")
+            probe["error"] = info.get("error")
+            raw = info.get("raw_probability")
+            try:
+                raw_f = float(raw) if raw is not None else None
+            except (TypeError, ValueError):
+                raw_f = None
+            if info.get("ok") and raw_f is not None:
+                # Confidence score for ranking: calibrated-ish raw × affinity, setup boost.
+                conf_score = raw_f * (0.60 + 0.40 * aff)
+                if info.get("setup_ok"):
+                    conf_score += 0.04
+            else:
+                conf_score = float(row_base.get("final_score") or 0.0) * 0.5 * aff
+        else:
+            conf_score = float(row_base.get("final_score") or 0.0) * (0.55 + 0.45 * aff)
+            probe["ok"] = True
+        probe["confidence_score"] = round(conf_score, 4)
+        probes.append(probe)
+        if best is None or conf_score > float(best.get("confidence_score") or -1):
+            best = probe
+
+    winner_model = (best or {}).get("model") or routed.get("model")
+    winner_probe = best or {"model": winner_model, "confidence_score": 0.0}
+    # Reuse router_confidence as floor; lift when probe found high raw+setup.
+    rconf = dict(routed.get("router_confidence") or {})
+    raw_w = winner_probe.get("raw_probability")
+    try:
+        raw_w_f = float(raw_w) if raw_w is not None else None
+    except (TypeError, ValueError):
+        raw_w_f = None
+    if raw_w_f is not None and winner_probe.get("setup_ok"):
+        lifted = max(float(rconf.get("value") or 0.0), min(0.95, 0.40 + 0.55 * raw_w_f))
+        rconf["value"] = round(lifted, 4)
+        rconf["band"] = "high" if lifted >= 0.70 else "medium" if lifted >= 0.50 else "low"
+        rconf["source"] = "live_probe"
+    else:
+        rconf.setdefault("source", "router")
+
+    return {
+        "model": winner_model,
+        "reason": (
+            f"confidence_ranker[{h}]: {winner_model} "
+            f"conf_score={winner_probe.get('confidence_score')} "
+            f"raw={raw_w} setup_ok={winner_probe.get('setup_ok')}"
+        ),
+        "source": "confidence_ranker",
+        "horizon": h,
+        "router": routed,
+        "router_confidence": rconf,
+        "probes": probes,
+        "score": winner_probe.get("confidence_score"),
+        "raw_probability": raw_w,
+        "setup_ok": winner_probe.get("setup_ok"),
+        "kind": engine_kind(str(winner_model)),
+        "track": routed.get("track"),
+        "code": routed.get("code"),
+        "specialist": routed.get("specialist"),
+        "family": routed.get("family"),
+        "candidates": routed.get("candidates") or [],
     }
 
 

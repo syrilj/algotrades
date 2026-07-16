@@ -20,18 +20,22 @@ import { Chip } from "@/components/ui/Chip";
 import { Stat } from "@/components/ui/Stat";
 import { colorVarFor } from "@/lib/actionColors";
 import {
+  analysisSetupLabel,
   buildPaperOrder,
   decisionPresentation,
   feedPresentation,
   gammaMethodology,
+  riskModeLabel,
 } from "@/lib/executionState";
 import { formatNum, formatPct, formatPctPoints, formatUsd } from "@/lib/format";
-import { gammaHref, liveHref, optionsHref, positionsHref, watchHref } from "@/lib/routes";
+import { analyzeHref, gammaHref, liveHref, optionsHref, positionsHref, watchHref } from "@/lib/routes";
 import type {
   ApiEnvelope,
+  GammaResponse,
   LivePlanResponse,
   LiveScanResponse,
   LiveScanRow,
+  OptionsPlanResponse,
   PaperPosition,
 } from "@/lib/types";
 
@@ -46,7 +50,7 @@ function cleanReason(reason: string): string {
     setup_not_ready: "The entry setup is not ready",
     calibrated_probability_below_entry_threshold: "Confidence is below the entry threshold",
     portfolio_state_verified: "Portfolio equity, drawdown, and open positions are not verified",
-    trusted_execution_feed: "Execution-grade LSE data is unavailable",
+    trusted_execution_feed: "Live market data is unavailable (need LSE or yfinance with a usable price)",
     fresh_market_data: "Market data is stale or unavailable",
     macro_data_complete: "Macro context is incomplete",
     model_probability_available: "Model probability is unavailable",
@@ -179,6 +183,12 @@ export function ExecutionDesk() {
   const [loading, setLoading] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [gammaFeed, setGammaFeed] = useState<GammaResponse | null>(null);
+  const [gammaFeedError, setGammaFeedError] = useState<string | null>(null);
+  const [gammaLoading, setGammaLoading] = useState(false);
+  const [optionsFeed, setOptionsFeed] = useState<OptionsPlanResponse | null>(null);
+  const [optionsFeedError, setOptionsFeedError] = useState<string | null>(null);
+  const [optionsLoading, setOptionsLoading] = useState(false);
   const lastPlannedRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -250,11 +260,75 @@ export function ExecutionDesk() {
     }
   }, [account]);
 
+  const loadGammaFeed = useCallback(
+    async (symOverride?: string) => {
+      const sym = (symOverride ?? plan?.symbol ?? symbol).trim().toUpperCase();
+      if (!sym) return;
+      setGammaLoading(true);
+      setGammaFeedError(null);
+      try {
+        const response = await fetch("/api/gamma", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ symbol: sym, source: "auto" }),
+        });
+        const json = (await response.json()) as ApiEnvelope<GammaResponse>;
+        if (!response.ok || !json.ok || !json.data) {
+          throw new Error(json.error ?? `Gamma feed failed (${response.status})`);
+        }
+        setGammaFeed(json.data);
+      } catch (caught) {
+        setGammaFeedError(caught instanceof Error ? caught.message : "Gamma feed failed");
+      } finally {
+        setGammaLoading(false);
+      }
+    },
+    [plan?.symbol, symbol],
+  );
+
+  const loadOptionsFeed = useCallback(
+    async (symOverride?: string) => {
+      const sym = (symOverride ?? plan?.symbol ?? symbol).trim().toUpperCase();
+      if (!sym) return;
+      setOptionsLoading(true);
+      setOptionsFeedError(null);
+      try {
+        const response = await fetch("/api/options-plan", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ symbol: sym, account, peak: account, risk_pct: 18 }),
+        });
+        const json = (await response.json()) as ApiEnvelope<OptionsPlanResponse>;
+        if (!response.ok || !json.ok || !json.data) {
+          throw new Error(json.error ?? `Options feed failed (${response.status})`);
+        }
+        setOptionsFeed(json.data);
+      } catch (caught) {
+        setOptionsFeedError(caught instanceof Error ? caught.message : "Options feed failed");
+      } finally {
+        setOptionsLoading(false);
+      }
+    },
+    [account, plan?.symbol, symbol],
+  );
+
+  // Pull options + gamma live feeds alongside the decision so the cards are not empty by default.
+  useEffect(() => {
+    if (!plan?.symbol) return;
+    void loadGammaFeed(plan.symbol);
+    void loadOptionsFeed(plan.symbol);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plan?.symbol, plan?.asof_utc]);
+
   const freshness = plan?.live?.freshness ?? plan?.confidence?.data_freshness;
   const feed = useMemo(() => feedPresentation(freshness), [freshness]);
   const decision = useMemo(() => (plan ? decisionPresentation(plan) : null), [plan]);
   const order = useMemo(() => (plan ? buildPaperOrder(plan) : null), [plan]);
-  const gammaRead = useMemo(() => gammaMethodology(plan?.gex), [plan?.gex]);
+  const setupLabel = plan ? analysisSetupLabel(plan) : "—";
+  const riskLabel = plan ? riskModeLabel(plan) : "—";
+  const gex = gammaFeed ?? plan?.gex ?? null;
+  const optionsCtx = optionsFeed?.structure ?? plan?.options ?? null;
+  const gammaRead = useMemo(() => gammaMethodology(gex), [gex]);
   const readinessBlockers = plan?.execution_readiness?.blockers ?? [];
   const reasons = readinessBlockers.length
     ? readinessBlockers
@@ -419,12 +493,38 @@ export function ExecutionDesk() {
                 <span className="td-eyebrow">{decision.eyebrow}</span>
                 <div>
                   <h2>{decision.title}</h2>
-                  <Chip
-                    label={plan.ticket?.mode ?? plan.confidence?.state ?? "—"}
-                    colorVar={colorVarFor("mode", plan.ticket?.mode)}
-                  />
+                  <div className="flex flex-wrap gap-2">
+                    <Chip
+                      label={`Setup ${setupLabel}`}
+                      colorVar={colorVarFor("action", setupLabel)}
+                    />
+                    <Chip
+                      label={`Risk ${riskLabel}`}
+                      colorVar={colorVarFor("mode", riskLabel)}
+                    />
+                    <Chip
+                      label={`Gate ${plan.confidence?.state ?? "ABSTAIN"}`}
+                      colorVar={colorVarFor("mode", plan.confidence?.state === "ENTER" ? "EQUITY_HEDGE" : "STAND_ASIDE")}
+                    />
+                  </div>
                 </div>
                 <p>{decision.detail}</p>
+                <p className="text-[11px] leading-snug" style={{ color: "var(--td-ink-500)", marginTop: 6 }}>
+                  <strong style={{ color: "var(--td-ink-300)" }}>Three different things:</strong>{" "}
+                  Analysis setup = what the model wants to do · Risk mode = vehicle (equity / options / cash) ·
+                  Paper order unlock = only when every execution gate passes. A locked paper order does not erase the setup.
+                </p>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  <Link href={analyzeHref({ symbol: plan.symbol })} className="td-btn td-btn-ghost no-underline">
+                    Open Analyze
+                  </Link>
+                  <Link href={optionsHref(plan.symbol, account)} className="td-btn td-btn-ghost no-underline">
+                    Options live feed
+                  </Link>
+                  <Link href={gammaHref(plan.symbol, account)} className="td-btn td-btn-ghost no-underline">
+                    Gamma live feed
+                  </Link>
+                </div>
               </div>
               <div className="exec-decision__quote">
                 <span>{plan.symbol}</span>
@@ -435,9 +535,9 @@ export function ExecutionDesk() {
 
             <div className="exec-decision__body">
               <div className="exec-decision__evidence">
-                <span className="td-eyebrow">WHY THIS DECISION</span>
+                <span className="td-eyebrow">WHY PAPER ORDER IS {order ? "OPEN" : "LOCKED"}</span>
                 <ul>
-                  {(reasons.length ? reasons : ["No confirmed live entry edge"]).slice(0, 4).map((reason) => (
+                  {(reasons.length ? reasons : ["No confirmed live entry edge"]).slice(0, 6).map((reason) => (
                     <li key={reason}>
                       {order ? <CheckCircle2 aria-hidden="true" /> : <LockKeyhole aria-hidden="true" />}
                       {cleanReason(reason)}
@@ -473,9 +573,13 @@ export function ExecutionDesk() {
                   <div className="exec-locked">
                     <LockKeyhole aria-hidden="true" />
                     <div>
-                      <span className="td-eyebrow">EXECUTION LOCKED</span>
-                      <strong>No order is available</strong>
-                      <p>The desk needs fresh data, an ENTER confidence gate, and valid entry/stop risk before it can size an order.</p>
+                      <span className="td-eyebrow">PAPER ORDER LOCKED</span>
+                      <strong>No sized equity order yet</strong>
+                      <p>
+                        Setup can still be {setupLabel}. This lock only blocks paper size until feed,
+                        calibration, confidence ENTER, and risk checks all pass. Use Options / Gamma live
+                        feeds below for structure — they are not blocked by this gate.
+                      </p>
                     </div>
                   </div>
                 )}
@@ -487,49 +591,119 @@ export function ExecutionDesk() {
             <section className="exec-context-card">
               <div className="exec-context-card__head">
                 <div>
-                  <span className="td-eyebrow">GAMMA CONTEXT</span>
-                  <strong>{gammaRead.label}</strong>
+                  <span className="td-eyebrow">GAMMA LIVE FEED</span>
+                  <strong>{gex ? gammaRead.label : "Not loaded"}</strong>
                 </div>
-                <Link href={gammaHref(plan.symbol, account)} className="td-btn td-btn-ghost no-underline">Open detail</Link>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className="td-btn td-btn-primary"
+                    onClick={() => void loadGammaFeed(plan.symbol)}
+                    disabled={gammaLoading}
+                  >
+                    {gammaLoading ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Radio className="size-4" aria-hidden="true" />}
+                    {gammaLoading ? "Loading…" : gex ? "Refresh gamma" : "Load live gamma"}
+                  </button>
+                  <Link href={gammaHref(plan.symbol, account)} className="td-btn td-btn-ghost no-underline">
+                    Full gamma desk
+                  </Link>
+                </div>
               </div>
-              {plan.gex ? (
+              {gammaFeedError ? (
+                <p className="td-alert td-alert--error" role="alert">{gammaFeedError}</p>
+              ) : null}
+              {gex ? (
                 <>
                   <p>{gammaRead.detail}</p>
                   <div className="exec-context-stats">
-                    <Stat label="Gamma spot" value={formatUsd(plan.gex.spot)} />
-                    <Stat label="Regime" value={plan.gex.regime?.replaceAll("_", " ") ?? "—"} />
-                    <Stat label="Call wall" value={formatUsd(plan.gex.call_wall)} />
-                    <Stat label="Put wall" value={formatUsd(plan.gex.put_wall)} />
-                    <Stat label="Expected move" value={plan.gex.expected_move_pct == null ? "—" : `±${formatPctPoints(plan.gex.expected_move_pct).replace("+", "")}`} />
-                    <Stat label="Price divergence" value={formatPctPoints(plan.gex.price_divergence_pct ?? 0)} />
+                    <Stat label="Gamma spot" value={formatUsd(gex.spot)} />
+                    <Stat label="Regime" value={gex.regime?.replaceAll("_", " ") ?? "—"} />
+                    <Stat label="Call wall" value={formatUsd(gex.call_wall)} />
+                    <Stat label="Put wall" value={formatUsd(gex.put_wall)} />
+                    <Stat
+                      label="Squeeze"
+                      value={
+                        gex.squeeze_label === "bullish_squeeze"
+                          ? `Upside ${formatNum(gex.squeeze_score, 1)}`
+                          : gex.squeeze_label === "bearish_squeeze"
+                            ? `Downside ${formatNum(gex.squeeze_score, 1)}`
+                            : `None ${formatNum(gex.squeeze_score ?? 0, 1)}`
+                      }
+                    />
+                    <Stat
+                      label="Expected move"
+                      value={
+                        gex.expected_move_pct == null
+                          ? "—"
+                          : `±${formatPctPoints(gex.expected_move_pct).replace("+", "")}`
+                      }
+                    />
                   </div>
-                  {(plan.gex.warnings ?? []).slice(0, 1).map((warning) => <small key={warning}>{warning}</small>)}
+                  {(gex.warnings ?? []).slice(0, 1).map((warning) => (
+                    <small key={warning}>{warning}</small>
+                  ))}
                 </>
-              ) : <p>Gamma context is unavailable. It is never required to force a trade.</p>}
+              ) : (
+                <p>
+                  No gamma snapshot on this decision yet. Press <strong>Load live gamma</strong> to pull
+                  walls, squeeze, and expected move from the options chain.
+                </p>
+              )}
             </section>
 
             <section className="exec-context-card">
               <div className="exec-context-card__head">
                 <div>
-                  <span className="td-eyebrow">OPTIONS CONTEXT</span>
-                  <strong>{plan.options?.action === "buy" ? plan.options.structure : "No options attack"}</strong>
+                  <span className="td-eyebrow">OPTIONS LIVE FEED</span>
+                  <strong>
+                    {optionsCtx?.action === "buy"
+                      ? optionsCtx.structure ?? "Structure"
+                      : optionsCtx
+                        ? "No structure"
+                        : "Not loaded"}
+                  </strong>
                 </div>
-                <Link href={optionsHref(plan.symbol, account)} className="td-btn td-btn-ghost no-underline">Open detail</Link>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className="td-btn td-btn-primary"
+                    onClick={() => void loadOptionsFeed(plan.symbol)}
+                    disabled={optionsLoading}
+                  >
+                    {optionsLoading ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Radio className="size-4" aria-hidden="true" />}
+                    {optionsLoading ? "Loading…" : optionsCtx ? "Refresh options" : "Load live options"}
+                  </button>
+                  <Link href={optionsHref(plan.symbol, account)} className="td-btn td-btn-ghost no-underline">
+                    Full options desk
+                  </Link>
+                </div>
               </div>
-              {plan.options?.action === "buy" ? (
+              {optionsFeedError ? (
+                <p className="td-alert td-alert--error" role="alert">{optionsFeedError}</p>
+              ) : null}
+              {optionsCtx?.action === "buy" ? (
                 <>
-                  <p>Defined-risk structure generated from the same verified symbol and account.</p>
+                  <p>
+                    {optionsFeed?.mode?.includes("OPTIONS")
+                      ? "Attack path from live risk mode."
+                      : "Defined-risk proposal from the live options chain. Not a green light unless risk mode is OPTIONS_ATTACK."}
+                  </p>
                   <div className="exec-context-stats">
-                    <Stat label="Expiry" value={plan.options.expiry ?? "—"} />
-                    <Stat label="DTE" value={String(plan.options.dte ?? "—")} />
-                    <Stat label="Long strike" value={formatUsd(plan.options.long_strike)} />
-                    <Stat label="Short strike" value={formatUsd(plan.options.short_strike)} />
-                    <Stat label="Debit/share" value={formatUsd(plan.options.debit_per_share)} />
-                    <Stat label="Max loss" value={formatUsd(plan.options.max_loss_1_contract, 0)} />
+                    <Stat label="Expiry" value={optionsCtx.expiry ?? "—"} />
+                    <Stat label="DTE" value={String(optionsCtx.dte ?? "—")} />
+                    <Stat label="Long strike" value={formatUsd(optionsCtx.long_strike)} />
+                    <Stat label="Short strike" value={formatUsd(optionsCtx.short_strike)} />
+                    <Stat label="Debit/share" value={formatUsd(optionsCtx.debit_per_share)} />
+                    <Stat label="Max loss" value={formatUsd(optionsCtx.max_loss_1_contract, 0)} />
                   </div>
                 </>
               ) : (
-                <p>{plan.options?.reason ?? plan.options?.error ?? "The verified decision does not call for an options structure."}</p>
+                <p>
+                  {optionsCtx?.reason ||
+                    optionsCtx?.error ||
+                    optionsFeed?.structure_error ||
+                    "No options structure yet. Press Load live options to pull the chain and a debit-spread proposal."}
+                </p>
               )}
             </section>
           </div>

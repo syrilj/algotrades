@@ -80,9 +80,46 @@ def _print_json(obj: Any) -> int:
     return 0
 
 
-def window_specs(today: date | None = None) -> dict[str, dict[str, str]]:
+def window_specs(
+    today: date | None = None,
+    *,
+    horizon: str = "swing",
+) -> dict[str, dict[str, str]]:
+    """Multi-window backtest ranges, interval-tuned per trade horizon.
+
+    - day: 1H bars, shorter lookbacks (intraday / swing-day DNA)
+    - swing: 1D bars, ~6m recent / prior (default)
+    - position: 1D bars, longer full window emphasis
+    """
     today = today or date.today()
     end = today.isoformat()
+    h = str(horizon or "swing").strip().lower()
+    if h in ("intraday", "daytrade", "day_trade", "1h", "hourly", "short"):
+        h = "day"
+    elif h in ("long", "long_term", "longterm", "invest", "buy_hold"):
+        h = "position"
+    elif h not in ("day", "swing", "position"):
+        h = "swing"
+
+    if h == "day":
+        recent_start = (today - timedelta(days=90)).isoformat()
+        prior_start = (today - timedelta(days=180)).isoformat()
+        full_start = (today - timedelta(days=365)).isoformat()
+        interval = "1H"
+        return {
+            "full": {"start": full_start, "end": end, "interval": interval},
+            "recent": {"start": recent_start, "end": end, "interval": interval},
+            "prior": {"start": prior_start, "end": recent_start, "interval": interval},
+        }
+    if h == "position":
+        recent_start = (today - timedelta(days=270)).isoformat()
+        prior_start = (today - timedelta(days=540)).isoformat()
+        return {
+            "full": {"start": "2024-01-01", "end": end, "interval": "1D"},
+            "recent": {"start": recent_start, "end": end, "interval": "1D"},
+            "prior": {"start": prior_start, "end": recent_start, "interval": "1D"},
+        }
+    # swing (default)
     recent_start = (today - timedelta(days=182)).isoformat()
     prior_start = (today - timedelta(days=364)).isoformat()
     return {
@@ -102,7 +139,18 @@ def _winner_doc() -> dict[str, Any]:
         return {}
 
 
-def equity_candidates(max_models: int = 8) -> list[str]:
+# Always-probe champions so ranker evidence covers live sleeves, not only priors.
+_ALWAYS_RANK: tuple[str, ...] = (
+    "v72_dual_sleeve",
+    "v71_live_confidence",
+    "v39d_confluence",
+    "v39b_live_adapt",
+    "v50_high_win_rate",
+    "v63_spy_prune",
+)
+
+
+def equity_candidates(max_models: int = 8, *, horizon: str = "swing") -> list[str]:
     import model_registry as mr
 
     ordered: list[str] = []
@@ -113,6 +161,19 @@ def equity_candidates(max_models: int = 8) -> list[str]:
             ordered.append(str(mid))
     if mr.DEFAULT_MODEL not in ordered and mr.DEFAULT_MODEL not in EXCLUDE:
         ordered.append(mr.DEFAULT_MODEL)
+    # Horizon-priority champions first.
+    try:
+        h = mr.normalize_horizon(horizon)
+    except Exception:
+        h = "swing"
+    ranked_always = sorted(
+        _ALWAYS_RANK,
+        key=lambda m: mr.model_horizon_affinity(m, h),
+        reverse=True,
+    )
+    for mid in ranked_always:
+        if mid not in ordered and mid not in EXCLUDE and (MODELS_ROOT / mid / "signal_engine.py").exists():
+            ordered.append(mid)
     desk = set(mr.list_desk_engines())
     for row in mr.rank_models(engines_only=True):
         mid = row.get("model")
@@ -526,9 +587,26 @@ def _rank_sort(rows: list[dict[str, Any]]) -> None:
         r["rank"] = i
 
 
-def load_artifact(symbol: str) -> dict[str, Any] | None:
+def _artifact_path(sym: str, horizon: str = "swing") -> Path:
+    h = str(horizon or "swing").strip().lower()
+    if h in ("intraday", "daytrade", "1h", "hourly", "short"):
+        h = "day"
+    elif h in ("long", "long_term", "longterm", "invest"):
+        h = "position"
+    elif h not in ("day", "swing", "position"):
+        h = "swing"
+    if h == "swing":
+        # Legacy path stays the default so existing consumers keep working.
+        return OUT / sym / "RANKER.json"
+    return OUT / sym / f"RANKER_{h}.json"
+
+
+def load_artifact(symbol: str, *, horizon: str = "swing") -> dict[str, Any] | None:
     sym, _ = _sym(symbol)
-    path = OUT / sym / "RANKER.json"
+    path = _artifact_path(sym, horizon)
+    if not path.exists() and horizon != "swing":
+        # Fall back to legacy RANKER.json.
+        path = OUT / sym / "RANKER.json"
     if not path.exists():
         return None
     try:
@@ -559,7 +637,7 @@ def _prune(sym: str, artifact: dict[str, Any]) -> None:
     if not base.exists():
         return
     for child in base.iterdir():
-        if child.name == "RANKER.json" or child.name.endswith(".tmp"):
+        if child.name.startswith("RANKER") or child.name.endswith(".tmp"):
             continue
         if child.is_dir() and child.name not in keep:
             shutil.rmtree(child, ignore_errors=True)
@@ -575,12 +653,20 @@ def build_ranker(
     max_models: int = 8,
     cash: float = CASH,
     models: list[str] | None = None,
+    horizon: str = "swing",
 ) -> dict[str, Any]:
     sym, code = _sym(symbol)
-    specs = window_specs()
+    h = str(horizon or "swing").strip().lower()
+    if h in ("intraday", "daytrade", "1h", "hourly", "short"):
+        h = "day"
+    elif h in ("long", "long_term", "longterm", "invest"):
+        h = "position"
+    elif h not in ("day", "swing", "position"):
+        h = "swing"
+    specs = window_specs(horizon=h)
     windows_run = ("full",) if quick else ("full", "recent", "prior")
 
-    eq = models if models else equity_candidates(max_models)
+    eq = models if models else equity_candidates(max_models, horizon=h)
     do_opts = kind in ("options", "both") or (kind == "equity" and sym in OPTIONS_BAG)
     if kind == "options":
         eq = []
@@ -641,9 +727,10 @@ def build_ranker(
         _rank_sort(rows)
         _rank_sort(opt_rows)
         return {
-            "schema": 1,
+            "schema": 2,
             "symbol": sym,
             "code": code,
+            "horizon": h,
             "asof": _utc_now(),
             "cash": cash,
             "status": status,
@@ -655,7 +742,7 @@ def build_ranker(
             "errors": errors,
         }
 
-    path = OUT / sym / "RANKER.json"
+    path = _artifact_path(sym, h)
 
     for window in windows_run:
         if budget_hit:
@@ -696,22 +783,23 @@ def build_ranker(
     return art
 
 
-def show_payload(symbol: str) -> dict[str, Any]:
+def show_payload(symbol: str, *, horizon: str = "swing") -> dict[str, Any]:
     sym, code = _sym(symbol)
-    art = load_artifact(sym)
+    art = load_artifact(sym, horizon=horizon)
     if not art:
         return {
             "exists": False,
             "symbol": sym,
             "code": code,
+            "horizon": horizon,
             "stale": True,
             "rows": [],
             "options_rows": [],
-            "schema": 1,
+            "schema": 2,
             "asof": _utc_now(),
             "cash": CASH,
             "status": "partial",
-            "windows": window_specs(),
+            "windows": window_specs(horizon=horizon),
         }
     rows = list(art.get("rows") or [])
     opt_rows = list(art.get("options_rows") or [])
@@ -730,11 +818,12 @@ def show_payload(symbol: str) -> dict[str, Any]:
 
 def cmd_rank(ns: argparse.Namespace) -> int:
     sym, _ = _sym(ns.symbol)
+    horizon = getattr(ns, "horizon", "swing") or "swing"
     if not ns.refresh:
-        art = load_artifact(sym)
+        art = load_artifact(sym, horizon=horizon)
         age = _age_days(art.get("asof")) if art else None
         if art and art.get("status") == "complete" and age is not None and age <= STALE_DAYS:
-            return _print_json(show_payload(sym))
+            return _print_json(show_payload(sym, horizon=horizon))
 
     models = None
     if ns.models:
@@ -748,8 +837,9 @@ def cmd_rank(ns: argparse.Namespace) -> int:
         max_models=int(ns.max_models),
         cash=float(ns.cash),
         models=models,
+        horizon=horizon,
     )
-    out = show_payload(sym)
+    out = show_payload(sym, horizon=horizon)
     out.update({k: art[k] for k in art if k not in ("exists", "stale", "age_days")})
     out["exists"] = True
     age = _age_days(out.get("asof"))
@@ -759,22 +849,23 @@ def cmd_rank(ns: argparse.Namespace) -> int:
 
 
 def cmd_show(ns: argparse.Namespace) -> int:
-    return _print_json(show_payload(ns.symbol))
+    horizon = getattr(ns, "horizon", "swing") or "swing"
+    return _print_json(show_payload(ns.symbol, horizon=horizon))
 
 
 def cmd_best(ns: argparse.Namespace) -> int:
     import model_registry as mr
 
+    horizon = getattr(ns, "horizon", "swing") or "swing"
     hit = None
     if hasattr(mr, "ranker_best_model"):
-        hit = mr.ranker_best_model(ns.symbol, desk_only=True)
+        hit = mr.ranker_best_model(ns.symbol, desk_only=True, horizon=horizon)
     if not hit:
-        art = show_payload(ns.symbol)
+        art = show_payload(ns.symbol, horizon=horizon)
         for row in art.get("rows") or []:
             if (
                 row.get("status") == "ok"
-                and float(row.get("score") or 0) > 0
-                and row.get("claim_level") in ("RESEARCH", "CLAIM")
+                and row.get("claim_level") in ("RESEARCH", "CLAIM", "THIN")
                 and row.get("desk_runnable")
             ):
                 hit = {
@@ -784,9 +875,11 @@ def cmd_best(ns: argparse.Namespace) -> int:
                     "asof": art.get("asof"),
                     "win_rate": row.get("win_rate"),
                     "sharpe": row.get("sharpe"),
+                    "horizon": horizon,
+                    "relative_only": float(row.get("score") or 0) <= 0,
                 }
                 break
-    return _print_json({"ok": True, "best": hit, "exists": hit is not None})
+    return _print_json({"ok": True, "best": hit, "exists": hit is not None, "horizon": horizon})
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -807,14 +900,22 @@ def main(argv: list[str] | None = None) -> int:
     r.add_argument("--max-models", type=int, default=8)
     r.add_argument("--models", default=None)
     r.add_argument("--cash", type=float, default=CASH)
+    r.add_argument(
+        "--horizon",
+        choices=["day", "swing", "position"],
+        default="swing",
+        help="Trade timeframe: day (1H), swing (1D default), position (longer 1D)",
+    )
     r.set_defaults(func=cmd_rank)
 
     s = sub.add_parser("show")
     s.add_argument("symbol")
+    s.add_argument("--horizon", choices=["day", "swing", "position"], default="swing")
     s.set_defaults(func=cmd_show)
 
     b = sub.add_parser("best")
     b.add_argument("symbol")
+    b.add_argument("--horizon", choices=["day", "swing", "position"], default="swing")
     b.set_defaults(func=cmd_best)
 
     ns = ap.parse_args(raw)

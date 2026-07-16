@@ -6,8 +6,10 @@
 - `tools/evolve/pipeline.py` / `tools/evolve/farm.py` manage multi-generation model ranking and evolution.
 
 ## Current Champion Equity Model
-- `models/poc_va_macdha/v39d_confluence/` is the current best single model.
-- Verified result at `$1,000` scale on `EQUITY_WINNER_BAG` (2024-08-01 to 2026-07-11, `source=local`, `interval=1H`): 357.5% return, -13.4% max drawdown, Sharpe 2.82, 135 trades, 67% win rate, final $4,575.
+- **Live combined book (promoted):** `models/poc_va_macdha/v72_dual_sleeve/` — hierarchical **v71 sniper + v39d core** (no signal averaging). Full: **+513% ret**, −19.4% max DD, **Sharpe 3.08**, 179 trades, 72% WR, final **$6,131**. Holdout: **+82%**, Sharpe **2.20**, n=84, WR 65.5%.
+- **Best pure single model:** `models/poc_va_macdha/v39d_confluence/` — 357.5% return, -13.4% max drawdown, Sharpe 2.82, 135 trades, 67% win rate, final $4,575 (tighter DD than v72).
+- **High-WR confidence sleeve:** `v71_live_confidence` — full +114% / 86% WR; OOS +31% / 77% WR with `last_confidence` for desk.
+- Desk routing: `DESK_ROUTING.json` keys `dual_sleeve_equity=v72_dual_sleeve`, `high_wr_equity=v71_live_confidence`, `fallback_equity=v39d_confluence`.
 - Reconcile/run: `.venv/bin/python tools/baseline_manifest.py --cash 1000`.
 - Legacy `source=yfinance` result (367.1% / Sharpe 2.80 / final $4,671) was on unadjusted prices and is kept as historical evidence, not the contract.
 - `models/poc_va_macdha/v41_ensemble_feedback/` best `perf_weighted` variant (`v39b_live_adapt` + `v39d_confluence`, `perf_forward=1`, `perf_metric=raw_return`): 359.2% return, -13.3% max drawdown, Sharpe 2.82, 135 trades, 67% win rate.
@@ -62,6 +64,16 @@
 - Vs peers: slightly above `v50` full return (114% vs 109%) with explicit confidence; hard quality=2 (`v70`) hits ~91% WR but **fails** holdout n floor (n=11). **Does not** replace `v39d_confluence` for max return (357%).
 - Train/verify: `.venv/bin/python tools/train_v71_live_confidence.py --workers 4 --cash 1000`
 - Artifacts: `runs/v71_live_confidence/LEADERBOARD.md`, `models/poc_va_macdha/v71_live_confidence/results.json`.
+
+## v72_dual_sleeve (promoted live combined book)
+- Hierarchical **v71 sniper → v39d core** (not averaging). Both-fire stacks sniper + 0.35× scaled core under 50% cap.
+- Verified (`source=local`, `1H`, `$1,000`, `EQUITY_WINNER_BAG`):
+  - **Full**: **+513.1%** ret, −19.4% max DD, **Sharpe 3.08**, 179 trades, 72.1% WR, final **$6,131**
+  - **Holdout**: **+81.6%** ret, −19.6% max DD, **Sharpe 2.20**, 84 trades, 65.5% WR
+- Beats pure v39d on full/OOS return and Sharpe; accepts deeper DD (~19% vs ~13%).
+- Desk: `trade_desk` / `live_plan` use `last_confidence` when present (`confidence_source=engine_last_confidence`); prefixes include v70–v72.
+- Run: `dmr.run_one(dmr.discover_models(['v72_dual_sleeve'])[0], mode='daily', codes=EQUITY_WINNER_BAG, start='2024-08-01', end='2026-07-11', tag='verify', cash=1000, source='local', interval='1H')`
+- Artifacts: `runs/v72_dual_sleeve/LEADERBOARD.md`, `COMPARE.json`, `STATE.json`.
 
 ## v60_microstructure (microstructure / institutional-flow research artifact)
 - `models/poc_va_macdha/v60_microstructure/` is a new standalone microstructure model implementing OHLCV-safe OFI, absorption, volume schedule-deviation, VPIN-style toxicity, VPA confirmation, and an XGB meta-classifier with triple-barrier labels.

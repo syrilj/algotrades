@@ -27,6 +27,7 @@ export function analyzeHref(q: AnalyzeQuery = {}): string {
  */
 export type LiveMode =
   | "bias"
+  | "flow"
   | "picks"
   | "supply-chain"
   | "watch"
@@ -36,6 +37,7 @@ export type LiveMode =
 
 const LIVE_MODES: readonly LiveMode[] = [
   "bias",
+  "flow",
   "picks",
   "supply-chain",
   "watch",
@@ -52,6 +54,14 @@ export function resolveLiveMode(raw: string | null | undefined): LiveMode {
   if (raw === "risk" || raw === "decision") return "ticket";
   if (raw === "scan" || raw === "radar") return "bias";
   if (raw === "chain" || raw === "supply") return "supply-chain";
+  if (
+    raw === "money-flow" ||
+    raw === "money_flow" ||
+    raw === "rotation" ||
+    raw === "sectors"
+  ) {
+    return "flow";
+  }
   // default: decision workspace (empty state teaches the path)
   return "ticket";
 }
@@ -91,6 +101,7 @@ export function liveHubTabs(
 ): { key: LiveMode; label: string; href: string }[] {
   return [
     { key: "bias", label: "Bias", href: liveHref(symbol, "bias", account) },
+    { key: "flow", label: "Flow", href: liveHref(symbol, "flow", account) },
     { key: "picks", label: "Picks", href: liveHref(symbol, "picks", account) },
     {
       key: "supply-chain",
@@ -107,6 +118,8 @@ export function liveHubTabs(
 export const LIVE_MODE_DESCRIPTIONS: Record<LiveMode, string> = {
   bias:
     "Market bias scan (VPA / VWAP DNA). Research checklist — not auto-execution.",
+  flow:
+    "Sector money flow — where capital is rotating in/out, how definitive it looks, and what to keep in mind.",
   picks:
     "Horizon + sector scan for live setups. Click a name to open a decision ticket.",
   "supply-chain":
@@ -114,11 +127,17 @@ export const LIVE_MODE_DESCRIPTIONS: Record<LiveMode, string> = {
   watch:
     "Multi-symbol operator board. Market scan ranks plays; poll keeps levels fresh. Click a name for a ticket.",
   ticket:
-    "A guided live decision: verify the feed, understand the risk, then execute only when every gate passes.",
-  options: "Options structure and attack paths for the selected symbol.",
+    "Three layers: analysis setup · risk mode · paper-order unlock. Locked paper size does not erase the setup — use Options/Gamma for live feeds.",
+  options:
+    "Live options chain feed: risk mode + defined-risk structure. Load feed for the symbol; only size on OPTIONS_ATTACK.",
   gamma:
-    "Gamma-derived levels from current option flow, with open-interest fallback when available.",
+    "Live gamma feed from option flow (OI fallback). Walls, squeeze, and listed expiries — not invented calendar dates.",
 };
+
+/** Deep link into the money-flow / rotation board. */
+export function moneyFlowHref(symbol?: string, account?: number): string {
+  return liveHref(symbol, "flow", account);
+}
 
 // ---------------------------------------------------------------------------
 // Legacy Radar hub (/scan) — aliases into Ops modes

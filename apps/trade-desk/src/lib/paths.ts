@@ -29,8 +29,16 @@ export function optionsPickerScript(): string {
   return path.join(repoRoot(), "tools", "options_picker.py");
 }
 
+export function volPackageScoreScript(): string {
+  return path.join(repoRoot(), "tools", "vol_package_score.py");
+}
+
 export function gammaExposureScript(): string {
   return path.join(repoRoot(), "tools", "gamma_exposure.py");
+}
+
+export function optionsUnusualFlowScript(): string {
+  return path.join(repoRoot(), "tools", "options_unusual_flow.py");
 }
 
 export function riskManagerScript(): string {
@@ -47,6 +55,10 @@ export function vpaScanScript(): string {
 
 export function sectorWatchlistScript(): string {
   return path.join(repoRoot(), "tools", "sector_watchlist.py");
+}
+
+export function sectorMoneyFlowScript(): string {
+  return path.join(repoRoot(), "tools", "sector_money_flow.py");
 }
 
 export function modelsRoot(): string {

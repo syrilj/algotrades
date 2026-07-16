@@ -1,0 +1,20 @@
+{
+  "mode": "soft",
+  "teacher": "v39b_live_adapt",
+  "elevated_threshold": 0.50,
+  "size_floor": 0.15,
+  "soft_power": 1.25,
+  "dd_soft": -0.025,
+  "dd_hard": -0.12,
+  "vol_window": 16,
+  "ma_lookback": 40,
+  "w_dd": 0.35,
+  "w_vol": 0.30,
+  "w_trend": 0.15,
+  "w_tech": 0.10,
+  "w_crypto": 0.10,
+  "market_code": "SPY.US",
+  "tech_code": "QQQ.US",
+  "crypto_codes": ["COIN.US", "MSTR.US"],
+  "note": "Soft continuous size scale with crypto-corridor component when COIN/MSTR present. Frozen before Trump-window eval."
+}

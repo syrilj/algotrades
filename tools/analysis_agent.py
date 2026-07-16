@@ -44,19 +44,34 @@ def _rank_models_for_symbol(symbol: str, top_n: int = 3) -> list[dict[str, Any]]
     return rows[:top_n]
 
 
-def _resolve_analysis_model(symbol: str, model: str | None) -> tuple[str | None, dict[str, Any] | None]:
-    """Prefer explicit model; else desk specialist routing; else WINNER."""
-    if model and str(model).strip() and str(model).strip().lower() not in {"auto", "best", "default"}:
+def _resolve_analysis_model(
+    symbol: str,
+    model: str | None,
+    *,
+    horizon: str | None = None,
+    probe: bool = True,
+) -> tuple[str | None, dict[str, Any] | None]:
+    """Prefer explicit model; else confidence-ranked best for horizon."""
+    if model and str(model).strip() and str(model).strip().lower() not in {"auto", "best", "default", "rank"}:
         return str(model).strip(), None
+    h = _mr.normalize_horizon(horizon)
     try:
-        rec = _mr.recommend_model(symbol, desk_only=True)
+        if probe and hasattr(_mr, "select_model_for_confidence"):
+            # Fast path for analysis: router scores only (no live multi-probe).
+            # live_plan still probes when model=auto.
+            rec = _mr.select_model_for_confidence(
+                symbol, horizon=h, desk_only=True, max_probe=6, probe_fn=None
+            )
+            return rec.get("model"), rec
+        rec = _mr.recommend_model(symbol, desk_only=True, horizon=h)
         return rec.get("model"), rec
     except Exception:
         try:
-            return _mr.equity_model_for_symbol(symbol), {
-                "model": _mr.equity_model_for_symbol(symbol),
+            return _mr.equity_model_for_symbol(symbol, horizon=h), {
+                "model": _mr.equity_model_for_symbol(symbol, horizon=h),
                 "source": "desk_or_winner",
                 "reason": "equity_model_for_symbol fallback",
+                "horizon": h,
             }
         except Exception:
             return None, None
@@ -421,19 +436,26 @@ def run_analysis(
     account: float = 1000.0,
     model: str | None = None,
     top_n: int = 3,
+    horizon: str | None = None,
 ) -> dict[str, Any]:
     """Generate one structured Facts → Decision → Suggestion report."""
     if not symbol or not symbol.strip():
         return {"ok": False, "error": "symbol required", "asof_utc": _now()}
 
     raw_symbol = symbol.strip().upper()
-    resolved_model, model_selection = _resolve_analysis_model(raw_symbol, model)
+    h = _mr.normalize_horizon(horizon)
+    resolved_model, model_selection = _resolve_analysis_model(
+        raw_symbol, model, horizon=h, probe=True
+    )
     # live_plan handles both TSLA and TSLA.US; routes desk specialists via model_registry
+    # Pass explicit resolved model so plan does not re-probe (analysis already ranked).
     plan = _lp.plan_symbol(
         raw_symbol,
         account=account,
         model=resolved_model,
         use_model=True,
+        horizon=h,
+        max_model_probe=1,
     )
 
     if not plan.get("ok"):
@@ -455,7 +477,12 @@ def run_analysis(
             "specialist": model_selection.get("specialist"),
             "family": model_selection.get("family"),
             "code": model_selection.get("code"),
+            "horizon": model_selection.get("horizon") or h,
+            "router_confidence": model_selection.get("router_confidence"),
+            "score": model_selection.get("score"),
+            "candidates": (model_selection.get("candidates") or [])[:5],
         }
+    facts["horizon"] = h
     decision = _build_decision(plan)
     suggestion = _build_suggestion(plan)
     rationale, drivers, alternatives = _build_rationale_and_drivers(
@@ -483,8 +510,11 @@ def run_analysis(
         "ok": True,
         "symbol": plan.get("symbol") or raw_symbol,
         "asof_utc": plan.get("asof_utc") or _now(),
+        "horizon": h,
         "model_used": resolved_model or plan.get("model_used"),
         "model_selection": model_selection,
+        "router_confidence": (model_selection or {}).get("router_confidence")
+        or plan.get("router_confidence"),
         "report": {
             "facts": facts,
             "decision": decision,
@@ -515,7 +545,7 @@ def _print_report(report: dict[str, Any]) -> None:
     facts = r["facts"]
     decision = r["decision"]
     suggestion = r["suggestion"]
-    print(f"=== ANALYSIS AGENT  {report['symbol']}  {report['asof_utc']} ===")
+    print(f"=== ANALYSIS AGENT  {report['symbol']}  horizon={report.get('horizon')}  {report['asof_utc']} ===")
     print()
     print("FACTS")
     print(f"  Price: ${facts['price']:.2f}" if facts.get("price") is not None else "  Price: n/a")
@@ -526,7 +556,15 @@ def _print_report(report: dict[str, Any]) -> None:
     gex = facts.get("gex") or {}
     print(f"  GEX: {gex.get('regime')} squeeze={gex.get('squeeze_label')}")
     model = facts.get("model") or {}
-    print(f"  Model: {model.get('model')} conf={model.get('confidence')} setup_ok={model.get('setup_ok')}")
+    sel = facts.get("model_selection") or {}
+    rconf = sel.get("router_confidence") or report.get("router_confidence") or {}
+    print(
+        f"  Model: {model.get('model') or report.get('model_used')} "
+        f"conf={model.get('confidence')} setup_ok={model.get('setup_ok')} "
+        f"router={rconf.get('value')}/{rconf.get('band')}"
+    )
+    if sel.get("reason"):
+        print(f"  Route: {sel.get('reason')}")
     print()
     print("DECISION")
     print(f"  Confidence: {decision.get('confidence_state')} (blended {decision.get('blended_confidence')})")
@@ -545,7 +583,14 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Analysis Agent — structured per-ticker report")
     ap.add_argument("--symbol", type=str, required=True, help="Ticker symbol")
     ap.add_argument("--account", type=float, default=1000.0, help="Account size")
-    ap.add_argument("--model", type=str, default="", help="Equity engine (default: WINNER.json)")
+    ap.add_argument("--model", type=str, default="", help="Equity engine (default: auto confidence ranker)")
+    ap.add_argument(
+        "--horizon",
+        type=str,
+        default="swing",
+        choices=["day", "swing", "position"],
+        help="Trade timeframe for model ranking + confidence thresholds",
+    )
     ap.add_argument("--top-n", type=int, default=3, help="Number of top models to include")
     ap.add_argument("--json", action="store_true", help="Emit JSON report")
     args = ap.parse_args(argv)
@@ -555,6 +600,7 @@ def main(argv: list[str] | None = None) -> int:
         account=args.account,
         model=args.model or None,
         top_n=args.top_n,
+        horizon=args.horizon,
     )
     report = _sanitize_nan(report)
 

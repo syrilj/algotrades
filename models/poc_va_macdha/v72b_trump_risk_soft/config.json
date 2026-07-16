@@ -1,0 +1,15 @@
+{
+  "source": "local",
+  "codes": ["TSLA.US", "MU.US", "SPY.US", "IONQ.US", "APLD.US", "XLP.US", "QQQ.US"],
+  "start_date": "2025-01-20",
+  "end_date": "2026-07-11",
+  "initial_cash": 1000,
+  "commission": 0.001,
+  "engine": "daily",
+  "interval": "1H",
+  "strategy": {
+    "name": "v72b_trump_risk_soft",
+    "model_version": "v72b_trump_risk_soft",
+    "note": "v39b_live_adapt + soft risk size scale with optional crypto-corridor stress. Trump-era live focus."
+  }
+}

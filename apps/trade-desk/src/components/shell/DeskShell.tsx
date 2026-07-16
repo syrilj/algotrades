@@ -25,6 +25,7 @@ const NAV = [
 const LEGACY_NAV = [
   { href: "/analysis-agent", label: "Analysis agent" },
   { href: "/live?mode=bias", label: "Bias scan (Ops)" },
+  { href: "/live?mode=flow", label: "Money flow (Ops)" },
   { href: "/live?mode=picks", label: "Picks (Ops)" },
   { href: "/research?view=evolve", label: "Evolve (Lab)" },
   { href: "/research?view=backtest", label: "Backtest (Lab)" },

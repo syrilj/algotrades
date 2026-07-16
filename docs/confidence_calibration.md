@@ -5,6 +5,57 @@ The live plan now exposes a fail-closed `confidence` object with `ENTER`,
 for compatibility, but it is a heuristic score and must not be treated as a
 probability.
 
+## Main-model calibrators (honest policy — no cheating)
+
+Rebuild / audit with:
+
+```bash
+.venv/bin/python tools/calibrate_main_models.py
+```
+
+Policy:
+
+1. Fit isotonic only when sequential OOS **Brier and log-loss improve** vs raw.
+2. If isotonic hurts, **do not force it**. Prefer **identity** map (raw = calibrated)
+   with ENTER/WATCH tuned on OOF expectancy (bootstrap p05 > 0).
+3. Never activate when confidence has no discrimination or ENTER expectancy ≤ 0.
+4. **Runtime fails closed**: no silent `fallback_identity`. Missing artifact →
+   `confidence.state = ABSTAIN` (not a fake ENTER).
+5. `v65_spec_*` / universal specialists **inherit** `v39d_confluence` only when
+   they lack their own active file (documented DNA alias). Own specialist maps
+   win when evidence supports them.
+6. Portfolio delta is 0 for these artifacts: calibration remaps live ENTER bands,
+   not the historical backtest path.
+
+Active artifacts live under `runs/calibration/active/<model>.json`.
+
+## Timeframes (horizons)
+
+Model selection and confidence thresholds are horizon-aware:
+
+| Horizon | Meaning | Ranker bars | Default ENTER tilt |
+|---------|---------|-------------|--------------------|
+| `day` | Intraday / same-session | 1H windows | slightly lower bar |
+| `swing` | Multi-day (default) | 1D windows | baseline (0.50 / 0.60) |
+| `position` | Weeks–months | longer 1D | higher bar |
+
+Use:
+
+```bash
+.venv/bin/python tools/live_plan.py --symbol TSLA --horizon day --json
+.venv/bin/python tools/analysis_agent.py --symbol TSLA --horizon swing --json
+.venv/bin/python tools/symbol_ranker.py rank TSLA --horizon day --quick
+```
+
+When `--model` is empty/`auto`, the **confidence ranker**
+(`model_registry.select_model_for_confidence`) scores router candidates for that
+horizon and optionally probes live raw probability so the desk can pick the
+model with the highest confidence — not just the highest prior.
+
+`router_confidence` is trust in the *model pick* (evidence depth + score gap +
+horizon fit). It is **not** trade ENTER probability; execution still requires
+calibrated `confidence.state == ENTER` plus readiness gates.
+
 ## Build a candidate artifact
 
 Use completed candidate ledgers from the reconciled local-data runs:

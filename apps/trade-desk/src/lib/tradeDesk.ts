@@ -9,12 +9,15 @@ import {
   livePlanScript,
   modelsRoot,
   optionsPickerScript,
+  optionsUnusualFlowScript,
+  volPackageScoreScript,
   paperLedgerScript,
   portfolioOptimizerScript,
   pythonBin,
   repoRoot,
   riskAssessmentScript,
   riskManagerScript,
+  sectorMoneyFlowScript,
   sectorWatchlistScript,
   supplyChainScript,
   symbolRankerScript,
@@ -215,12 +218,38 @@ export async function runOptionsPicker(
   return runPythonScript(optionsPickerScript(), args, "options_picker", timeoutMs);
 }
 
+/** Research-only IV–RV / surface vol package scores (never auto-trades). */
+export async function runVolPackageScore(
+  args: string[],
+  timeoutMs = 90_000,
+): Promise<unknown> {
+  return runPythonScript(
+    volPackageScoreScript(),
+    args,
+    "vol_package_score",
+    timeoutMs,
+  );
+}
+
 /** Gamma exposure snapshot (LSE spot + yfinance options). */
 export async function runGammaExposure(
   args: string[],
   timeoutMs = 60_000,
 ): Promise<unknown> {
   return runPythonScript(gammaExposureScript(), args, "gamma_exposure", timeoutMs);
+}
+
+/** Same-day unusual options activity flags from chain aggregates (not OPRA tape). */
+export async function runOptionsUnusualFlow(
+  args: string[],
+  timeoutMs = 90_000,
+): Promise<unknown> {
+  return runPythonScript(
+    optionsUnusualFlowScript(),
+    args,
+    "options_unusual_flow",
+    timeoutMs,
+  );
 }
 
 export async function runRiskManager(
@@ -271,6 +300,19 @@ export async function runSectorWatchlist(
     sectorWatchlistScript(),
     args,
     "sector_watchlist",
+    timeoutMs,
+  );
+}
+
+/** Sector money-flow / rotation scanner (in/out + definitive score). */
+export async function runSectorMoneyFlow(
+  args: string[] = ["--source", "auto"],
+  timeoutMs = 90_000,
+): Promise<unknown> {
+  return runPythonScript(
+    sectorMoneyFlowScript(),
+    args,
+    "sector_money_flow",
     timeoutMs,
   );
 }

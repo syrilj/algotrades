@@ -108,7 +108,8 @@ def test_runtime_enters_only_with_active_gated_calibrator():
     assert result.get("uncalibrated") is False
 
 
-def test_identity_fallback_is_flagged_uncalibrated():
+def test_identity_fallback_is_rejected_no_cheat():
+    """Uncalibrated/fallback paths must ABSTAIN — never invent ENTER."""
     freshness = assess_data_freshness("2026-07-14T15:00:00Z", now=pd.Timestamp("2026-07-14T15:30:00Z").to_pydatetime())
     artifact = {
         "available": True,
@@ -130,9 +131,45 @@ def test_identity_fallback_is_flagged_uncalibrated():
         model="auto",
         calibrator=artifact,
     )
-    assert result["state"] == "ENTER"
+    assert result["state"] == "ABSTAIN"
+    assert result["size_limit"] == 0.0
     assert result["uncalibrated"] is True
-    assert "using_identity_calibration_fallback" in result["reasons"]
+    assert "uncalibrated_model_no_cheat_fallback" in result["reasons"]
+    assert "active_calibration" in result["failed_checks"]
+
+
+def test_missing_calibrator_is_unavailable():
+    from confidence_runtime import load_active_calibrator
+
+    info = load_active_calibrator("model_that_does_not_exist_xyz")
+    assert info.get("available") is False
+    assert info.get("reason") == "calibration_artifact_missing"
+
+
+def test_specialist_inherits_v39d_dna_when_active(tmp_path, monkeypatch):
+    """v65_spec_* reuses v39d map only when that active artifact exists."""
+    import confidence_runtime as cr
+
+    active = tmp_path / "active"
+    active.mkdir()
+    art = {
+        "schema_version": "confidence-calibration-v1",
+        "status": "active",
+        "model": "v39d_confluence",
+        "calibration_type": "identity",
+        "calibrator": {"x": [0.0, 1.0], "y": [0.0, 1.0]},
+        "thresholds": {"watch": 0.525, "enter": 0.625},
+        "promotion": {"all_promotion_gates_pass": True, "all_calibration_gates_pass": True},
+    }
+    (active / "v39d_confluence.json").write_text(json.dumps(art))
+    monkeypatch.setattr(cr, "ROOT", tmp_path)
+    # load_active_calibrator joins ROOT/runs/calibration/active
+    (tmp_path / "runs" / "calibration" / "active").mkdir(parents=True)
+    (tmp_path / "runs" / "calibration" / "active" / "v39d_confluence.json").write_text(json.dumps(art))
+    info = cr.load_active_calibrator("v65_spec_tsla")
+    assert info.get("available") is True
+    assert info.get("resolved_model") == "v39d_confluence"
+    assert info.get("inherited_dna") is True
 
 
 def test_high_cal_without_setup_stays_watch():
@@ -221,7 +258,7 @@ def test_live_readiness_requires_verified_portfolio_and_execution_feed():
         "effective_risk_pct": 0.02,
         "hard_cap_risk_pct": 0.02,
     }
-    result = assess_execution_readiness(
+    base_kwargs = dict(
         live={
             "source": "yfinance",
             "price": 100.0,
@@ -241,12 +278,35 @@ def test_live_readiness_requires_verified_portfolio_and_execution_feed():
         options_plan=None,
         gex=None,
         execution_risk=risk,
+    )
+    # Unverified portfolio still blocks; live yfinance feed is valid.
+    result = assess_execution_readiness(
+        **base_kwargs,
         portfolio_state_verified=False,
     )
-
     assert result["ready"] is False
     assert "portfolio_state_verified" in result["blockers"]
-    assert "trusted_execution_feed" in result["blockers"]
+    assert "trusted_execution_feed" not in result["blockers"]
+
+    # Missing live price fails the feed gate.
+    bad_live = assess_execution_readiness(
+        live={"source": "yfinance", "price": None, "freshness": {"available": True, "stale": False}},
+        macro={"qqq_trend": "up", "xlp_spy_ratio_state": "risk_on"},
+        model={"ok": True, "entry": 100.0, "stop": 98.0},
+        confidence={
+            "state": "ENTER",
+            "raw_probability": 0.8,
+            "raw_probability_source": "test",
+            "calibration_available": True,
+            "calibration_version": "v1",
+        },
+        decision={"action": "enter", "vehicle": "equity"},
+        options_plan=None,
+        gex=None,
+        execution_risk=risk,
+        portfolio_state_verified=True,
+    )
+    assert "trusted_execution_feed" in bad_live["blockers"]
 
 
 def test_shadow_ledger_records_and_settles(tmp_path):

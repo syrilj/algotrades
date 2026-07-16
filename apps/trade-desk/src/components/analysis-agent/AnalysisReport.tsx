@@ -271,17 +271,6 @@ export function AnalysisReport({ symbol, model, report }: AnalysisReportProps) {
         </div>
 
         <div className="mt-4 grid grid-cols-2 gap-3 border-t border-dashed pt-4 md:grid-cols-4" style={{ borderColor: "var(--td-hairline)" }}>
-          <Stat label="GEX regime" value={gex.regime || "—"} emphasize />
-          <Stat label="Call wall" value={fmtUsd(gex.call_wall)} emphasize />
-          <Stat label="Put wall" value={fmtUsd(gex.put_wall)} emphasize />
-          <Stat label="Flip strike" value={fmtUsd(gex.approx_flip_strike)} emphasize />
-          <Stat label="Spot" value={fmtUsd(gex.spot)} emphasize />
-          <Stat label="Exp move" value={fmtPct(gex.expected_move_pct, 2)} emphasize />
-          <Stat label="Max pain" value={fmtUsd(gex.max_pain)} emphasize />
-          <Stat label="Squeeze" value={gex.squeeze_label || "neutral"} emphasize />
-        </div>
-
-        <div className="mt-4 grid grid-cols-2 gap-3 border-t border-dashed pt-4 md:grid-cols-4" style={{ borderColor: "var(--td-hairline)" }}>
           <Stat label="Model" value={m.model || "—"} emphasize />
           <Stat label="Model conf" value={fmt(m.confidence, 2)} emphasize />
           <Stat label="Setup" value={m.setup_ok ? "ok" : m.setup_ok === false ? "not ok" : "—"} emphasize />
@@ -330,7 +319,7 @@ export function AnalysisReport({ symbol, model, report }: AnalysisReportProps) {
         </div>
       </section>
 
-      {/* Decision */}
+      {/* Decision — options (if any) first, then gamma levels, then trace */}
       <section className="td-panel">
         <h2 className="mb-3 text-[14px] font-medium" style={{ color: "var(--td-ink-100)" }}>
           Decision
@@ -361,6 +350,89 @@ export function AnalysisReport({ symbol, model, report }: AnalysisReportProps) {
             </ul>
           </div>
         ) : null}
+
+        {/* Optional options structure — ahead of gamma so operators see the call/spread first */}
+        {suggestion.options ? (
+          <div
+            className="mt-4 border-t border-dashed pt-4"
+            style={{ borderColor: "var(--td-hairline)" }}
+          >
+            <h3
+              className="mb-3 text-[12px] font-medium uppercase tracking-wider"
+              style={{ color: "var(--td-ink-500)" }}
+            >
+              Options structure
+              {suggestion.options.action === "buy" ? " · available" : " · none"}
+            </h3>
+            {suggestion.options.action === "buy" ? (
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <Stat label="Structure" value={suggestion.options.structure || "—"} emphasize />
+                <Stat label="Expiry" value={suggestion.options.expiry || "—"} emphasize />
+                <Stat label="Long strike" value={fmtUsd(suggestion.options.long_strike)} emphasize />
+                <Stat
+                  label="Short strike"
+                  value={
+                    suggestion.options.short_strike != null
+                      ? fmtUsd(suggestion.options.short_strike)
+                      : "—"
+                  }
+                  emphasize
+                />
+                <Stat
+                  label="Debit / sh"
+                  value={
+                    suggestion.options.debit_per_share != null
+                      ? `$${fmt(suggestion.options.debit_per_share, 2)}`
+                      : "—"
+                  }
+                  emphasize
+                />
+                <Stat
+                  label="Max loss (1)"
+                  value={fmtUsd(suggestion.options.max_loss_1_contract)}
+                  emphasize
+                />
+                <Stat label="DTE" value={suggestion.options.dte ?? "—"} emphasize />
+                <Stat
+                  label="Long Δ"
+                  value={
+                    suggestion.options.long_delta != null
+                      ? fmt(suggestion.options.long_delta, 2)
+                      : "—"
+                  }
+                  emphasize
+                />
+              </div>
+            ) : (
+              <p className="text-[13px]" style={{ color: "var(--td-ink-300)" }}>
+                {suggestion.options.reason || "No options structure"}
+              </p>
+            )}
+          </div>
+        ) : null}
+
+        {/* Gamma / GEX levels after options */}
+        <div
+          className="mt-4 border-t border-dashed pt-4"
+          style={{ borderColor: "var(--td-hairline)" }}
+        >
+          <h3
+            className="mb-3 text-[12px] font-medium uppercase tracking-wider"
+            style={{ color: "var(--td-ink-500)" }}
+          >
+            Gamma levels
+          </h3>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <Stat label="GEX regime" value={gex.regime || "—"} emphasize />
+            <Stat label="Call wall" value={fmtUsd(gex.call_wall)} emphasize />
+            <Stat label="Put wall" value={fmtUsd(gex.put_wall)} emphasize />
+            <Stat label="Flip strike" value={fmtUsd(gex.approx_flip_strike)} emphasize />
+            <Stat label="Spot" value={fmtUsd(gex.spot)} emphasize />
+            <Stat label="Exp move" value={fmtPct(gex.expected_move_pct, 2)} emphasize />
+            <Stat label="Max pain" value={fmtUsd(gex.max_pain)} emphasize />
+            <Stat label="Squeeze" value={gex.squeeze_label || "neutral"} emphasize />
+          </div>
+        </div>
 
         <div className="mt-4 border-t border-dashed pt-4" style={{ borderColor: "var(--td-hairline)" }}>
           <h3 className="mb-3 text-[12px] font-medium uppercase tracking-wider" style={{ color: "var(--td-ink-500)" }}>
@@ -416,19 +488,6 @@ export function AnalysisReport({ symbol, model, report }: AnalysisReportProps) {
             </li>
           )}
         </ol>
-
-        {suggestion.options ? (
-          <div className="mt-3">
-            <span className="td-label">Options structure</span>
-            <p className="text-[13px]" style={{ color: "var(--td-ink-300)" }}>
-              {suggestion.options.action === "buy"
-                ? `${suggestion.options.structure} ${symbol} exp ${suggestion.options.expiry} — ` +
-                  `long ${suggestion.options.long_strike} / short ${suggestion.options.short_strike} — ` +
-                  `debit $${fmt(suggestion.options.debit_per_share, 2)}`
-                : suggestion.options.reason || "No options structure"}
-            </p>
-          </div>
-        ) : null}
       </section>
 
       {/* Drivers */}

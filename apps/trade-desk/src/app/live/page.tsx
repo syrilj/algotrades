@@ -6,6 +6,7 @@ import { ExecutionDesk } from "@/components/live/ExecutionDesk";
 import { OptionsDesk } from "@/components/options/OptionsDesk";
 import { WatchDesk } from "@/components/watch/WatchDesk";
 import { GammaExposureDesk } from "@/components/gamma/GammaExposureDesk";
+import { MoneyFlowDesk } from "@/components/money-flow/MoneyFlowDesk";
 import { PicksDesk } from "@/components/picks/PicksDesk";
 import { ScanDesk } from "@/components/scan/ScanDesk";
 import SupplyChainDesk from "@/components/supply-chain/SupplyChainDesk";
@@ -19,7 +20,12 @@ import {
   type LiveMode,
 } from "@/lib/routes";
 
-const DISCOVER_MODES = new Set<LiveMode>(["bias", "picks", "supply-chain"]);
+const DISCOVER_MODES = new Set<LiveMode>([
+  "bias",
+  "flow",
+  "picks",
+  "supply-chain",
+]);
 
 function LiveOpsHub() {
   const searchParams = useSearchParams();
@@ -31,13 +37,23 @@ function LiveOpsHub() {
 
   const tabs = liveHubTabs(symbol || undefined, account);
   const activeLabel = tabs.find((t) => t.key === mode)?.label ?? "Decision";
-  const phase = DISCOVER_MODES.has(mode) ? "Discover" : "Execute";
+  const phase = DISCOVER_MODES.has(mode) ? "Discover" : "Operate";
+  const titleByMode: Record<LiveMode, string> = {
+    bias: "Bias",
+    flow: "Money flow",
+    picks: "Picks",
+    "supply-chain": "Supply chain",
+    watch: "Watch",
+    ticket: "Decision",
+    options: "Options",
+    gamma: "Gamma",
+  };
 
   return (
     <div className="td-page">
       <PageHeader
         eyebrow={`Ops · ${phase}`}
-        title="Execution"
+        title={titleByMode[mode] ?? activeLabel}
         description={LIVE_MODE_DESCRIPTIONS[mode as LiveMode]}
         meta={
           symbol ? (
@@ -48,7 +64,7 @@ function LiveOpsHub() {
               {symbol}
             </span>
           ) : (
-            <span className="td-chip">bias · picks · watch · decision</span>
+            <span className="td-chip">bias · flow · picks · decision</span>
           )
         }
         actions={
@@ -63,6 +79,7 @@ function LiveOpsHub() {
         aria-label={activeLabel}
       >
         {mode === "bias" ? <ScanDesk /> : null}
+        {mode === "flow" ? <MoneyFlowDesk showHeader={false} /> : null}
         {mode === "picks" ? <PicksDesk showHeader={false} /> : null}
         {mode === "supply-chain" ? (
           <SupplyChainDesk showHeader={false} />

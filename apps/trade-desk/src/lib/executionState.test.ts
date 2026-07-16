@@ -5,6 +5,7 @@ import {
   buildPaperOrder,
   decisionPresentation,
   feedPresentation,
+  gammaDeskPresentation,
   gammaMethodology,
   gammaFreshness,
   isExecutionActionable,
@@ -78,8 +79,8 @@ test("decision copy makes an abstention unambiguously non-actionable", () => {
     ticket: { action: "abstain", mode: "STAND_ASIDE" },
   });
 
-  assert.equal(result.title, "Stand aside");
-  assert.equal(result.eyebrow, "NO TRADE");
+  assert.equal(result.title, "Feed not ready for execution");
+  assert.equal(result.eyebrow, "PAPER ORDER LOCKED");
   assert.match(result.detail, /fresh market data/i);
 });
 
@@ -100,7 +101,7 @@ test("ENTER confidence alone never claims Ready to execute", () => {
 
   assert.notEqual(result.eyebrow, "SETUP READY");
   assert.notEqual(result.title, "Ready to execute");
-  assert.equal(result.eyebrow, "NO TRADE");
+  assert.equal(result.eyebrow, "PAPER ORDER LOCKED");
 });
 
 test("full gate pass presents Ready to execute", () => {
@@ -126,10 +127,25 @@ test("passed signal still shows blocked when execution readiness fails", () => {
     confidence: { state: "ENTER" },
     execution_readiness: { ready: false, blockers: ["portfolio_state_verified"] },
     ticket: { action: "abstain", vehicle: "equity" },
+    decision: { analysis_action: "BUY NOW", mode: "EQUITY_HEDGE" },
   });
 
-  assert.equal(result.title, "Execution checks blocked this plan");
-  assert.equal(result.eyebrow, "NO TRADE");
+  assert.equal(result.title, "Signal cleared; order still blocked");
+  assert.equal(result.eyebrow, "PAPER ORDER LOCKED");
+  assert.match(result.detail, /BUY NOW/);
+});
+
+test("stand-aside execution still names the analysis setup so modes do not look contradictory", () => {
+  const result = decisionPresentation({
+    confidence: { state: "ABSTAIN", reasons: ["calibration_artifact_missing"] },
+    ticket: { action: "abstain", mode: "STAND_ASIDE", vehicle: "none" },
+    decision: { analysis_action: "WAIT", mode: "STAND_ASIDE" },
+    model: { action_hint: "WAIT" },
+  });
+
+  assert.equal(result.eyebrow, "PAPER ORDER LOCKED");
+  assert.match(result.detail, /WAIT/);
+  assert.match(result.detail, /STAND_ASIDE/);
 });
 
 test("paper order size is derived from the actual stop risk", () => {
@@ -223,4 +239,100 @@ test("Gamma levels expire after ninety minutes, not ninety hours", () => {
 
   assert.equal(freshness.isCurrent, false);
   assert.equal(freshness.ageMinutes, 120);
+});
+
+test("OI gamma uses snapshot time so delayed lastTradeDate does not hide squeeze", () => {
+  const now = new Date("2026-07-15T21:00:00Z");
+  const freshness = gammaFreshness(
+    {
+      // Chain last trade is hours old (normal for open interest).
+      options_asof: "2026-07-15T16:00:00Z",
+      // Snapshot was just computed.
+      asof_utc: "2026-07-15T20:55:00Z",
+      exposure_kind: "dealer_positioning_estimate",
+    },
+    now,
+  );
+
+  assert.equal(freshness.isCurrent, true);
+  assert.equal(freshness.ageMinutes, 5);
+  assert.equal(freshness.hasChainTimestamp, true);
+  assert.ok((freshness.chainAgeMinutes ?? 0) >= 90);
+});
+
+test("Flow proxy gamma prefers options_asof and still ages out", () => {
+  const now = new Date("2026-07-15T21:00:00Z");
+  const stale = gammaFreshness(
+    {
+      options_asof: "2026-07-15T18:00:00Z",
+      asof_utc: "2026-07-15T20:55:00Z",
+      exposure_kind: "intraday_gamma_flow_proxy",
+    },
+    now,
+  );
+  assert.equal(stale.isCurrent, false);
+  assert.equal(stale.ageMinutes, 180);
+
+  const live = gammaFreshness(
+    {
+      options_asof: "2026-07-15T20:50:00Z",
+      asof_utc: "2026-07-15T20:55:00Z",
+      exposure_kind: "intraday_gamma_flow_proxy",
+    },
+    now,
+  );
+  assert.equal(live.isCurrent, true);
+  assert.equal(live.ageMinutes, 10);
+});
+
+test("aged gamma snapshot still shows levels for analysis (does not hide board)", () => {
+  const now = new Date("2026-07-15T21:00:00Z");
+  const aged = gammaDeskPresentation(
+    {
+      options_asof: "2026-07-15T16:00:00Z",
+      asof_utc: "2026-07-15T16:05:00Z",
+      exposure_kind: "dealer_positioning_estimate",
+    },
+    now,
+  );
+  assert.equal(aged.hasSnapshot, true);
+  assert.equal(aged.isStale, true);
+  assert.equal(aged.isCurrent, false);
+  assert.equal(aged.showLevels, true);
+  assert.ok(aged.banner && /minutes old/i.test(aged.banner));
+  assert.match(aged.banner ?? "", /stay visible|analysis/i);
+  assert.equal(aged.ageMinutes, 295);
+});
+
+test("missing gamma timestamp still shows levels with honest unknown-age banner", () => {
+  const view = gammaDeskPresentation({
+    options_asof: null,
+    asof_utc: null,
+    exposure_kind: "dealer_positioning_estimate",
+  });
+  assert.equal(view.showLevels, true);
+  assert.equal(view.isCurrent, false);
+  assert.ok(view.banner && /unknown age|no usable snapshot time/i.test(view.banner));
+});
+
+test("current gamma snapshot shows levels without age banner", () => {
+  const now = new Date("2026-07-15T21:00:00Z");
+  const live = gammaDeskPresentation(
+    {
+      asof_utc: "2026-07-15T20:55:00Z",
+      options_asof: "2026-07-15T16:00:00Z",
+      exposure_kind: "dealer_positioning_estimate",
+    },
+    now,
+  );
+  assert.equal(live.showLevels, true);
+  assert.equal(live.isCurrent, true);
+  assert.equal(live.banner, null);
+  assert.equal(live.sessionLabel, "live");
+});
+
+test("no gamma payload means no levels to show", () => {
+  const empty = gammaDeskPresentation(null);
+  assert.equal(empty.showLevels, false);
+  assert.equal(empty.hasSnapshot, false);
 });

@@ -300,6 +300,9 @@
   "universal_model": "v67_universal_specialist",
   "fallback_equity": "v39d_confluence",
   "fallback_equity_alt": "v39b_live_adapt",
+  "high_wr_equity": "v71_live_confidence",
+  "dual_sleeve_equity": "v72_dual_sleeve",
   "routing_mode": "competitive_best",
-  "note_universal": "Unmapped symbols get v67_universal_specialist as a candidate (family DNA), competing with v39d \u2014 not auto-promoted."
+  "note_universal": "Unmapped symbols get v67_universal_specialist as a candidate (family DNA), competing with v39d \u2014 not auto-promoted.",
+  "note_sleeves": "Live book: v39d core return champion; v71 high-WR + confidence; v72 hierarchical dual-sleeve (sniper then core). Prefer --model v72_dual_sleeve for combined book, v71_live_confidence for high-WR only."
 }

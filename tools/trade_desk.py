@@ -394,6 +394,7 @@ _PRIOR_WR = {
 _GENERATE_CONF_PREFIXES = (
     "v41", "v45", "v46", "v47", "v48", "v49", "v50", "v51",
     "v60", "v61", "v63", "v64", "v65", "v66", "v67",
+    "v70", "v71", "v72",
 )
 
 
@@ -503,19 +504,20 @@ def _engine_last_signal(
     mod: Any,
     code: str,
     frame: pd.DataFrame,
-) -> tuple[float | None, str | None]:
-    """Run SignalEngine.generate on the latest bar; return (weight, error).
+) -> tuple[float | None, str | None, float | None]:
+    """Run SignalEngine.generate on the latest bar; return (weight, error, conf).
 
-    Newer research engines (v45+, v50/v51/v60/v61) expose generate() rather than
+    Newer research engines (v45+, v50/v71/v72, …) expose generate() rather than
     the classic VA/MACD helpers. Desk uses the last non-null target weight as the
-    live long/flat decision.
+    live long/flat decision. When the engine publishes ``last_confidence``, that
+    value is returned as conf for live tickets (fail-soft: None if missing).
     """
     try:
         eng = mod.SignalEngine()
     except Exception as exc:  # noqa: BLE001
-        return None, f"SignalEngine init failed: {exc}"
+        return None, f"SignalEngine init failed: {exc}", None
     if not hasattr(eng, "generate"):
-        return None, None
+        return None, None, None
 
     yf = _to_yf(code)
     keys = [code, yf, f"{yf}.US"]
@@ -530,27 +532,49 @@ def _engine_last_signal(
     try:
         out = eng.generate(data_map)
     except Exception as exc:  # noqa: BLE001
-        return None, f"generate failed: {exc}"
+        return None, f"generate failed: {exc}", None
 
     if not isinstance(out, dict):
-        return None, "generate returned non-dict"
+        return None, "generate returned non-dict", None
 
     sig = None
+    used_key: str | None = None
     for k in keys:
         if k in out and out[k] is not None:
             sig = out[k]
+            used_key = k
             break
     if sig is None and out:
-        sig = next(iter(out.values()))
+        used_key = next(iter(out.keys()))
+        sig = out[used_key]
     if sig is None:
-        return None, "generate returned no series"
+        return None, "generate returned no series", None
+
+    conf_val: float | None = None
+    raw_conf = getattr(eng, "last_confidence", None)
+    if isinstance(raw_conf, dict) and raw_conf:
+        conf_series = None
+        for k in keys:
+            if k in raw_conf and raw_conf[k] is not None:
+                conf_series = raw_conf[k]
+                break
+        if conf_series is None:
+            conf_series = next(iter(raw_conf.values()), None)
+        if conf_series is not None:
+            try:
+                cs = pd.Series(conf_series).dropna()
+                if not cs.empty:
+                    conf_val = float(np.clip(float(cs.iloc[-1]), 0.0, 1.0))
+            except Exception:  # noqa: BLE001
+                conf_val = None
+
     try:
         s = pd.Series(sig).dropna()
         if s.empty:
-            return 0.0, None
-        return float(s.iloc[-1]), None
+            return 0.0, None, conf_val
+        return float(s.iloc[-1]), None, conf_val
     except Exception as exc:  # noqa: BLE001
-        return None, f"signal parse failed: {exc}"
+        return None, f"signal parse failed: {exc}", None
 
 
 def _fallback_kelly(conf: float, atr_pct: float, med_atr_pct: float, kelly_fraction: float = 0.5) -> float:
@@ -852,6 +876,7 @@ def _compute_state(mod, code: str, df: pd.DataFrame, model_name: str, live: bool
     # decision comes from the last target weight.
     gen_signal: float | None = None
     gen_error: str | None = None
+    gen_conf: float | None = None
     uses_classic = _has_classic_desk_helpers(desk_mod)
     is_generate_model = model_name.startswith(_GENERATE_CONF_PREFIXES) or (
         "spec_" in model_name or "router" in model_name or "bounce" in model_name
@@ -863,7 +888,7 @@ def _compute_state(mod, code: str, df: pd.DataFrame, model_name: str, live: bool
     if should_try_generate:
         # Prefer original loaded module so wrappers keep their own generate()
         gen_mod = mod if hasattr(mod, "SignalEngine") else desk_mod
-        gen_signal, gen_error = _engine_last_signal(gen_mod, code, frame)
+        gen_signal, gen_error, gen_conf = _engine_last_signal(gen_mod, code, frame)
         if gen_signal is not None:
             gen_long = gen_signal > 1e-9
             # Target weight may be 0–1 (fraction) or ~0.2 (v50 scale) or 1.0 flat.
@@ -871,16 +896,20 @@ def _compute_state(mod, code: str, df: pd.DataFrame, model_name: str, live: bool
             size_frac = float(np.clip(size_raw if size_raw <= 1.5 else 1.0, 0.0, 1.5))
             if gen_long:
                 setup_ok = True
-                # Confidence from LIVE signal weight, not a hard-coded 0.55 floor.
-                # size 0.2 → ~0.50, size 0.5 → ~0.64, size 1.0 → ~0.88
                 structure = float(np.clip(c, 0.0, 1.0))  # classic gate average as soft bonus
-                c = float(
-                    np.clip(
-                        0.42 + 0.46 * min(size_frac, 1.0) + 0.10 * structure,
-                        0.35,
-                        0.95,
+                if gen_conf is not None and np.isfinite(gen_conf) and float(gen_conf) > 0:
+                    # Prefer engine-published entry confidence (v71/v72).
+                    c = float(np.clip(0.55 * float(gen_conf) + 0.35 * min(size_frac, 1.0) + 0.10 * structure, 0.35, 0.96))
+                else:
+                    # Fallback: confidence from LIVE signal weight (legacy generate models).
+                    # size 0.2 → ~0.50, size 0.5 → ~0.64, size 1.0 → ~0.88
+                    c = float(
+                        np.clip(
+                            0.42 + 0.46 * min(size_frac, 1.0) + 0.10 * structure,
+                            0.35,
+                            0.95,
+                        )
                     )
-                )
                 sleeve = max(float(sleeve), max(0.20, min(1.0, size_frac if size_frac > 0 else 0.35)))
                 hard = True
             else:
@@ -888,7 +917,10 @@ def _compute_state(mod, code: str, df: pd.DataFrame, model_name: str, live: bool
                 # watch kinds can still fire with real levels. Do NOT crush to ~30%
                 # (that made every non-CRWV specialist look broken with no plan).
                 structure = float(np.clip(c, 0.0, 1.0))
-                c = float(np.clip(0.28 + 0.52 * structure, 0.22, 0.78))
+                if gen_conf is not None and np.isfinite(gen_conf) and float(gen_conf) > 0:
+                    c = float(np.clip(0.25 * float(gen_conf) + 0.55 * structure, 0.22, 0.80))
+                else:
+                    c = float(np.clip(0.28 + 0.52 * structure, 0.22, 0.78))
                 if not uses_classic or is_generate_model:
                     setup_ok = False
                     hard = False
@@ -1087,8 +1119,15 @@ def _compute_state(mod, code: str, df: pd.DataFrame, model_name: str, live: bool
         "prior_wr": prior,
         "prior_source": prior_source,
         "gen_signal": None if gen_signal is None else round(float(gen_signal), 4),
+        "engine_confidence": None if gen_conf is None else round(float(gen_conf), 4),
         "confidence_source": (
-            "generate_signal" if (gen_signal is not None and is_generate_model) else "classic_gate_average"
+            "engine_last_confidence"
+            if (gen_conf is not None and gen_signal is not None and float(gen_signal) > 1e-9)
+            else (
+                "generate_signal"
+                if (gen_signal is not None and is_generate_model)
+                else "classic_gate_average"
+            )
         ),
         "flags": part_flags,
         "missing": missing,

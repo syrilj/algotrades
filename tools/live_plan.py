@@ -337,8 +337,45 @@ def plan_symbol(
     ac_beta: float = 0.5,
     ac_adv_days: int = 20,
     ac_vol_days: int = 20,
+    horizon: str | None = None,
+    max_model_probe: int = 3,
 ) -> dict[str, Any]:
-    model = model or _default_equity_model(symbol)
+    """Build a live plan for one symbol.
+
+    ``horizon`` is day | swing | position (aliases accepted). When ``model`` is
+    empty/auto/best, the confidence ranker picks the highest-confidence child
+    for that horizon among router candidates (optionally probing live).
+    """
+    try:
+        from model_registry import normalize_horizon, select_model_for_confidence
+    except Exception:  # noqa: BLE001
+        normalize_horizon = lambda h: str(h or "swing")  # type: ignore
+        select_model_for_confidence = None  # type: ignore
+
+    h = normalize_horizon(horizon)
+    model_selection: dict[str, Any] | None = None
+    model_in = (model or "").strip()
+    if not model_in or model_in.lower() in {"auto", "best", "default", "rank"}:
+        if select_model_for_confidence is not None and use_model:
+            # Probe top router candidates for live raw probability so we can
+            # actually recommend the model with the highest confidence.
+            probe_n = max(1, min(int(max_model_probe), 4))
+
+            def _probe(sym: str, mid: str) -> dict[str, Any]:
+                return try_model_confidence(sym, model=mid)
+
+            model_selection = select_model_for_confidence(
+                symbol,
+                horizon=h,
+                desk_only=True,
+                max_probe=probe_n,
+                probe_fn=_probe,
+            )
+            model = str(model_selection.get("model") or _default_equity_model(symbol))
+        else:
+            model = _default_equity_model(symbol)
+    else:
+        model = model_in
     pol = load_policy()
     eng = LiveSignalEngine()
     portfolio_snapshot_valid = bool(
@@ -359,7 +396,7 @@ def plan_symbol(
         df = None
     live = eng.analyze(symbol, df=df)
     live["source"] = "lse" if df is not None else "yfinance"
-    live["interval"] = "1h"
+    live["interval"] = "1h" if h == "day" else ("1d" if h == "position" else "1h")
     if live.get("error"):
         return {
             "ok": False,
@@ -458,6 +495,7 @@ def plan_symbol(
         model=cal_model,
         calibrator=load_active_calibrator(cal_model),
         raw_probability_source=model_info.get("raw_probability_source"),
+        horizon=h,
         evidence=[
             f"side={side}",
             f"vol_z={live.get('vol_z')}",
@@ -469,6 +507,7 @@ def plan_symbol(
             f"swing_uptrend={live.get('swing_uptrend')}",
             f"macro_ok={macro.get('macro_ok')}",
             f"cal_model={cal_model}",
+            f"horizon={h}",
         ],
         failed_checks=list(model_info.get("flags") or []) if isinstance(model_info.get("flags"), list) else [],
     )
@@ -525,18 +564,29 @@ def plan_symbol(
     dec["confidence_state"] = confidence["state"]
     dec["confidence_reasons"] = confidence.get("reasons", [])
 
+    # Always attach a structure proposal for the desk (research context).
+    # Only OPTIONS_ATTACK + enter makes it the live attack path; otherwise it is
+    # labeled as a proposal so Analyze vs Execution do not look empty.
     options_plan = None
-    if decision.mode == "OPTIONS_ATTACK" and decision.action == "enter":
-        try:
-            options_plan = options_propose(
-                ysym,
-                account=account,
-                max_risk_pct=float(decision.risk_pct),
-                prefer_spread=True,
-                side=setup.side,
-            )
-        except Exception as e:  # noqa: BLE001
-            options_plan = {"error": str(e), "action": "skip"}
+    try:
+        options_plan = options_propose(
+            ysym,
+            account=account,
+            max_risk_pct=float(decision.risk_pct) if decision.risk_pct else 0.18,
+            prefer_spread=True,
+            side=setup.side,
+        )
+        if isinstance(options_plan, dict):
+            attack_path = decision.mode == "OPTIONS_ATTACK" and decision.action == "enter"
+            options_plan["attack_path"] = bool(attack_path)
+            if not attack_path and options_plan.get("action") == "buy":
+                options_plan["proposal_only"] = True
+                options_plan.setdefault(
+                    "note",
+                    "Structure proposal for context — not a green-light options attack.",
+                )
+    except Exception as e:  # noqa: BLE001
+        options_plan = {"error": str(e), "action": "skip", "attack_path": False}
 
     # Operator ticket
     ticket = {
@@ -798,6 +848,10 @@ def plan_symbol(
         "peak": peak_eq,
         "drawdown": round(drawdown(account, peak_eq), 4),
         "portfolio_state_verified": portfolio_snapshot_valid,
+        "horizon": h,
+        "model_used": model,
+        "model_selection": model_selection,
+        "router_confidence": (model_selection or {}).get("router_confidence"),
         "live": live,
         "macro": macro,
         "model": model_info,
@@ -819,6 +873,7 @@ def plan_symbol(
         "notes": [
             "SIDE research DNA: v23/v20b macro + vol_z conviction; vehicle from v25 risk",
             "Do not retune primary rules on today's tape; only size/vehicle react",
+            f"Horizon={h}: auto model picks highest-confidence candidate for this timeframe",
         ],
     }
     try:
@@ -960,7 +1015,20 @@ def main(argv: list[str] | None = None) -> int:
         "--model",
         type=str,
         default="",
-        help="Equity engine (default: WINNER.json via equity_default_model)",
+        help="Equity engine (default: auto = confidence ranker for --horizon)",
+    )
+    ap.add_argument(
+        "--horizon",
+        type=str,
+        default="swing",
+        choices=["day", "swing", "position"],
+        help="Trade timeframe: day (intraday), swing (multi-day), position (weeks+)",
+    )
+    ap.add_argument(
+        "--max-model-probe",
+        type=int,
+        default=3,
+        help="When model=auto, probe top-N candidates for highest live confidence",
     )
     ap.add_argument("--no-model", action="store_true", help="Skip trade_desk model analyze (faster)")
     ap.add_argument("--scan", action="store_true")
@@ -973,8 +1041,7 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--ac-vol-days", type=int, default=20)
     ap.add_argument("--json", action="store_true")
     args = ap.parse_args(argv)
-    if not str(args.model).strip():
-        args.model = _default_equity_model()
+    # Leave empty model as auto so plan_symbol can confidence-rank.
 
     hist = []
     if args.history.strip():
@@ -1018,7 +1085,7 @@ def main(argv: list[str] | None = None) -> int:
         account=args.account,
         peak=args.peak or None,
         history=hist,
-        model=args.model,
+        model=args.model or None,
         use_model=not args.no_model,
         open_equity=args.open_equity,
         open_options=args.open_options,
@@ -1030,6 +1097,8 @@ def main(argv: list[str] | None = None) -> int:
         ac_beta=args.ac_beta,
         ac_adv_days=args.ac_adv_days,
         ac_vol_days=args.ac_vol_days,
+        horizon=args.horizon,
+        max_model_probe=int(args.max_model_probe),
     )
     if args.json:
         print(json.dumps(out, indent=2, default=str))
@@ -1038,9 +1107,14 @@ def main(argv: list[str] | None = None) -> int:
             print("ERROR", out.get("error"))
             return 1
         t = out["ticket"]
-        print(f"=== LIVE PLAN  {out['symbol']}  ${args.account:,.0f} ===")
-        print(f"MODE {t['mode']}  VEHICLE {t['vehicle']}  ACTION {t['action']}")
-        print(f"CONF blended={out['blended_confidence']:.2f}  live_vol_z={out['live'].get('vol_z')}  go_long={out['live'].get('go_long')}")
+        conf_obj = out.get("confidence") or {}
+        rconf = out.get("router_confidence") or {}
+        print(f"=== LIVE PLAN  {out['symbol']}  ${args.account:,.0f}  horizon={out.get('horizon')} ===")
+        print(f"MODEL {out.get('model_used')}  MODE {t['mode']}  VEHICLE {t['vehicle']}  ACTION {t['action']}")
+        print(
+            f"CONF state={conf_obj.get('state')} cal={conf_obj.get('calibrated_probability')} "
+            f"blended={out['blended_confidence']:.2f}  router={rconf.get('value')}/{rconf.get('band')}"
+        )
         print(f"MACRO qqq={out['macro'].get('qqq_trend')}  {out['macro'].get('xlp_spy_ratio_state')}")
         print(f"RISK {t['risk_pct']:.1%} → max loss ${t['max_loss_dollars']:,.0f}")
         print("TICKET")

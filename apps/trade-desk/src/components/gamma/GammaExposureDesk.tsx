@@ -18,7 +18,11 @@ import { analyzeHref, liveHref, optionsHref } from "@/lib/routes";
 import { Chip } from "@/components/ui/Chip";
 import { colorVarFor } from "@/lib/actionColors";
 import { Stat } from "@/components/ui/Stat";
-import { gammaFreshness, gammaMethodology } from "@/lib/executionState";
+import {
+  gammaDeskPresentation,
+  gammaFreshness,
+  gammaMethodology,
+} from "@/lib/executionState";
 
 function RegimeChip({ regime }: { regime: string }) {
   const isPin = regime === "positive_gex_pin";
@@ -300,10 +304,28 @@ function buildNotes(gamma: GammaResponse): string[] {
   return notes;
 }
 
-function isoDateDaysAhead(days: number): string {
-  const date = new Date();
-  date.setDate(date.getDate() + days);
-  return date.toISOString().slice(0, 10);
+/** Pick default from/to from real listed expiries (within ~45 DTE when possible). */
+function defaultsFromListedExpiries(listed: string[]): { from: string; to: string } {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const future = listed
+    .filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d))
+    .filter((d) => {
+      const t = new Date(`${d}T00:00:00`);
+      return Number.isFinite(t.getTime()) && t >= today;
+    })
+    .sort();
+  if (future.length === 0) {
+    return { from: listed[0] ?? "", to: listed[listed.length - 1] ?? "" };
+  }
+  const from = future[0];
+  const within45 = future.filter((d) => {
+    const t = new Date(`${d}T00:00:00`);
+    const days = Math.round((t.getTime() - today.getTime()) / 86_400_000);
+    return days <= 45;
+  });
+  const to = within45.length > 0 ? within45[within45.length - 1] : future[Math.min(3, future.length - 1)];
+  return { from, to };
 }
 
 export function GammaExposureDesk({
@@ -316,8 +338,10 @@ export function GammaExposureDesk({
   const qAccount = Number(searchParams.get("account") || "1000");
   const account = Number.isFinite(qAccount) && qAccount > 0 ? qAccount : 1000;
   const [symbol, setSymbol] = useState(qSymbol || "APLD");
-  const [expiryFrom, setExpiryFrom] = useState(() => isoDateDaysAhead(0));
-  const [expiryTo, setExpiryTo] = useState(() => isoDateDaysAhead(45));
+  // Empty until first options chain returns real listed expiries — never invent calendar dates.
+  const [expiryFrom, setExpiryFrom] = useState("");
+  const [expiryTo, setExpiryTo] = useState("");
+  const [listedExpiries, setListedExpiries] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [gamma, setGamma] = useState<GammaResponse | null>(null);
@@ -329,13 +353,19 @@ export function GammaExposureDesk({
   }, [qSymbol]);
 
   const run = useCallback(
-    async (symOverride?: string) => {
+    async (symOverride?: string, opts?: { resetExpiry?: boolean }) => {
       const sym = (symOverride ?? symbol).trim().toUpperCase();
       if (!sym) return;
+      const resetExpiry = opts?.resetExpiry === true || sym !== symbol;
       setSymbol(sym);
       setLoading(true);
       setError(null);
       setLiveError(null);
+      if (resetExpiry) {
+        setExpiryFrom("");
+        setExpiryTo("");
+        setListedExpiries([]);
+      }
 
       const gammaController = new AbortController();
       const liveController = new AbortController();
@@ -343,11 +373,18 @@ export function GammaExposureDesk({
       const liveTimer = setTimeout(() => liveController.abort(), 120_000);
 
       try {
+        const body: Record<string, unknown> = { symbol: sym, source: "auto" };
+        // Only filter when both bounds are real listed option dates for *this* symbol.
+        if (!resetExpiry && expiryFrom && expiryTo) {
+          body.expiryFrom = expiryFrom;
+          body.expiryTo = expiryTo;
+        }
+
         const [gammaRes, liveRes] = await Promise.allSettled([
           fetch("/api/gamma", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ symbol: sym, source: "auto", expiryFrom: expiryFrom || undefined, expiryTo: expiryTo || undefined }),
+            body: JSON.stringify(body),
             signal: gammaController.signal,
           }),
           fetch("/api/live-plan", {
@@ -368,7 +405,22 @@ export function GammaExposureDesk({
         if (!gammaRes.value.ok || gammaJson.ok === false || !gammaJson.data) {
           throw new Error(gammaJson.error ?? `gamma failed (${gammaRes.value.status})`);
         }
-        setGamma(gammaJson.data);
+        const data = gammaJson.data;
+        setGamma(data);
+
+        const listed = (data.available_expiries?.length
+          ? data.available_expiries
+          : data.expiries_used
+        ).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d));
+        if (listed.length > 0) {
+          setListedExpiries(listed);
+          // Seed pickers from the real chain after a fresh symbol load or empty bounds.
+          if (resetExpiry || !expiryFrom || !expiryTo) {
+            const defaults = defaultsFromListedExpiries(listed);
+            setExpiryFrom(defaults.from);
+            setExpiryTo(defaults.to);
+          }
+        }
 
         if (liveRes.status === "fulfilled") {
           const liveJson = (await liveRes.value.json()) as ApiEnvelope<LivePlanResponse>;
@@ -390,16 +442,40 @@ export function GammaExposureDesk({
   );
 
   useEffect(() => {
-    if (!qSymbol) return;
-    void run(qSymbol);
+    // Deep-link or default symbol — auto-pull the live chain so the board is not empty.
+    void run(qSymbol || symbol, { resetExpiry: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [qSymbol]);
 
   const verdict = useVerdict(gamma, live);
   const notes = useMemo(() => (gamma ? buildNotes(gamma) : []), [gamma]);
-  const freshness = useMemo(() => (gamma ? gammaFreshness(gamma.options_asof) : null), [gamma]);
+  const freshness = useMemo(
+    () =>
+      gamma
+        ? gammaFreshness({
+            options_asof: gamma.options_asof,
+            asof_utc: gamma.asof_utc,
+            exposure_kind: gamma.exposure_kind,
+          })
+        : null,
+    [gamma],
+  );
   const methodology = useMemo(() => gammaMethodology(gamma), [gamma]);
-  const showLevels = Boolean(gamma && freshness?.isCurrent);
+  // Analysis levels always render when a snapshot exists. Freshness only labels age.
+  const deskView = useMemo(
+    () =>
+      gammaDeskPresentation(
+        gamma
+          ? {
+              options_asof: gamma.options_asof,
+              asof_utc: gamma.asof_utc,
+              exposure_kind: gamma.exposure_kind,
+            }
+          : null,
+      ),
+    [gamma],
+  );
+  const showLevels = deskView.showLevels;
 
   const body = (
     <>
@@ -467,11 +543,55 @@ export function GammaExposureDesk({
           </label>
           <label className="td-field">
             <span className="td-label">Expiry from</span>
-            <input type="date" value={expiryFrom} max={expiryTo || undefined} onChange={(e) => setExpiryFrom(e.target.value)} className="td-input" />
+            {listedExpiries.length > 0 ? (
+              <select
+                value={expiryFrom}
+                onChange={(e) => setExpiryFrom(e.target.value)}
+                className="td-input"
+                style={{ fontFamily: "var(--td-font-mono)" }}
+              >
+                {listedExpiries.map((d) => (
+                  <option key={`from-${d}`} value={d} disabled={Boolean(expiryTo && d > expiryTo)}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                type="text"
+                value={expiryFrom || "—"}
+                readOnly
+                className="td-input"
+                title="Loads from the option chain after refresh"
+                style={{ fontFamily: "var(--td-font-mono)", color: "var(--td-ink-500)" }}
+              />
+            )}
           </label>
           <label className="td-field">
             <span className="td-label">Expiry to</span>
-            <input type="date" value={expiryTo} min={expiryFrom || undefined} onChange={(e) => setExpiryTo(e.target.value)} className="td-input" />
+            {listedExpiries.length > 0 ? (
+              <select
+                value={expiryTo}
+                onChange={(e) => setExpiryTo(e.target.value)}
+                className="td-input"
+                style={{ fontFamily: "var(--td-font-mono)" }}
+              >
+                {listedExpiries.map((d) => (
+                  <option key={`to-${d}`} value={d} disabled={Boolean(expiryFrom && d < expiryFrom)}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <input
+                type="text"
+                value={expiryTo || "—"}
+                readOnly
+                className="td-input"
+                title="Loads from the option chain after refresh"
+                style={{ fontFamily: "var(--td-font-mono)", color: "var(--td-ink-500)" }}
+              />
+            )}
           </label>
           <button
             type="button"
@@ -479,11 +599,12 @@ export function GammaExposureDesk({
             disabled={loading || !symbol.trim()}
             className="td-btn td-btn-primary"
           >
-            {loading ? "Refreshing…" : "Refresh levels"}
+            {loading ? "Loading live feed…" : gamma ? "Refresh live gamma" : "Load live gamma feed"}
           </button>
         </div>
         <p className="text-[11px]" style={{ color: "var(--td-ink-500)" }}>
-          Current option flow is preferred when its price agrees with the live feed; otherwise the desk falls back to open interest. Levels expire after 90 minutes.
+          Expiry bounds come from listed option dates for this symbol — not calendar guesses.
+          Flow is preferred when price-consistent; otherwise open-interest walls. Aged snapshots stay visible with a banner; execution still requires a live feed.
         </p>
       </section>
 
@@ -497,19 +618,17 @@ export function GammaExposureDesk({
           Model signal unavailable: {liveError}
         </div>
       ) : null}
-      {gamma && !freshness?.isCurrent ? (
+      {deskView.banner ? (
         <div
           className="td-alert"
-          role="alert"
+          role="status"
           style={{
-            border: "1px solid var(--td-action-avoid)",
-            color: "var(--td-action-avoid)",
-            background: "color-mix(in oklch, var(--td-action-avoid) 10%, transparent)",
+            border: "1px solid var(--td-action-breakout-watch)",
+            color: "var(--td-action-breakout-watch)",
+            background: "color-mix(in oklch, var(--td-action-breakout-watch) 10%, transparent)",
           }}
         >
-          {freshness?.hasTimestamp
-            ? `The latest options update is ${freshness.ageMinutes} minutes old, so levels are hidden rather than presented as live.`
-            : "The options provider did not return a usable update time, so levels are hidden rather than presented as live."}
+          {deskView.banner}
         </div>
       ) : null}
 
@@ -519,12 +638,12 @@ export function GammaExposureDesk({
             className="text-[15px] font-medium"
             style={{ color: "var(--td-ink-100)", fontFamily: "var(--td-font-display)" }}
           >
-            No gamma snapshot yet
+            No live gamma feed yet
           </p>
           <ol className="mt-2 flex flex-col gap-1 text-[13px]" style={{ color: "var(--td-ink-300)" }}>
-            <li>1. Enter a symbol</li>
-            <li>2. Refresh live levels</li>
-            <li>3. Filter the strike board by range and exposure side</li>
+            <li>1. Enter a symbol (or keep the default)</li>
+            <li>2. Press <strong>Load live gamma feed</strong></li>
+            <li>3. Read walls, squeeze, and the strike board — expiry dates come from the chain</li>
           </ol>
         </section>
       ) : null}
@@ -668,10 +787,33 @@ export function GammaExposureDesk({
                   <Stat label="OTM call OI" value={formatNum(gamma.otm_call_oi, 0)} />
                   <Stat label="OTM put vol" value={formatNum(gamma.otm_put_volume, 0)} />
                   <Stat label="OTM put OI" value={formatNum(gamma.otm_put_oi, 0)} />
-                  <Stat label="Options updated" value={freshness?.hasTimestamp ? freshness.dataDate.toLocaleString() : "—"} />
+                  <Stat
+                    label={
+                      gamma.exposure_kind === "intraday_gamma_flow_proxy"
+                        ? "Flow as-of"
+                        : "Chain last trade"
+                    }
+                    value={
+                      freshness?.hasChainTimestamp || freshness?.hasTimestamp
+                        ? freshness.dataDate.toLocaleString()
+                        : "—"
+                    }
+                  />
+                  <Stat
+                    label="Expiries in book"
+                    value={
+                      (gamma.expiries_used ?? [])
+                        .filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d))
+                        .slice(0, 4)
+                        .join(" · ") || "—"
+                    }
+                  />
                 </div>
                 <p className="mt-3 text-[11px] leading-snug" style={{ color: "var(--td-ink-500)" }}>
                   {methodology.detail}
+                  {gamma.exposure_kind !== "intraday_gamma_flow_proxy"
+                    ? " Open-interest last-trade stamps are delayed by design; squeeze and walls still use this snapshot."
+                    : ""}
                 </p>
               </div>
 
