@@ -23,10 +23,8 @@ coverage/
 .turbo/
 *.tsbuildinfo
 
-# Generated run artifacts and data caches
-runs/*/
-runs/*.md
-runs/evolve_latest
+# Generated run artifacts and data caches (whole dir is generated)
+runs/
 *.log
 data_cache/
 **/artifacts/
