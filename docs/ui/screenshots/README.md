@@ -1,6 +1,6 @@
 # Trade desk screenshots
 
-Drop screenshots of the running trade desk here, then uncomment the image block in the top-level [README](../../../README.md) Screenshots section.
+Drop screenshots of the running trade desk here, then reference them from the "The Trade Desk" section of the top-level [README](../../../README.md), for example `![Command Center](docs/ui/screenshots/command-center.png)`.
 
 ## How to capture
 
