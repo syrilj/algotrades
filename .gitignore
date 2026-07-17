@@ -74,3 +74,10 @@ media/
 .cursor/
 .superpowers/
 .claude_resources.json
+AGENTS.md
+
+# Local scratch notes (not for the public repo)
+notes.md
+task_plan.md
+docs/arete/videos/
+docs/arete/_state/
