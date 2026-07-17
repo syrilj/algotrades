@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -191,9 +193,9 @@
   --td-border: var(--td-hairline);
   --td-shadow: none;
   --td-panel-edge: none;
-  --td-font-display: var(--font-ibm-plex-sans), "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
-  --td-font-body: var(--font-ibm-plex-sans), "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
-  --td-font-mono: var(--font-ibm-plex-mono), "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  --td-font-display: var(--font-ibm-plex-sans, "IBM Plex Sans"), "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --td-font-body: var(--font-ibm-plex-sans, "IBM Plex Sans"), "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --td-font-mono: var(--font-ibm-plex-mono, "IBM Plex Mono"), "IBM Plex Mono", ui-monospace, Menlo, monospace;
   --td-page-max: 1440px;
   --td-topbar-h: 68px;
   --td-mobile-nav-h: 64px;
@@ -8383,4 +8385,104 @@ body {
   .options-visual__payoff svg { height: 185px; }
   .options-visual__legend { flex-wrap: wrap; }
   .options-visual__legend small { width: 100%; margin-left: 0; }
+}
+
+/* ==========================================================================
+   Command system theme overrides
+   Deeper green/red accent, professional Source Serif display type,
+   square winner-bag layout, fully-rounded edges, no half-bar artifacts.
+   ========================================================================== */
+
+.td-command-theme {
+  --td-brand: oklch(0.62 0.1 145);
+  --td-brand-muted: oklch(0.52 0.08 145);
+  --td-brand-soft: oklch(0.62 0.1 145 / 0.18);
+  --td-success: oklch(0.62 0.1 145);
+  --td-danger: oklch(0.60 0.13 25);
+}
+
+.td-command-theme .td-landing-title {
+  font-family: var(--font-source-serif-4, "Source Serif 4"), Georgia, serif;
+  letter-spacing: -0.03em;
+}
+
+.td-command-theme .td-winner-bag-grid {
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+}
+
+.td-command-theme .td-winner-bag-card {
+  aspect-ratio: 1 / 1;
+  border-radius: var(--td-radius-md);
+  transition: border-color var(--td-dur-fast) var(--td-ease), background var(--td-dur-fast) var(--td-ease), transform var(--td-dur-fast) var(--td-ease);
+}
+
+.td-command-theme .td-winner-bag-card:hover {
+  border-color: var(--td-brand);
+  background: var(--td-brand-soft);
+  transform: translateY(-2px);
+}
+
+.td-command-theme .td-winner-bag-card:active {
+  transform: translateY(0);
+}
+
+.td-command-theme .td-winner-bag-card:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--td-brand);
+}
+
+.td-command-theme .td-metric-card:hover {
+  border-color: var(--td-brand);
+}
+
+.td-command-theme .td-metric-card--winner::before {
+  top: 0;
+  right: 0;
+  bottom: auto;
+  left: 0;
+  width: auto;
+  height: 3px;
+  border-radius: var(--td-radius-md) var(--td-radius-md) 0 0;
+  background: var(--td-brand);
+}
+
+.td-command-theme .td-metric-card .td-metric-item:nth-child(1) .td-metric-value {
+  color: var(--td-success);
+}
+
+.td-command-theme .td-metric-card .td-metric-item:nth-child(2) .td-metric-value {
+  color: var(--td-danger);
+}
+
+.td-command-theme .td-command-rail {
+  border: 1px solid var(--td-hairline);
+  border-left: 1px solid var(--td-hairline);
+  border-radius: var(--td-radius-md);
+}
+
+.td-command-theme .td-command-action__icon {
+  color: var(--td-brand);
+}
+
+.td-command-theme .td-command-action:hover {
+  border-color: var(--td-brand);
+  background: var(--td-brand-soft);
+  color: var(--td-ink);
+}
+
+@media (max-width: 900px) {
+  .td-command-theme .td-command-rail {
+    flex-direction: column;
+  }
+
+  .td-command-theme .td-command-rail__label {
+    border-right: 0;
+    border-bottom: 1px solid var(--td-hairline);
+  }
+}
+
+@media (max-width: 639px) {
+  .td-command-theme .td-winner-bag-grid {
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  }
 }

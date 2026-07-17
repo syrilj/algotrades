@@ -379,6 +379,35 @@ def justified_promotion(artifact: dict[str, Any]) -> tuple[bool, list[str]]:
     return ok, reasons
 
 
+def promote_artifact(
+    artifact: dict[str, Any],
+    active_path: Path | str,
+    thr_meta: dict[str, Any] | None = None,
+) -> Path:
+    """Activate a justified artifact — the single promotion write path.
+
+    Only call after ``justified_promotion`` returned ok. Stamps the winning
+    calibration family (never hardcodes isotonic) so the runtime gate can
+    verify probability semantics, and prefers expectancy-tuned thresholds.
+    """
+    family = str(artifact.get("calibration_type") or "isotonic")
+    artifact["promotion"]["all_calibration_gates_pass"] = True
+    artifact["promotion"]["all_promotion_gates_pass"] = True
+    artifact["promotion"]["justified_activate"] = True
+    artifact["promotion"]["calibration_type"] = family
+    artifact["promotion"]["justification"] = (
+        f"OOS Brier and log-loss improve vs raw ({family}); ECE not worse; "
+        "portfolio delta 0 (calibrator remaps live bands only)"
+    )
+    if thr_meta and thr_meta.get("ok"):
+        artifact["thresholds"] = {
+            "watch": thr_meta["watch"],
+            "enter": thr_meta["enter"],
+        }
+        artifact["threshold_selection"] = thr_meta
+    return write_artifact(artifact, active_path, activate=True, force=False)
+
+
 def tune_thresholds_oof(
     frame: pd.DataFrame,
     *,
@@ -582,7 +611,7 @@ def calibrate_one(model: str, cfg: dict[str, Any], *, dry_run: bool = False) -> 
     print(f"  isotonic_justified={ok}  reasons={reasons or ['ok']}")
 
     cand_path = OUT_CAND / f"{model}.json"
-    mode = "isotonic" if ok else "ordinal_identity_candidate"
+    mode = str(artifact.get("calibration_type") or "isotonic") if ok else "ordinal_identity_candidate"
     thr_meta = tune_thresholds_oof(frame)
     print(f"  threshold_tune: {thr_meta}")
 
@@ -590,23 +619,8 @@ def calibrate_one(model: str, cfg: dict[str, Any], *, dry_run: bool = False) -> 
         write_artifact(artifact, cand_path, activate=False)
         active_path = OUT_ACTIVE / f"{model}.json"
         if ok:
-            artifact["promotion"]["all_calibration_gates_pass"] = True
-            artifact["promotion"]["all_promotion_gates_pass"] = True
-            artifact["promotion"]["justified_activate"] = True
-            artifact["promotion"]["calibration_type"] = "isotonic"
-            artifact["promotion"]["justification"] = (
-                "OOS Brier and log-loss improve vs raw; ECE not worse; "
-                "portfolio delta 0 (calibrator remaps live bands only)"
-            )
-            # Prefer expectancy-tuned thresholds when available.
-            if thr_meta.get("ok"):
-                artifact["thresholds"] = {
-                    "watch": thr_meta["watch"],
-                    "enter": thr_meta["enter"],
-                }
-                artifact["threshold_selection"] = thr_meta
-            write_artifact(artifact, active_path, activate=True, force=False)
-            print(f"  ACTIVE (isotonic) → {active_path}")
+            promote_artifact(artifact, active_path, thr_meta)
+            print(f"  ACTIVE ({artifact.get('calibration_type')}) → {active_path}")
         else:
             # Identity may preserve an ordinal score for threshold research,
             # but it cannot be activated as probability calibration.

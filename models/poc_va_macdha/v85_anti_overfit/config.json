@@ -1,0 +1,15 @@
+{
+  "source": "yfinance",
+  "codes": ["TSLA.US", "MU.US", "SPY.US", "IONQ.US", "APLD.US", "XLP.US", "QQQ.US"],
+  "start_date": "2024-08-01",
+  "end_date": "2026-07-11",
+  "initial_cash": 1000000,
+  "commission": 0.001,
+  "engine": "daily",
+  "interval": "1H",
+  "strategy": {
+    "name": "v85_anti_overfit",
+    "model_version": "v85_anti_overfit",
+    "note": "v39d base + anti-overfit frozen filter overlay: drop SPY, require vol_expand and !red_flag_up"
+  }
+}

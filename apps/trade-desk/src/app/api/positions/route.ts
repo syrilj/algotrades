@@ -61,8 +61,10 @@ export async function GET(req: Request) {
       marked = true;
     }
 
-    const listRaw = await runPaperLedger(["list", "--status", status], 30_000);
-    const statsRaw = await runPaperLedger(["stats"], 30_000);
+    const [listRaw, statsRaw] = await Promise.all([
+      runPaperLedger(["list", "--status", status], 30_000),
+      runPaperLedger(["stats"], 30_000),
+    ]);
 
     const positions = extractPositions(listRaw);
     const stats = extractStats(statsRaw);

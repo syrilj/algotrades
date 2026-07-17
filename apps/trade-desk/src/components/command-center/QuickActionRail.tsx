@@ -18,7 +18,7 @@ export type QuickAction = {
 const DEFAULT_ACTIONS: QuickAction[] = [
   {
     id: "analyze",
-    href: "/",
+    href: "/command",
     label: "Command",
     detail: "Analyze a symbol",
     icon: Crosshair,

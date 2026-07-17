@@ -603,18 +603,16 @@ function runPythonSnippet(code: string, timeoutMs = 15_000): Promise<string> {
   });
 }
 
+let cachedCatalog: ModelsCatalog | null = null;
+let cachedDirListHash = "";
+let cachedWinnerStat = "";
+
 /**
  * Dynamically discover models from filesystem + registry.
  * New models/poc_va_macdha/v* folders with signal_engine.py appear automatically.
  */
 export async function loadModelsCatalog(): Promise<ModelsCatalog> {
   const root = modelsRoot();
-  const winnerDoc = await readJsonSafe<{
-    winner?: string;
-    previous_winner?: string;
-    updated_at?: string;
-    selection_rule?: string;
-  }>(path.join(root, "WINNER.json"));
 
   let entries: string[] = [];
   try {
@@ -640,6 +638,30 @@ export async function loadModelsCatalog(): Promise<ModelsCatalog> {
   )
     .filter((x): x is string => Boolean(x))
     .sort();
+
+  let winnerStatStr = "none";
+  try {
+    const winnerStat = await fs.stat(path.join(root, "WINNER.json"));
+    winnerStatStr = `${winnerStat.mtimeMs}-${winnerStat.size}`;
+  } catch {
+    /* WINNER.json missing */
+  }
+
+  const dirListHash = versionDirs.join(",");
+  if (
+    cachedCatalog &&
+    dirListHash === cachedDirListHash &&
+    winnerStatStr === cachedWinnerStat
+  ) {
+    return cachedCatalog;
+  }
+
+  const winnerDoc = await readJsonSafe<{
+    winner?: string;
+    previous_winner?: string;
+    updated_at?: string;
+    selection_rule?: string;
+  }>(path.join(root, "WINNER.json"));
 
   const engines: string[] = [];
   for (const id of versionDirs) {
@@ -677,7 +699,7 @@ export async function loadModelsCatalog(): Promise<ModelsCatalog> {
     // Surface featured research engines first in pickers (stable order).
     if (parsed.featured_desk_engines?.length) {
       const featured = parsed.featured_desk_engines.filter((id) =>
-        deskEngines.includes(id),
+         deskEngines.includes(id),
       );
       const rest = deskEngines.filter((id) => !featured.includes(id));
       deskEngines = [...featured, ...rest];
@@ -702,7 +724,7 @@ export async function loadModelsCatalog(): Promise<ModelsCatalog> {
     };
   });
 
-  return {
+  const catalog: ModelsCatalog = {
     default_model: defaultModel,
     winner,
     previous_winner: winnerDoc?.previous_winner ?? null,
@@ -714,6 +736,12 @@ export async function loadModelsCatalog(): Promise<ModelsCatalog> {
     updated_at: winnerDoc?.updated_at ?? null,
     selection_rule: winnerDoc?.selection_rule ?? null,
   };
+
+  cachedCatalog = catalog;
+  cachedDirListHash = dirListHash;
+  cachedWinnerStat = winnerStatStr;
+
+  return catalog;
 }
 
 export async function loadModelDetail(id: string): Promise<{

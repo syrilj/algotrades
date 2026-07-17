@@ -71,6 +71,9 @@ export interface AnalyzeState {
   vol_surge?: boolean;
   vol_dry?: boolean;
   flags?: AnalyzeFlags;
+  confidence_source?: string;
+  engine_confidence?: number | null;
+  confidence_kind?: string;
   [key: string]: unknown;
 }
 
@@ -90,6 +93,7 @@ export interface PlainPlan {
   why: string;
   do_next: string;
   confidence_note?: string;
+  checklist?: { ok: boolean; label: string; key: string }[];
 }
 
 export interface ModelRankRow {
@@ -295,6 +299,8 @@ export interface LiveConfidence {
 export interface LivePlanResponse {
   ok: boolean;
   symbol: string;
+  /** Engine id the plan was generated with (tools/live_plan.py). */
+  model_used?: string;
   account?: number;
   peak?: number;
   drawdown?: number;

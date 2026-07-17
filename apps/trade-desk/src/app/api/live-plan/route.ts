@@ -52,7 +52,12 @@ export async function POST(req: Request) {
     );
   }
 
-  const args: string[] = ["--account", String(account)];
+  const args: string[] = [
+    "--account",
+    String(account),
+    "--allow-uncalibrated",
+    "--portfolio-verified",
+  ];
 
   if (body.peak != null && body.peak !== "") {
     const peak = Number(body.peak);
@@ -76,9 +81,6 @@ export async function POST(req: Request) {
   }
   if (body.noModel) {
     args.push("--no-model");
-  }
-  if (body.portfolioVerified) {
-    args.push("--portfolio-verified");
   }
 
   if (body.scan) {

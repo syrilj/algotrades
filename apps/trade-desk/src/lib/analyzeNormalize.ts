@@ -153,7 +153,34 @@ export function derivePlan(state: AnalyzeResponse["state"]): PlainPlan {
     confidence_note: missing.length
       ? `missing: ${missing.join(", ")}`
       : undefined,
+    checklist: buildChecklistFromFlags(state.flags),
   };
+}
+
+const FLAG_LABELS: Record<string, string> = {
+  poc_hold: "Holding above POC (support)",
+  in_value_area: "Inside value area (not chasing)",
+  htf_ha_green: "Bigger-timeframe trend is up",
+  vwap_uptrend: "VWAP trend is up",
+  above_vwap: "Price is above VWAP",
+  vol_confirm_or_pull: "Volume confirms the move",
+  not_red_flag: "Not a weak rally (vol drying up)",
+  mom_pos: "Momentum is positive",
+  sqz_off_or_release: "Squeeze released / not crushed",
+  vol_surge: "Volume SURGE (breakout fuel)",
+  vol_awake: "Volume waking vs average",
+  not_vol_dry: "Volume not drying on the push",
+  above_ema22: "Above 22 EMA (drawdown support)",
+  above_ema200: "Above 200 EMA (structure intact)",
+  near_ema22: "Near 22 EMA (pullback zone)",
+};
+
+export function buildChecklistFromFlags(flags?: Record<string, unknown>): { ok: boolean; label: string; key: string }[] {
+  if (!flags || typeof flags !== "object") return [];
+  return Object.keys(FLAG_LABELS).map((key) => {
+    const ok = Boolean(flags[key]);
+    return { ok, label: FLAG_LABELS[key], key };
+  });
 }
 
 export function normalizeAnalyze(data: unknown): AnalyzeResponse {
@@ -184,6 +211,7 @@ export function normalizeAnalyze(data: unknown): AnalyzeResponse {
     if (!p.action) p.action = derivePlan(stateRaw).action;
     if (!p.do_next) p.do_next = derivePlan(stateRaw).do_next;
     if (!p.why) p.why = derivePlan(stateRaw).why;
+    if (!p.checklist) p.checklist = buildChecklistFromFlags(stateRaw.flags);
     d.plan = p;
   }
 

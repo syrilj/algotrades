@@ -488,6 +488,7 @@ function OptionsDeskInner({ showHeader = true }: { showHeader?: boolean }) {
       setSymbol(sym);
       setLoading(true);
       setError(null);
+      setPlan(null);
       try {
         const res = await fetch("/api/options-plan", {
           method: "POST",

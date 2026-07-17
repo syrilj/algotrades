@@ -1,8 +1,10 @@
 "use client";
 
 import { useCallback, useMemo, useState } from "react";
-import { analyzeHref, moneyFlowHref, optionsHref } from "@/lib/routes";
+import { analyzeHref, liveHref, moneyFlowHref, optionsHref } from "@/lib/routes";
+import { formatPct, formatUsd } from "@/lib/format";
 import Link from "next/link";
+import type { ApiEnvelope, LiveScanResponse, LiveScanRow } from "@/lib/types";
 
 export type ScanFlagMap = Record<string, boolean | undefined>;
 
@@ -283,12 +285,64 @@ function SectorPanel({ sectors }: { sectors: SectorBlock }) {
   );
 }
 
+function LiveOppsPanel({ payload }: { payload: LiveScanResponse | null }) {
+  if (!payload?.rows?.length) return null;
+  const rows = payload.rows.slice(0, 10);
+  return (
+    <section className="scan-all">
+      <h2 className="scan-panel__title">
+        Live opportunities
+        <span className="scan-panel__count">{payload.rows.length}</span>
+      </h2>
+      <p className="scan-meta">asof {payload.asof_utc ?? "—"}</p>
+      <div className="scan-table-wrap">
+        <table className="scan-table">
+          <thead>
+            <tr>
+              <th>Symbol</th>
+              <th>Action</th>
+              <th>Setup</th>
+              <th>Price</th>
+              <th>Conf</th>
+              <th>Risk</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r: LiveScanRow) => (
+              <tr key={r.symbol}>
+                <td>
+                  <Link href={liveHref(r.symbol, "ticket")} className="scan-sym">
+                    {r.symbol}
+                  </Link>
+                </td>
+                <td>{r.action}</td>
+                <td>{r.analysis_action ?? r.mode}</td>
+                <td className="tabular">{formatUsd(r.price)}</td>
+                <td className="tabular">
+                  {formatPct(r.calibrated_probability ?? r.blended_confidence)}
+                </td>
+                <td className="tabular">
+                  {r.risk_pct != null ? formatPct(r.risk_pct) : "—"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
 export function ScanDesk() {
   const [symbols, setSymbols] = useState(DEFAULT_SYMBOLS);
   const [withSectors, setWithSectors] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [payload, setPayload] = useState<ScanPayload | null>(null);
+  const [livePayload, setLivePayload] = useState<LiveScanResponse | null>(null);
+  const [liveScanning, setLiveScanning] = useState(false);
+  const [liveError, setLiveError] = useState<string | null>(null);
+  const [liveFast, setLiveFast] = useState(false);
 
   const run = useCallback(async () => {
     setLoading(true);
@@ -320,6 +374,38 @@ export function ScanDesk() {
       setLoading(false);
     }
   }, [symbols, withSectors]);
+
+  const runLive = useCallback(async () => {
+    setLiveScanning(true);
+    setLiveError(null);
+    setLivePayload(null);
+    try {
+      const list = symbols
+        .split(/[,\s]+/)
+        .map((s) => s.trim().toUpperCase())
+        .filter(Boolean);
+      const res = await fetch("/api/live-plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          scan: true,
+          account: 1000,
+          peak: 1000,
+          symbols: list.join(","),
+          noModel: liveFast,
+        }),
+      });
+      const json = (await res.json()) as ApiEnvelope<LiveScanResponse>;
+      if (!res.ok || json.ok === false || !json.data) {
+        throw new Error(json.error ?? `Live scan failed (${res.status})`);
+      }
+      setLivePayload(json.data);
+    } catch (e) {
+      setLiveError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLiveScanning(false);
+    }
+  }, [symbols, liveFast]);
 
   const calls = useMemo(() => {
     if (payload?.calls?.length) return payload.calls;
@@ -385,10 +471,41 @@ export function ScanDesk() {
           type="button"
           className="scan-btn"
           onClick={run}
-          disabled={loading}
+          disabled={loading || liveScanning}
         >
           {loading ? "Scanning…" : "Run VPA scan"}
         </button>
+      </div>
+
+      <div
+        className="scan-controls"
+        style={{ borderTop: "1px dashed var(--td-hairline)", paddingTop: "0.75rem" }}
+      >
+        <span className="scan-label" style={{ alignSelf: "center" }}>
+          Live market scan
+        </span>
+        <label className="scan-check">
+          <input
+            type="checkbox"
+            checked={liveFast}
+            onChange={(e) => setLiveFast(e.target.checked)}
+          />
+          Fast (skip model)
+        </label>
+        <button
+          type="button"
+          className="scan-btn"
+          onClick={() => void runLive()}
+          disabled={loading || liveScanning}
+        >
+          {liveScanning ? "Scanning live…" : "Scan opportunities"}
+        </button>
+        <Link
+          href="/live?mode=watch"
+          className="scan-btn scan-btn--secondary no-underline"
+        >
+          Full watch board
+        </Link>
       </div>
 
       {error ? <p className="scan-error">{error}</p> : null}
@@ -400,6 +517,9 @@ export function ScanDesk() {
           asof {payload.asof} · {payload.count ?? allRows.length} names
         </p>
       ) : null}
+
+      {liveError ? <p className="scan-error">{liveError}</p> : null}
+      <LiveOppsPanel payload={livePayload} />
 
       {payload?.sectors ? <SectorPanel sectors={payload.sectors} /> : null}
 

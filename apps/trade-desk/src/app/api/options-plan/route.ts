@@ -114,6 +114,13 @@ export async function POST(req: Request) {
     liveError = e instanceof Error ? e.message : String(e);
   }
 
+  const ticket = live?.ticket;
+  const mode = ticket?.mode ?? live?.decision?.mode ?? "STAND_ASIDE";
+  const vehicle = ticket?.vehicle ?? live?.decision?.vehicle ?? "none";
+  const action = ticket?.action ?? live?.decision?.action ?? "abstain";
+  const attackPath = mode === "OPTIONS_ATTACK" && action === "enter";
+  const side = live?.live?.go_short && !live?.live?.go_long ? "short" : "long";
+
   // Always propose structure so the desk can show "what the contract would be"
   // even when risk mode says stand aside (clearly labeled).
   let structure: OptionsPlanResponse["structure"] = null;
@@ -125,12 +132,20 @@ export async function POST(req: Request) {
         symbol,
         "--account",
         String(account),
+        "--side",
+        side,
         // UI/route speak percent points; Python --risk-pct is a fraction.
         ...(riskOk ? ["--risk-pct", String(riskPct / 100)] : []),
       ],
       60_000,
     )) as Record<string, unknown>;
     structure = raw as OptionsPlanResponse["structure"];
+    if (structure && !attackPath) {
+      if (structure.action === "buy") {
+        structure.action = "skip";
+        structure.reason = `Reference proposal only (mode is ${mode}) — options entry inactive.`;
+      }
+    }
   } catch (e) {
     structureError = e instanceof Error ? e.message : String(e);
   }
@@ -169,10 +184,6 @@ export async function POST(req: Request) {
   } catch (e) {
     unusualFlowError = e instanceof Error ? e.message : String(e);
   }
-
-  const ticket = live?.ticket;
-  const mode = ticket?.mode ?? live?.decision?.mode ?? "STAND_ASIDE";
-  const vehicle = ticket?.vehicle ?? live?.decision?.vehicle ?? "none";
 
   const doNext: string[] = [];
   if (String(mode).includes("OPTIONS") && structure && structure.action === "buy") {

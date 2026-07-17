@@ -53,6 +53,7 @@ from risk_manager import (  # noqa: E402
     decision_to_dict,
     plan_entry,
 )
+from confidence_runtime import clamp_ordinal_confidence  # noqa: E402
 
 def _sanitize_nan(obj: Any) -> Any:
     """Replace NaN/±Infinity with None so downstream JSON.parse is safe."""
@@ -1108,7 +1109,14 @@ def _compute_state(mod, code: str, df: pd.DataFrame, model_name: str, live: bool
         "near_ema22": near_22_pull,
         "lost_200": lost_200,
         "reclaim_200": reclaim_200,
-        "confidence": round(c, 3),
+        # P0-4: every active calibrator in this repo is an identity map
+        # today (ordinal score, not a probability — see
+        # docs/ML_PROD_READINESS_PLAN.md G3 and confidence_runtime.py's
+        # clamp_ordinal_confidence). Clamp at this serving boundary so no
+        # desk/UI/plan consumer of trade_desk output ever sees an
+        # unsupported ordinal reading above the highest reliability bin
+        # with adequate support.
+        "confidence": clamp_ordinal_confidence(round(c, 3)),
         "min_confidence": min_confidence,
         "setup_ok": setup_kind in ("classic_buy", "breakout_buy"),
         "setup_kind": setup_kind,
@@ -1119,12 +1127,12 @@ def _compute_state(mod, code: str, df: pd.DataFrame, model_name: str, live: bool
         "coiling": coiling,
         "hard_gates_ok": hard,
         "sleeve_fraction": round(float(sleeve), 3),
-        "hit_probability": round(hit_prob, 3),
+        "hit_probability": clamp_ordinal_confidence(round(hit_prob, 3)),
         "hit_probability_kind": "heuristic_probability_like_score_not_calibrated",
         "prior_wr": prior,
         "prior_source": prior_source,
         "gen_signal": None if gen_signal is None else round(float(gen_signal), 4),
-        "engine_confidence": None if gen_conf is None else round(float(gen_conf), 4),
+        "engine_confidence": clamp_ordinal_confidence(None if gen_conf is None else round(float(gen_conf), 4)),
         "engine_confidence_kind": gen_conf_kind,
         "confidence_kind": gen_conf_kind or "heuristic_probability_like_score_not_calibrated",
         "confidence_source": (
@@ -1749,9 +1757,13 @@ def _print_analyze(payload: dict) -> None:
         print("-" * 64)
         print("  BEST MODELS FOR THIS STOCK (past backtests)")
         for r in ranks[:3]:
+            wr = r.get("win_rate")
+            sh = r.get("sharpe")
+            wr_str = f"won {wr:.0%} of trades" if wr is not None else "no backtest WR"
+            sh_str = f"Sharpe {sh:.2f}" if sh is not None else "no Sharpe"
             print(
                 f"    #{r['rank']} {r['model']:<20} "
-                f"won {r['win_rate']:.0%} of trades, Sharpe {r['sharpe']:.2f}"
+                f"{wr_str}, {sh_str}"
             )
         print("    Tip: retry with  --model auto  to use #1 engine for this name")
     print("=" * 64)

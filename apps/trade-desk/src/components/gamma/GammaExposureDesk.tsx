@@ -337,6 +337,8 @@ export function GammaExposureDesk({
       setLoading(true);
       setError(null);
       setLiveError(null);
+      setGamma(null);
+      setLive(null);
 
       let currentExp = selectedExpiry;
       if (opts?.targetExpiry !== undefined) {

@@ -57,10 +57,12 @@ def _resolve_analysis_model(
     h = _mr.normalize_horizon(horizon)
     try:
         if probe and hasattr(_mr, "select_model_for_confidence"):
-            # Fast path for analysis: router scores only (no live multi-probe).
-            # live_plan still probes when model=auto.
+            # Probe top router candidates for live raw probability so we can
+            # select the same model as live_plan.
+            def _probe(sym: str, mid: str) -> dict[str, Any]:
+                return _lp.try_model_confidence(sym, model=mid)
             rec = _mr.select_model_for_confidence(
-                symbol, horizon=h, desk_only=True, max_probe=6, probe_fn=None
+                symbol, horizon=h, desk_only=True, max_probe=4, probe_fn=_probe
             )
             return rec.get("model"), rec
         rec = _mr.recommend_model(symbol, desk_only=True, horizon=h)

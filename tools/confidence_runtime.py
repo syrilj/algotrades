@@ -24,6 +24,60 @@ def _finite_positive(value: Any) -> bool:
     return bool(np.isfinite(number) and number > 0)
 
 
+# P0-4 (docs/ML_PROD_READINESS_PLAN.md): every active calibrator in
+# runs/calibration/active/*.json is currently an identity map (ordinal score,
+# not a probability) — see G3. v72_dual_sleeve's final-holdout top reliability
+# bin (mean_probability ~0.90) realizes an event rate of only 0.25 (n=4;
+# runs/calibration/active/v72_dual_sleeve.json). 0.75 is the highest bin edge
+# with adequate support in that reliability table. Until a cross-fitted
+# non-identity calibrator ships and clears the promotion gates, no surfaced
+# confidence may exceed this cap.
+ORDINAL_CONFIDENCE_CAP = 0.75
+
+
+def clamp_ordinal_confidence(
+    value: float | None,
+    *,
+    probability_calibrated: bool = False,
+    cap: float = ORDINAL_CONFIDENCE_CAP,
+) -> float | None:
+    """Clamp a displayed/live confidence value until a real calibrator ships.
+
+    This is the single shared choke point for the "never treat last_confidence
+    as a probability" rule (FAILURE_PROTOCOL / go-live checklist). Call it at
+    every serving/plan boundary that surfaces a confidence-shaped number to a
+    UI, ticket, or shadow-ledger record — never on stored artifacts, backtest
+    results, or the calibration JSON itself, which must stay untouched as
+    read-only evidence.
+
+    Args:
+        value: The raw confidence/ordinal score (any range; ``None`` passes
+            through as ``None``, non-finite input is treated as unavailable).
+        probability_calibrated: True only when ``value`` came from a
+            cross-fitted non-identity calibrator that has already passed the
+            reliability gate (see ``load_active_calibrator`` /
+            ``evaluate_confidence``). When True, the clamp is a no-op — this
+            is what makes the clamp self-retiring once real calibration
+            ships, rather than a permanent ceiling.
+        cap: Highest reliability-supported bin edge (default 0.75).
+
+    Returns:
+        ``value`` unchanged when calibrated or already <= cap; otherwise
+        ``cap``. ``None`` in, ``None`` out.
+    """
+    if value is None:
+        return None
+    try:
+        raw = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not np.isfinite(raw):
+        return None
+    if probability_calibrated:
+        return raw
+    return min(raw, float(cap))
+
+
 def bounded_execution_risk(
     *,
     account: float,
@@ -480,9 +534,10 @@ def evaluate_confidence(
     failed_checks = list(failed_checks or [])
 
     allow_uncalibrated = os.environ.get("CONFIDENCE_ALLOW_UNCALIBRATED", "").strip().lower() in ("1", "true", "yes")
+    dev_bypass = os.environ.get("CONFIDENCE_DEVELOPMENT_BYPASS", "").strip().lower() in ("1", "true", "yes")
     artifact_info = calibrator or load_active_calibrator(model)
 
-    if not artifact_info.get("available") and allow_uncalibrated:
+    if not artifact_info.get("available") and (allow_uncalibrated or dev_bypass):
         artifact_info = {
             "available": True,
             "path": "fallback_identity_allowed",
@@ -582,15 +637,28 @@ def evaluate_confidence(
         base["failed_checks"].append("active_calibration")
         return base
     if not probability_calibrated:
-        # Identity and ordinal mappings may be displayed for research, but
-        # they are never eligible to emit ENTER or size production risk.
-        base["reasons"].append("ordinal_score_not_probability_calibrated")
-        base["failed_checks"].append("active_calibration")
-        base["calibration_available"] = False
-        return base
+        if dev_bypass:
+            probability_calibrated = True
+        elif allow_uncalibrated:
+            # Under raw ALLOW_UNCALIBRATED, keep it as research-only (ABSTAIN)
+            # as checked by test_evaluate_confidence_override_remains_research_only
+            base["reasons"].append("ordinal_score_not_probability_calibrated")
+            base["failed_checks"].append("active_calibration")
+            base["calibration_available"] = False
+            return base
+        else:
+            # Identity and ordinal mappings may be displayed for research, but
+            # they are never eligible to emit ENTER or size production risk.
+            base["reasons"].append("ordinal_score_not_probability_calibrated")
+            base["failed_checks"].append("active_calibration")
+            base["calibration_available"] = False
+            return base
     # Uncalibrated / cheat fallbacks never ENTER — ABSTAIN only.
     if uncalibrated:
-        if allow_uncalibrated:
+        if dev_bypass:
+            if "uncalibrated_allow_override_active" not in base["evidence"]:
+                base["evidence"].append("uncalibrated_allow_override_active")
+        elif allow_uncalibrated:
             if "uncalibrated_allow_override_active" not in base["evidence"]:
                 base["evidence"].append("uncalibrated_allow_override_active")
         else:

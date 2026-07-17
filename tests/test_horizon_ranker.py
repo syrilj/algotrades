@@ -197,3 +197,130 @@ def test_ranker_best_allows_relative_negative_scores(tmp_path, monkeypatch):
     assert hit is not None
     assert hit["model"] == "v39d_confluence"
     assert hit["relative_only"] is True
+    # (c) Neither row has window_metrics, so recomputed confidence is 0.0 for
+    # both — selection must fall back to the legacy score-based pick above,
+    # and the router-facing flag must say so.
+    assert hit["confidence"] == 0.0
+    assert hit["low_confidence"] is True
+
+
+def _ranker_full_window(n: int, wr: float, plr: float, dd: float = -0.08) -> dict:
+    return {
+        "status": "ok",
+        "trade_count": n,
+        "win_rate": wr,
+        "profit_loss_ratio": plr,
+        "profit_factor": plr * wr / max(1e-9, 1 - wr),
+        "max_drawdown": dd,
+        "total_return": 0.2,
+        "sharpe": 1.5,
+    }
+
+
+def test_ranker_best_prefers_high_confidence_over_high_score(tmp_path, monkeypatch):
+    """(a) A high-confidence row must outrank a higher-score, low-confidence row."""
+    import json
+    from datetime import datetime, timezone
+
+    sym = "CONF"
+    root = tmp_path / "symbol_ranker" / sym
+    root.mkdir(parents=True)
+
+    low_conf_row = {
+        "model": "v_lowconf_highscore",
+        "status": "ok",
+        "score": 0.9,
+        "claim_level": "RESEARCH",
+        "desk_runnable": True,
+        "trade_count": 40,
+        "reliability": 0.5,
+        "win_rate": 0.55,
+        "sharpe": 0.5,
+        "oos_consistency": 1.0,
+        # 55% WR at PLR 1.2 on 40 trades: Wilson LB below breakeven -> 0 confidence.
+        "window_metrics": {
+            "full": _ranker_full_window(40, 0.55, 1.2),
+            "recent": {"status": "ok", "trade_count": 13, "total_return": 0.1},
+        },
+    }
+    high_conf_row = {
+        "model": "v_highconf_lowscore",
+        "status": "ok",
+        "score": 0.2,
+        "claim_level": "RESEARCH",
+        "desk_runnable": True,
+        "trade_count": 60,
+        "reliability": 0.5,
+        "win_rate": 0.70,
+        "sharpe": 1.5,
+        "oos_consistency": 1.0,
+        # 70% WR at PLR 2.0 on 60 trades -> strong evidence-gated confidence.
+        "window_metrics": {
+            "full": _ranker_full_window(60, 0.70, 2.0),
+            "recent": {"status": "ok", "trade_count": 20, "total_return": 0.1},
+        },
+    }
+    art = {
+        "schema": 2,
+        "symbol": sym,
+        "code": "CONF.US",
+        "horizon": "swing",
+        "asof": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "status": "complete",
+        "rows": [low_conf_row, high_conf_row],
+    }
+    (root / "RANKER.json").write_text(json.dumps(art))
+    monkeypatch.setattr(mr, "RANKER_ROOT", tmp_path / "symbol_ranker")
+
+    hit = mr.ranker_best_model(sym, desk_only=False, horizon="swing")
+    assert hit is not None
+    # Raw score favors v_lowconf_highscore (0.9 > 0.2); confidence must win instead.
+    assert hit["model"] == "v_highconf_lowscore"
+    assert hit["relative_only"] is False
+    assert hit["confidence"] >= 0.70
+
+
+def test_ranker_best_hit_includes_confidence_and_low_confidence_flag(tmp_path, monkeypatch):
+    """(b) The returned hit always carries `confidence` + `low_confidence`."""
+    import json
+    from datetime import datetime, timezone
+
+    sym = "WATCH"
+    root = tmp_path / "symbol_ranker" / sym
+    root.mkdir(parents=True)
+
+    # Positive edge but thin sample -> capped confidence, below the swing
+    # "watch" threshold (0.50), so low_confidence must be flagged True.
+    row = {
+        "model": "v_thin_edge",
+        "status": "ok",
+        "score": 0.3,
+        "claim_level": "RESEARCH",
+        "desk_runnable": True,
+        "trade_count": 8,
+        "reliability": 0.4,
+        "win_rate": 0.95,
+        "sharpe": 1.0,
+        "oos_consistency": 1.0,
+        "window_metrics": {
+            "full": _ranker_full_window(8, 0.95, 3.0),
+            "recent": {"status": "ok", "trade_count": 3, "total_return": 0.1},
+        },
+    }
+    art = {
+        "schema": 2,
+        "symbol": sym,
+        "code": "WATCH.US",
+        "horizon": "swing",
+        "asof": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "status": "complete",
+        "rows": [row],
+    }
+    (root / "RANKER.json").write_text(json.dumps(art))
+    monkeypatch.setattr(mr, "RANKER_ROOT", tmp_path / "symbol_ranker")
+
+    hit = mr.ranker_best_model(sym, desk_only=False, horizon="swing")
+    assert hit is not None
+    assert "confidence" in hit
+    assert 0.0 < hit["confidence"] <= sr.CONF_THIN_CAP
+    assert hit["low_confidence"] is True

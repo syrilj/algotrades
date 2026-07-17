@@ -419,7 +419,9 @@ def wilson_lower_bound(wins: float, n: int, z: float = Z_ONE_SIDED_90) -> float:
 
 def breakeven_win_rate(profit_loss_ratio: float) -> float:
     """Win rate needed to break even given the avg win / avg loss ratio."""
-    plr = min(10.0, max(0.1, _f(profit_loss_ratio, 1.0) or 1.0))
+    # A degenerate/zero ratio clamps to the worst case, never to neutral —
+    # an engine with no payoff evidence must not look like a coin flip.
+    plr = min(10.0, max(0.1, _f(profit_loss_ratio, 1.0)))
     return 1.0 / (1.0 + plr)
 
 

@@ -231,3 +231,45 @@
   - `v72_dual_sleeve` same window: +336.9% ret, -19.4% DD, Sharpe 2.92, 149 trades, 73.8% WR, final $4,369
 - Verdict: macro overlay does not beat v72; it trades return for deeper drawdown. Both variants trail v72 on risk-adjusted and absolute return.
 - Forward-paper harness `tools/forward_paper_v83.py` (now generic `--model`) can run any poc_va_macdha model including `v84_macro_sleeve`.
+
+## v85_online_contextual (research-only adaptive challenger)
+- `models/poc_va_macdha/v85_online_contextual/` routes a hash-locked frozen
+  DUAL/CORE/SNIPER expert bundle plus CASH with causal, cost-aware Fixed Share.
+  Experts may be selected only while flat; stress can only reduce open risk;
+  stale/missing macro context blocks new entries. `last_confidence` is ordinal
+  expert support, not a probability.
+- Corrected causal execution (`source=local`, `1H`, $1,000, 5 bp slippage +
+  5 bp commission): full +344.6% / -17.7% DD / Sharpe 2.834 / final $4,446;
+  later 2025-08-01→2026-07-11 +60.5% / -15.5% / Sharpe 2.026 / final $1,605.
+- Same-contract v72: full +469.4% / -24.7% / Sharpe 2.830; later +69.8% /
+  -23.1% / Sharpe 1.851. v85 improves risk and later Sharpe but gives up return;
+  the 0.004 full Sharpe edge is not meaningful. Verdict: **not promoted**.
+- True closed-episode precision (partial resizes collapsed, commissions
+  included): v85 full 114/155 = 73.5% (Wilson 95% 66.1%-79.9%); later 48/77 =
+  62.3% (51.2%-72.3%). The intervals overlap v72 and do not support treating
+  `last_confidence` as an 80%-90% win probability.
+- `services/market_runtime/adaptive_replay.py` supplies an exactly-once,
+  fixed-anchor completed-bar ledger with bundle pinning and restart replay
+  parity. Options observations are recorded only when neutral/non-actionable.
+- Artifacts: `runs/v85_online_contextual/LEADERBOARD.md`, `STATE.json`, and
+  `COMPARE.json`. Regenerate the report with
+  `.venv/bin/python tools/evaluate_v85_online_contextual.py`.
+- There is no untouched holdout remaining. Enable only for no-retune forward
+  paper; production ENTER/probability sizing stays blocked until a cross-fitted
+  beta/other valid calibrator and forward evidence pass promotion gates.
+
+## v86_anti_overfit_soft (robustness/stress check, 2026-07-16)
+- `models/poc_va_macdha/v86_anti_overfit_soft/` is a frozen, **no-retuning** overlay on `v72_dual_sleeve`: drops SPY from the book, soft-sizes every other symbol to 50%/100% of the v72 weight based on a volume-expansion + no-red-flag-up confidence filter (`tools/institutional_flow`/`v39d` VPA state).
+- Headline (`source=local`, `1H`, $1,000, `EQUITY_WINNER_BAG`): full +327.7% ret, -12.9% DD, Sharpe 2.88, 147 trades, 76.2% WR; later (2025-08-01→2026-07-11) +62.6% ret, -11.8% DD, Sharpe 2.05, 69 trades, 72.5% WR.
+- Ran `tools/evaluate_v86_anti_overfit_soft.py`: re-runs the *unmodified* candidate across the 4 rolling `VALIDATION_FOLDS_1H` OOS windows (F1-F4) plus 2x-commission and 2x-commission+spread cost stress. This is explicitly not a parameter hunt — the overlay thresholds are pre-registered "no retuning" in the model's own docstring, and re-tuning on the already-consumed 2024-08-01→2026-07-11 window would be in-sample optimization.
+- Result: all 4 folds positive (+43.6%/+19.2%/+15.9%/+5.1%), majority beaten by `v72_dual_sleeve` on raw return (F1/F2/F4) with one near-tie (F3), consistent with the overlay trading some upside for lower drawdown/volatility. Both stress scenarios hold positive return and Sharpe > 1.5 in the `later` window (commission_2x: +49.7%/Sharpe 1.73; commission_2x_plus_spread: +41.8%/Sharpe 1.51).
+- Verdict: **not promoted** (still research-only, no untouched holdout consumed by this check — LOCKBOX 2026-04-16→2026-07-11 deliberately not touched). It survives rolling-fold and cost-stress sanity checks without a deep-loss fold, but does not beat `v72_dual_sleeve` on raw return in most sub-periods; its case is lower drawdown, not higher return.
+- Artifacts: `runs/v86_anti_overfit_soft/{LEADERBOARD.md,STATE.json,COMPARE.json,STRESS.json}`.
+
+## v87_arete_orderflow (Arete price-action + OHLCV order-flow skeleton)
+- `models/poc_va_macdha/v87_arete_orderflow/` implements the 6-step discretionary confluence recipe as a frozen, non-ML `SignalEngine`.
+- Components: SPY/QQQ trend + RS gate; recent swing-low pain-point zone; volume z-score (v44 `volume_price_state`); bullish-engulfing + higher-high trigger; candle-pressure + CVD + absorption-bias alignment (v44 `order_flow_state`); composite 0-100 score; in-trade score/ATR/time exits.
+- Vendors `v44_absorption/signal_engine.py` via `DEPENDENCIES.json` so the contract is hash-locked; parameters are pre-registered and must not be retuned on the consumed lockbox.
+- Run: `dmr.run_one(dmr.discover_models(['v87_arete_orderflow'])[0], mode='daily', codes=["TSLA.US", "MU.US", "SPY.US", "IONQ.US", "APLD.US", "XLP.US", "QQQ.US"], start='2024-08-01', end='2026-07-11', tag='verify', cash=1000, source='local', interval='1H')`
+- Full-period smoke (`source=local`, `1H`, $1,000, `EQUITY_WINNER_BAG`): +0.3% ret, -0.64% max DD, Sharpe 0.26, **13 trades**, **61.5% WR**, final $1,003.
+- Verdict: **research skeleton, not promoted**. The OHLCV-only order-flow proxies and strict engulfing/zone filter produce very few trades and no edge versus buy-and-hold over the full window. It is intentionally left as a calibration/forward-paper starting point; any re-thresholding must happen on a new holdout or live paper, not the consumed 2024-08-01→2026-07-11 period.

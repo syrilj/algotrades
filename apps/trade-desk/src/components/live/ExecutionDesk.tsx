@@ -196,6 +196,10 @@ export function ExecutionDesk() {
   const [optionsFeedError, setOptionsFeedError] = useState<string | null>(null);
   const [optionsLoading, setOptionsLoading] = useState(false);
   const [showReadinessDetails, setShowReadinessDetails] = useState(false);
+  const [showOverride, setShowOverride] = useState(false);
+  const [overrideShares, setOverrideShares] = useState(1);
+  const [overrideEntry, setOverrideEntry] = useState(0);
+  const [overrideStop, setOverrideStop] = useState(0);
   const lastPlannedRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -209,8 +213,12 @@ export function ExecutionDesk() {
       setSymbol(sym);
       setLoading(true);
       setError(null);
+      setPlan(null);
+      setGammaFeed(null);
+      setOptionsFeed(null);
 
       setShowReadinessDetails(false);
+      setShowOverride(false);
       try {
         const response = await fetch("/api/live-plan", {
           method: "POST",
@@ -328,6 +336,37 @@ export function ExecutionDesk() {
     void loadOptionsFeed(plan.symbol);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plan?.symbol, plan?.asof_utc]);
+
+  // Synchronize manual override sizer defaults with new plan details
+  useEffect(() => {
+    if (plan) {
+      const entryVal = plan.live?.price || plan.model?.entry || 100;
+      setOverrideEntry(entryVal);
+      const isShort = plan.live?.go_short && !plan.live?.go_long;
+      const stopVal = plan.model?.stop || (isShort ? entryVal * 1.05 : entryVal * 0.95);
+      setOverrideStop(Number(stopVal.toFixed(2)));
+      
+      const riskPerShare = Math.abs(entryVal - stopVal);
+      const maxLoss = 50; // default $50 risk for $1k account
+      const sharesVal = riskPerShare > 0 ? Math.max(1, Math.floor(maxLoss / riskPerShare)) : 1;
+      setOverrideShares(sharesVal);
+    }
+  }, [plan]);
+
+  const overrideOrder = useMemo(() => {
+    if (!plan) return null;
+    const isShort = plan.live?.go_short && !plan.live?.go_long;
+    return {
+      symbol: plan.symbol,
+      side: isShort ? ("short" as const) : ("long" as const),
+      shares: overrideShares,
+      entry: overrideEntry,
+      stop: overrideStop,
+      dollarRisk: overrideShares * Math.abs(overrideEntry - overrideStop),
+      model: plan.model?.model || plan.model_used || "auto",
+      account: account,
+    };
+  }, [plan, overrideShares, overrideEntry, overrideStop, account]);
 
   const freshness = plan?.live?.freshness ?? plan?.confidence?.data_freshness;
   const feed = useMemo(() => feedPresentation(freshness), [freshness]);
@@ -561,7 +600,36 @@ export function ExecutionDesk() {
             </div>
 
             <div className="exec-decision__body">
-              <div className="exec-decision__order w-full">
+              <div className="exec-decision__evidence">
+                <span className="td-eyebrow mb-3 block">VERIFICATION CHECKLIST</span>
+                <ul className="flex flex-col gap-3 mt-3 list-none p-0">
+                  {Object.entries(plan.execution_readiness?.checks || {}).map(([key, check]: [string, { passed?: boolean; detail?: string }]) => {
+                    const passed = check.passed;
+                    const displayName = key
+                      .replace(/_/g, " ")
+                      .replace(/\b\w/g, (c) => c.toUpperCase());
+                    return (
+                      <li key={key} className="flex items-start gap-2 text-[12px] leading-snug">
+                        {passed ? (
+                          <CheckCircle2 size={14} className="shrink-0 mt-0.5" style={{ color: "var(--td-success)" }} />
+                        ) : (
+                          <AlertTriangle size={14} className="shrink-0 mt-0.5" style={{ color: "var(--td-gate-fail)" }} />
+                        )}
+                        <div>
+                          <strong style={{ color: passed ? "var(--td-ink-300)" : "var(--td-muted)", fontWeight: passed ? 600 : 400 }}>
+                            {displayName}
+                          </strong>
+                          <span className="block text-[11px] text-[var(--td-muted)]">
+                            {check.detail}
+                          </span>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+
+              <div className="exec-decision__order">
                 <span className="td-eyebrow block mb-3">SIMULATED TRADE TICKET SUGGESTION</span>
                 {ticketView ? (
                   <div className="mb-4">
@@ -597,7 +665,7 @@ export function ExecutionDesk() {
                         emphasize
                       />
                     </div>
-                    {!ticketView.executable ? (
+                    {!ticketView.executable && !showOverride ? (
                       <p className="text-[11px] mb-3" style={{ color: "var(--td-muted)" }}>
                         Action <strong>{ticketView.action}</strong> — shares and sized risk only appear when
                         every execution gate passes. The desk does not invent stop levels or force ≥1 share.
@@ -627,19 +695,96 @@ export function ExecutionDesk() {
                         }}
                       >
                         <div
-                          className="flex items-center gap-2 text-[12px] font-medium"
+                          className="flex items-center justify-between gap-2 text-[12px] font-medium"
                           style={{ color: "var(--td-gate-fail)" }}
                         >
-                          <AlertTriangle className="shrink-0" size={16} />
-                          <span>
-                            Paper fill locked — stand-aside / failed gates. No client-side size override.
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <AlertTriangle className="shrink-0" size={16} />
+                            <span>
+                              Paper fill locked — stand-aside / failed gates.
+                            </span>
+                          </div>
+                          {!showOverride && (
+                            <button
+                              type="button"
+                              className="td-btn td-btn-ghost text-[11px] underline"
+                              onClick={() => setShowOverride(true)}
+                            >
+                              Override gates
+                            </button>
+                          )}
                         </div>
                       </div>
                     )}
 
                     {order ? (
                       <PaperExecution order={order} plan={plan} override={false} />
+                    ) : showOverride && overrideOrder ? (
+                      <div className="mt-4 p-4 border border-[var(--td-hairline)] rounded-lg bg-[var(--td-surface-soft)]">
+                        <div className="flex items-center justify-between mb-4 pb-2 border-b border-[var(--td-hairline)]">
+                          <span className="text-[12px] font-bold uppercase tracking-wider text-[var(--td-warning)]">Manual Override Sizer</span>
+                          <button
+                            type="button"
+                            className="text-[11px] text-[var(--td-muted)] hover:text-[var(--td-ink-300)]"
+                            onClick={() => setShowOverride(false)}
+                          >
+                            Disable Override
+                          </button>
+                        </div>
+                        <div className="grid grid-cols-3 gap-3 mb-4">
+                          <label className="td-field">
+                            <span className="td-label">Shares</span>
+                            <input
+                              type="number"
+                              min={1}
+                              value={overrideShares}
+                              onChange={(e) => setOverrideShares(Math.max(1, Number(e.target.value) || 1))}
+                              className="td-input tabular"
+                            />
+                          </label>
+                          <label className="td-field">
+                            <span className="td-label">Entry price</span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0.01"
+                              value={overrideEntry}
+                              onChange={(e) => setOverrideEntry(Math.max(0.01, Number(e.target.value) || 0.01))}
+                              className="td-input tabular"
+                            />
+                          </label>
+                          <label className="td-field">
+                            <span className="td-label flex items-center justify-between">
+                              <span>Stop level</span>
+                              <button
+                                type="button"
+                                className="text-[9px] text-[var(--td-muted)]"
+                                onClick={() => {
+                                  const isShort = plan.live?.go_short && !plan.live?.go_long;
+                                  const side = isShort ? 1.05 : 0.95;
+                                  setOverrideStop(Number((overrideEntry * side).toFixed(2)));
+                                }}
+                              >
+                                5% stop
+                              </button>
+                            </span>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0.01"
+                              value={overrideStop}
+                              onChange={(e) => setOverrideStop(Math.max(0.01, Number(e.target.value) || 0.01))}
+                              className="td-input tabular"
+                            />
+                          </label>
+                        </div>
+                        <div className="flex items-center justify-between mb-4 text-[12px] text-[var(--td-muted)]">
+                          <span>Risk per share: <strong style={{ color: "var(--td-ink-300)" }}>{formatUsd(Math.abs(overrideEntry - overrideStop))}</strong></span>
+                          <span>Max Loss: <strong style={{ color: "var(--td-ink-300)" }}>{formatUsd(Math.abs(overrideEntry - overrideStop) * overrideShares)}</strong></span>
+                          <span>Notional: <strong style={{ color: "var(--td-ink-300)" }}>{formatUsd(overrideEntry * overrideShares)}</strong></span>
+                        </div>
+                        <PaperExecution order={overrideOrder} plan={plan} override={true} />
+                      </div>
                     ) : null}
                   </div>
                 ) : (
@@ -756,8 +901,8 @@ export function ExecutionDesk() {
                 <div>
                   <span className="td-eyebrow">OPTIONS LIVE FEED</span>
                   <strong>
-                    {optionsCtx?.action === "buy"
-                      ? optionsCtx.structure ?? "Structure"
+                    {optionsCtx?.structure
+                      ? optionsCtx.structure.replaceAll("_", " ").replace(/\b\w/g, (c) => c.toUpperCase())
                       : optionsCtx
                         ? "No structure"
                         : "Not loaded"}
@@ -781,14 +926,19 @@ export function ExecutionDesk() {
               {optionsFeedError ? (
                 <p className="td-alert td-alert--error" role="alert">{optionsFeedError}</p>
               ) : null}
-              {optionsCtx?.action === "buy" ? (
-                <>
-                  <p>
-                    {optionsFeed?.mode?.includes("OPTIONS")
+              {optionsCtx && optionsCtx.structure ? (
+                <div style={{ opacity: plan.decision?.mode === "OPTIONS_ATTACK" && optionsCtx.action === "buy" ? 1 : 0.7 }}>
+                  {(plan.decision?.mode !== "OPTIONS_ATTACK" || optionsCtx.action !== "buy") && (
+                    <div className="mb-2 p-2 text-[11px] border border-dashed border-[var(--td-hairline-strong)] rounded text-[var(--td-muted)] bg-[var(--td-surface-soft)]">
+                      ℹ️ {optionsCtx.reason || "Reference proposal only. Option buying is inactive (stand-aside/equity mode)."}
+                    </div>
+                  )}
+                  <p className="text-[12px] leading-relaxed mb-3">
+                    {plan.decision?.mode === "OPTIONS_ATTACK" && optionsCtx.action === "buy"
                       ? "Attack path from live risk mode."
                       : "Defined-risk proposal from the live options chain. Not a green light unless risk mode is OPTIONS_ATTACK."}
                   </p>
-                  <div className="exec-context-stats">
+                  <div className="exec-context-stats" style={{ filter: plan.decision?.mode === "OPTIONS_ATTACK" && optionsCtx.action === "buy" ? "none" : "grayscale(40%)" }}>
                     <Stat label="Expiry" value={optionsCtx.expiry ?? "—"} />
                     <Stat label="DTE" value={String(optionsCtx.dte ?? "—")} />
                     <Stat label="Long strike" value={formatUsd(optionsCtx.long_strike)} />
@@ -796,9 +946,9 @@ export function ExecutionDesk() {
                     <Stat label="Debit/share" value={formatUsd(optionsCtx.debit_per_share)} />
                     <Stat label="Max loss" value={formatUsd(optionsCtx.max_loss_1_contract, 0)} />
                   </div>
-                </>
+                </div>
               ) : (
-                <p>
+                <p className="text-[13px] text-[var(--td-muted)]">
                   {optionsCtx?.reason ||
                     optionsCtx?.error ||
                     optionsFeed?.structure_error ||

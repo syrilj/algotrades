@@ -1,0 +1,51 @@
+{
+  "status": "research_only",
+  "promoted": false,
+  "source": "local",
+  "interval": "1H",
+  "cash": 1000.0,
+  "execution": {
+    "causal_execution": true,
+    "causal_commission_rate": 0.0005,
+    "commission": 0.0005,
+    "slippage_us": 0.0005,
+    "rebalance_tolerance": 0.05
+  },
+  "full": {
+    "start": "2024-08-01",
+    "end": "2026-07-11",
+    "return": 3.4463686882274462,
+    "max_drawdown": -0.17727258708786772,
+    "sharpe": 2.8341441351278895,
+    "final_value": 4446.368688227446,
+    "execution_records": 225,
+    "execution_record_win_rate": 0.6933333333333334,
+    "closed_episodes": 155,
+    "episode_wins": 114,
+    "episode_win_rate": 0.7354838709677419,
+    "episode_win_rate_wilson_95": [
+      0.6609585721290563,
+      0.7986187678121177
+    ]
+  },
+  "later": {
+    "start": "2025-08-01",
+    "end": "2026-07-11",
+    "return": 0.6045595560438182,
+    "max_drawdown": -0.15459072327965623,
+    "sharpe": 2.0258645810348477,
+    "final_value": 1604.5595560438182,
+    "execution_records": 108,
+    "execution_record_win_rate": 0.6018518518518519,
+    "closed_episodes": 77,
+    "episode_wins": 48,
+    "episode_win_rate": 0.6233766233766234,
+    "episode_win_rate_wilson_95": [
+      0.511725974706673,
+      0.7233015358819349
+    ]
+  },
+  "later_is_untouched_holdout": false,
+  "confidence_kind": "ordinal_online_expert_support_not_probability",
+  "verdict": "Lower drawdown and stronger later-period Sharpe than v72, but lower return and no untouched holdout or completed forward-paper evidence."
+}

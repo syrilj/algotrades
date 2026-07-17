@@ -10,7 +10,50 @@
       "path": "models/poc_va_macdha/v72_dual_sleeve",
       "signal_engine_sha256": "26025102b5cc10980f584ec449951fe060cdd11b9512426968fe82fd0b312633",
       "config_sha256": "a0466a8081ffc97571a77bb5b5303a1261280dde4a1dc6cde64f1abb8527d6b5",
-      "results_sha256": "a84160010a651e6736c7ffb4d0fae09b72213a8e953a40c6861d7687ad3ef930"
+      "results_sha256": "a84160010a651e6736c7ffb4d0fae09b72213a8e953a40c6861d7687ad3ef930",
+      "dependency_policy": "required",
+      "dependencies": [
+        {
+          "path": "models/poc_va_macdha/v72_dual_sleeve/hunt_config.json",
+          "sha256": "d0dbbe4cd226750597536b24a8057a597346862ad668e6d3c191ba6c3975e5a8"
+        },
+        {
+          "path": "models/poc_va_macdha/v71_live_confidence/signal_engine.py",
+          "sha256": "f62285a57b325c6386dcf3341fb78fd6725766d0394e7ca3aa35e19d55b64aae"
+        },
+        {
+          "path": "models/poc_va_macdha/v71_live_confidence/gates.py",
+          "sha256": "5f4877f8723cab5fb16d804502b5bcc773a9aab3b85d6f133c99a50fbdb51a54"
+        },
+        {
+          "path": "models/poc_va_macdha/v71_live_confidence/hunt_config.json",
+          "sha256": "625a896279e47de636ea030b84073063959387b8bd3b9788a5566927c9ee1afb"
+        },
+        {
+          "path": "models/poc_va_macdha/v45_ultimate_rsi/signal_engine.py",
+          "sha256": "52fca244456739c441b9851c2aceabc74abbc3fb215cce839875e64e07f0e2e1"
+        },
+        {
+          "path": "models/poc_va_macdha/v45_ultimate_rsi/config.json",
+          "sha256": "63d692ec2dc76a3e30eb1a980003f12105bc88fd3a798552b5a0a67b94306353"
+        },
+        {
+          "path": "models/poc_va_macdha/v39d_confluence/signal_engine.py",
+          "sha256": "82c1516a2bbc68d8d699858633dd392489b80fe1fbcbb9a6763a03f36de800a5"
+        },
+        {
+          "path": "models/poc_va_macdha/v39d_confluence/meta_config.json",
+          "sha256": "fabf8c8d4ed33ac8656921bb9c2f60c36b916a2b19f65bcde38bab072b8957c1"
+        },
+        {
+          "path": "models/poc_va_macdha/v39d_confluence/meta_xgb_final.json",
+          "sha256": "4f94d512bc58e4c9c1a9c2ed76dbf139ff1ca568d089fe3c32399648566dc3b3"
+        },
+        {
+          "path": "models/poc_va_macdha/v39d_confluence/candidate_ledger.py",
+          "sha256": "e0b0fa56df8fd268908d9334e044803f37d64426ff0d056423888c444d647e38"
+        }
+      ]
     }
   },
   "fallbacks": {

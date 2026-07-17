@@ -13,6 +13,17 @@ import { Stat } from "@/components/ui/Stat";
 import { TradeButton } from "@/components/analyze/TradeButton";
 import { gammaHref, liveHref, optionsHref } from "@/lib/routes";
 import { formatPct } from "@/lib/format";
+import {
+  CheckCircle2,
+  XCircle,
+  Info,
+  TrendingUp,
+  Activity,
+  Layers,
+  Award,
+  Shield,
+  HelpCircle,
+} from "lucide-react";
 
 function fmt(n: number | null | undefined, digits = 2): string {
   if (n == null || !Number.isFinite(n)) return "—";
@@ -105,22 +116,35 @@ export function VerdictPanel({
   if (empty || !state || !plan) {
     return (
       <aside
-        className="td-panel td-ticket td-ticket--empty"
+        className="td-panel td-ticket td-ticket--empty flex flex-col gap-4 p-6"
+        style={{ background: "var(--td-surface-card)", borderColor: "var(--td-hairline)" }}
         aria-label="Verdict"
       >
-        <p className="td-ticker" style={{ fontSize: "1.15rem" }}>
-          No ticket yet
-        </p>
+        <div className="flex items-center gap-2 border-b border-[var(--td-hairline)] pb-3">
+          <HelpCircle className="w-5 h-5 text-[var(--td-ink-400)]" />
+          <p className="text-md font-semibold text-[var(--td-ink)]">
+            No ticket generated yet
+          </p>
+        </div>
         <ol
-          className="flex flex-col gap-1.5 text-[13px]"
+          className="flex flex-col gap-2 text-[13px]"
           style={{ color: "var(--td-ink-300)" }}
         >
-          <li>1. Enter a ticker above and press Run</li>
-          <li>2. Read action → do next → size</li>
-          <li>3. Route to Live (risk) or Options (structure)</li>
+          <li className="flex gap-2">
+            <span className="font-mono text-[var(--td-ink-500)]">1.</span>
+            <span>Enter a ticker above and select a model, then press Run</span>
+          </li>
+          <li className="flex gap-2">
+            <span className="font-mono text-[var(--td-ink-500)]">2.</span>
+            <span>Evaluate action recommendation, execution steps, and optimal size</span>
+          </li>
+          <li className="flex gap-2">
+            <span className="font-mono text-[var(--td-ink-500)]">3.</span>
+            <span>Route directly to Live risk desk or Options spread selector</span>
+          </li>
         </ol>
-        <p className="text-[12px]" style={{ color: "var(--td-ink-500)" }}>
-          Or open a name from Watch / Picks — deep-links auto-run.
+        <p className="text-[12px] italic" style={{ color: "var(--td-ink-500)" }}>
+          Tip: You can click any winner bag asset on the landing page to auto-run a routed plan.
         </p>
       </aside>
     );
@@ -132,170 +156,203 @@ export function VerdictPanel({
 
   return (
     <aside
-      className="td-panel td-ticket"
+      className="td-panel td-ticket relative overflow-hidden flex flex-col gap-4 rounded-xl border"
       style={{
-        background: `color-mix(in oklch, ${rail.color} 7%, var(--td-ink-900))`,
-        borderColor: `color-mix(in oklch, ${rail.color} 55%, var(--td-hairline))`,
+        background: "var(--td-surface-card)",
+        borderColor: "var(--td-hairline)",
+        borderLeft: `4px solid ${rail.color}`,
+        padding: "1.5rem",
+        boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
       }}
       aria-label="Verdict"
     >
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      {/* Header Row */}
+      <div className="flex flex-wrap items-center justify-between gap-4 border-b border-[var(--td-hairline)] pb-4">
         <div className="flex flex-col gap-1">
-          <span className="td-label">Operator ticket</span>
+          <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--td-muted)] flex items-center gap-1.5">
+            <Shield className="w-3.5 h-3.5" style={{ color: rail.color }} />
+            Operator Trade Ticket
+          </span>
           <div className="flex flex-wrap items-baseline gap-3">
-            <span className="td-ticker">{sym}</span>
-            <span className="td-ticker-price">{fmt(state.price)}</span>
-            {model ?? state.model ? (
-              <span
-                className="text-[11px]"
-                style={{ fontFamily: "var(--td-font-mono)", color: "var(--td-ink-400)" }}
-              >
-                {model ?? state.model}
-              </span>
-            ) : null}
+            <span className="td-ticker" style={{ fontSize: "1.75rem", fontWeight: 800 }}>{sym}</span>
+            <span className="td-ticker-price text-lg font-mono font-bold text-[var(--td-ink)]">{fmtUsd(state.price)}</span>
+            <span className="text-xs font-mono text-[var(--td-ink-400)] bg-[var(--td-surface-elevated)] px-2 py-0.5 rounded">
+              {model ?? state.model}
+            </span>
           </div>
-          {model ?? state.model ? (
-            <p className="td-ticket__engine">
-              <span>Selected engine</span>
-              <strong>{model ?? state.model}</strong>
-              {selection?.reason ? <small>{selection.reason}</small> : null}
+          {selection?.reason ? (
+            <p className="text-[11px] text-[var(--td-muted)] flex items-center gap-1 mt-0.5">
+              <Award className="w-3 h-3 text-[var(--td-brand)] shrink-0" />
+              <span>{selection.reason}</span>
             </p>
           ) : null}
         </div>
         <ActionChip action={plan.action} size="lg" />
       </div>
 
-      <div>
-        <span className="td-label">Do this</span>
-        <p className="td-do-next">{plan.do_next}</p>
+      {/* Recommended Action Hero Banner */}
+      <div className="p-4 rounded-lg bg-[var(--td-surface-elevated)] border-l-2" style={{ borderColor: rail.color }}>
+        <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--td-muted)] block mb-1">Recommended Action</span>
+        <p className="text-sm font-semibold text-[var(--td-ink-100)] leading-relaxed uppercase">{plan.do_next || plan.why}</p>
       </div>
 
-      <div>
-        <span className="td-label">Steps</span>
-        <ol className="mt-1 flex flex-col gap-1.5 list-none p-0">
-          {steps.map((s, i) => (
-            <li
-              key={`${i}-${s.slice(0, 24)}`}
-              className="flex gap-2 text-[13px] leading-snug"
-              style={{ color: "var(--td-ink-200)" }}
-            >
-              <span
-                className="tabular shrink-0"
-                style={{
-                  fontFamily: "var(--td-font-mono)",
-                  color: "var(--td-ink-500)",
-                }}
-              >
-                {i + 1}.
-              </span>
-              <span>{s}</span>
-            </li>
-          ))}
-        </ol>
-      </div>
-
-      <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
-        <Stat label="Entry" value={fmt(state.entry)} emphasize />
-        <Stat label="Stop" value={fmt(state.stop)} emphasize />
-        <Stat label="Shares" value={size ? String(size.shares) : "—"} emphasize />
-        <Stat label="$ risk" value={size ? fmtUsd(size.dollar_risk) : "—"} emphasize />
-      </div>
-
-      <div className="flex flex-wrap gap-2">
-        {state && plan && model ? (
-          <TradeButton
-            symbol={sym}
-            state={state}
-            plan={plan}
-            size={size}
-            model={model ?? state.model}
-            reason={selection?.reason}
-          />
-        ) : null}
-        <Link href={liveHref(sym)} className="td-btn td-btn-primary no-underline">
-          Open Live
-        </Link>
-        <Link href={optionsHref(sym)} className="td-btn td-btn-ghost no-underline">
-          Options structure
-        </Link>
-        <Link href={gammaHref(sym)} className="td-btn td-btn-ghost no-underline">
-          Gamma
-        </Link>
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <ConfidenceMeter
-          value={state.confidence ?? 0}
-          label="Structure readiness"
-        />
-        <div className="grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-3">
-          <Stat
-            label="Hit chance"
-            value={formatPct(state.hit_probability, 0)}
-          />
-          <Stat
-            label="Setup"
-            value={state.setup_kind ?? (state.setup_ok ? "buy" : "wait")}
-          />
-          <Stat
-            label="RVOL"
-            value={
-              state.rvol != null
-                ? `${state.rvol.toFixed(1)}x${state.vol_dry ? " dry" : state.vol_surge ? " ↑" : ""}`
-                : "—"
-            }
-          />
-        </div>
-        <p className="text-[11px] leading-snug" style={{ color: "var(--td-ink-500)" }}>
-          Structure = share of desk gates true (not win probability). Hit = estimated chance from
-          structure + history. Low structure alone is not an AVOID — check setup + do-next.
-        </p>
-      </div>
-
-      <details className="td-details">
-        <summary className="td-details__summary">Why · levels · model</summary>
-        <div className="mt-3 flex flex-col gap-3">
+      {/* Two-Column Structured Split */}
+      <div className="flex flex-col lg:flex-row gap-6 w-full">
+        {/* Left Column: Core Trade Parameters & Execution */}
+        <div className="flex-1 flex flex-col gap-4">
           <div>
-            <span className="td-label">Why</span>
-            <p className="text-[13px] leading-snug" style={{ color: "var(--td-ink-300)" }}>
-              {plan.why}
-            </p>
-            {plan.confidence_note ? (
-              <p className="mt-1 text-[11px]" style={{ color: "var(--td-ink-500)" }}>
-                {plan.confidence_note}
-              </p>
-            ) : null}
+            <span className="td-label text-xs uppercase tracking-wider text-[var(--td-muted)] mb-2 block">Position Sizing & Levels</span>
+            <div className="grid grid-cols-2 gap-3 p-3 rounded-lg border border-[var(--td-hairline)] bg-[var(--td-surface-soft)]">
+              <Stat label="Entry Target" value={state.entry != null ? fmtUsd(state.entry) : "Market"} emphasize />
+              <Stat label="Stop Loss" value={state.stop != null ? fmtUsd(state.stop) : "—"} emphasize />
+              <Stat label="Shares Size" value={size ? String(size.shares) : "—"} emphasize />
+              <Stat label="Dollar Risk" value={size ? fmtUsd(size.dollar_risk) : "—"} emphasize />
+            </div>
           </div>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
-            <Stat label="Trail arm" value={fmt(state.trail_arm)} />
-            <Stat label="Risk / sh" value={fmt(state.risk_per_share)} />
-            {size ? (
-              <>
-                <Stat label="Notional" value={fmtUsd(size.notional)} />
-                <Stat label="Risk %" value={formatPct(size.risk_pct, 2)} />
-                <Stat label="Account" value={fmtUsd(size.account)} />
-              </>
+
+          {size && size.shares > 0 ? (
+            <div className="grid grid-cols-3 gap-2 text-center text-xs p-2.5 rounded border border-[var(--td-hairline)] bg-[var(--td-surface-soft)]/50 font-mono">
+              <div>
+                <span className="text-[10px] text-[var(--td-muted)] block">Notional</span>
+                <span className="font-semibold text-[var(--td-ink)]">{fmtUsd(size.notional)}</span>
+              </div>
+              <div>
+                <span className="text-[10px] text-[var(--td-muted)] block">Risk %</span>
+                <span className="font-semibold text-[var(--td-ink)]">{formatPct(size.risk_pct, 2)}</span>
+              </div>
+              <div>
+                <span className="text-[10px] text-[var(--td-muted)] block">Account</span>
+                <span className="font-semibold text-[var(--td-ink)]">{fmtUsd(size.account)}</span>
+              </div>
+            </div>
+          ) : null}
+
+          {/* Action Buttons */}
+          <div className="flex flex-col gap-2 mt-2">
+            {state && plan && model ? (
+              <TradeButton
+                symbol={sym}
+                state={state}
+                plan={plan}
+                size={size}
+                model={model ?? state.model}
+                reason={selection?.reason}
+              />
             ) : null}
-          </div>
-          <div
-            className="flex flex-col gap-0.5 border-t pt-3 text-[11px]"
-            style={{ borderColor: "var(--td-ink-700)", color: "var(--td-ink-400)" }}
-          >
-            <span
-              style={{ fontFamily: "var(--td-font-mono)", color: "var(--td-ink-200)" }}
-            >
-              {model ?? state.model}
-            </span>
-            {selection?.source === "symbol_ranker" ? (
-              <span className="td-chip text-[10px]" style={{ alignSelf: "flex-start" }}>
-                via ranker
-              </span>
-            ) : null}
-            {selection?.reason ? <span>{selection.reason}</span> : null}
-            <span>asof {state.asof ?? "—"}</span>
+            <div className="grid grid-cols-3 gap-2">
+              <Link href={liveHref(sym)} className="td-btn td-btn-primary flex items-center justify-center gap-1.5 text-xs py-2 no-underline">
+                <Activity className="w-3.5 h-3.5" />
+                Live Risk
+              </Link>
+              <Link href={optionsHref(sym)} className="td-btn td-btn-ghost flex items-center justify-center gap-1.5 text-xs py-2 no-underline">
+                <Layers className="w-3.5 h-3.5" />
+                Options
+              </Link>
+              <Link href={gammaHref(sym)} className="td-btn td-btn-ghost flex items-center justify-center gap-1.5 text-xs py-2 no-underline">
+                <TrendingUp className="w-3.5 h-3.5" />
+                Gamma
+              </Link>
+            </div>
           </div>
         </div>
-      </details>
+
+        {/* Right Column: Confidence Reasoning & Checklist */}
+        <div className="flex-1 flex flex-col gap-4 border-t lg:border-t-0 lg:border-l border-[var(--td-hairline)] pt-4 lg:pt-0 lg:pl-6">
+          <div className="flex flex-col gap-3">
+            <ConfidenceMeter
+              value={state.confidence ?? 0}
+              label="Structure Readiness"
+            />
+
+            <div className="grid grid-cols-2 gap-2 mt-1">
+              <div className="p-2 rounded bg-[var(--td-surface-soft)] border border-[var(--td-hairline)]">
+                <span className="text-[10px] text-[var(--td-muted)] block">Hit Probability</span>
+                <span className="text-sm font-mono font-bold text-[var(--td-ink)]">{formatPct(state.hit_probability, 0)}</span>
+              </div>
+              <div className="p-2 rounded bg-[var(--td-surface-soft)] border border-[var(--td-hairline)]">
+                <span className="text-[10px] text-[var(--td-muted)] block">RVOL Ratio</span>
+                <span className="text-sm font-mono font-bold text-[var(--td-ink)]">
+                  {state.rvol != null
+                    ? `${state.rvol.toFixed(1)}x${state.vol_dry ? " dry" : state.vol_surge ? " ↑" : ""}`
+                    : "—"}
+                </span>
+              </div>
+            </div>
+
+            {state.confidence_source ? (
+              <div className="text-[10px] text-[var(--td-muted)] font-mono flex items-center gap-1.5 bg-[var(--td-surface-soft)] p-2 rounded border border-[var(--td-hairline)]">
+                <Info className="w-3.5 h-3.5 text-[var(--td-brand)] shrink-0" />
+                <span>Source: {String(state.confidence_source).replace(/_/g, " ")}</span>
+              </div>
+            ) : null}
+          </div>
+
+          {/* Checklist of Gates */}
+          {plan.checklist && plan.checklist.length > 0 ? (
+            <div>
+              <span className="td-label text-xs uppercase tracking-wider text-[var(--td-muted)] mb-2 block">Structural Gate Checklist</span>
+              <div className="flex flex-col gap-2 max-h-[160px] overflow-y-auto pr-1 border border-[var(--td-hairline)] rounded-lg p-2.5 bg-[var(--td-surface-soft)]">
+                {plan.checklist.map((item) => (
+                  <div key={item.key} className="flex items-start gap-2 text-xs">
+                    {item.ok ? (
+                      <CheckCircle2 className="w-4 h-4 text-[var(--td-action-buy-now)] shrink-0 mt-0.5" />
+                    ) : (
+                      <XCircle className="w-4 h-4 text-[var(--td-action-avoid)] shrink-0 mt-0.5" />
+                    )}
+                    <span className={item.ok ? "text-[var(--td-ink-200)]" : "text-[var(--td-ink-400)]"}>
+                      {item.label}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      {/* Collapsible Lower Section for Explanation & Steps */}
+      <div className="border-t border-[var(--td-hairline)] pt-4 mt-2">
+        <details className="td-details border border-[var(--td-hairline)] rounded-lg bg-[var(--td-surface-soft)]" open={false}>
+          <summary className="td-details__summary font-mono text-[10px] font-bold text-[var(--td-ink-300)] hover:text-[var(--td-ink)] select-none">
+            Why · Steps · System Details
+          </summary>
+          <div className="mt-4 flex flex-col gap-4 text-xs">
+            <div>
+              <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--td-muted)] block mb-1.5">Execution Steps</span>
+              <ol className="flex flex-col gap-2 p-0 list-none m-0">
+                {steps.map((s, i) => (
+                  <li key={i} className="flex gap-2.5 items-start text-[var(--td-ink-200)] bg-[var(--td-surface-card)] p-2.5 rounded border border-[var(--td-hairline)]">
+                    <span className="w-5 h-5 rounded-full bg-[var(--td-surface-elevated)] flex items-center justify-center font-mono font-bold text-[10px] text-[var(--td-muted)] shrink-0 border border-[var(--td-hairline)]">
+                      {i + 1}
+                    </span>
+                    <span className="leading-normal">{s}</span>
+                  </li>
+                ))}
+              </ol>
+            </div>
+
+            <div>
+              <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--td-muted)] block mb-1.5">Stance Analysis</span>
+              <p className="text-[var(--td-ink-200)] leading-relaxed bg-[var(--td-surface-card)] p-2.5 rounded border border-[var(--td-hairline)] m-0">{plan.why}</p>
+            </div>
+
+            {plan.confidence_note ? (
+              <div>
+                <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--td-muted)] block mb-1.5">Confidence Note</span>
+                <p className="p-2.5 rounded bg-[var(--td-surface-card)] border border-[var(--td-hairline)] font-mono text-[10px] text-[var(--td-muted)] m-0">
+                  {plan.confidence_note}
+                </p>
+              </div>
+            ) : null}
+
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 font-mono text-[10px] text-[var(--td-muted)] border-t border-[var(--td-hairline)] pt-3">
+              <div>Trail arm: <span className="text-[var(--td-ink-200)] font-semibold">${fmt(state.trail_arm)}</span></div>
+              <div>Risk / sh: <span className="text-[var(--td-ink-200)] font-semibold">${fmt(state.risk_per_share)}</span></div>
+              {state.asof ? <div>asof: <span className="text-[var(--td-ink-200)] font-semibold">{state.asof}</span></div> : null}
+            </div>
+          </div>
+        </details>
+      </div>
     </aside>
   );
 }

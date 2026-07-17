@@ -121,6 +121,74 @@ def fit_isotonic(raw: Iterable[float], labels: Iterable[float]) -> dict[str, lis
     return {"x": x.tolist(), "y": y.tolist()}
 
 
+def fit_platt(
+    raw: Iterable[float],
+    labels: Iterable[float],
+    *,
+    grid_points: int = 101,
+    max_iter: int = 100,
+    tol: float = 1e-10,
+) -> dict[str, Any]:
+    """Platt scaling: sigmoid(a*s + b) with Platt-1999 target smoothing.
+
+    Exported as a dense monotone x/y curve so ``apply_isotonic`` (the runtime's
+    interpolation) applies it with no runtime change. Smoothed targets keep the
+    map strictly inside (0, 1) — it can never emit the degenerate 0/1 blocks
+    that make small-sample isotonic fail the log-loss gate.
+    """
+    s = np.asarray(list(raw), dtype=float)
+    y = np.asarray(list(labels), dtype=float)
+    if len(s) == 0 or len(s) != len(y):
+        raise ValueError("raw and labels must be non-empty and equally sized")
+    n_pos = float((y > 0.5).sum())
+    n_neg = float(len(y) - n_pos)
+    t_pos = (n_pos + 1.0) / (n_pos + 2.0)
+    t_neg = 1.0 / (n_neg + 2.0)
+    t = np.where(y > 0.5, t_pos, t_neg)
+
+    a, b = 1.0, 0.0
+    ridge = 1e-6  # keeps the 2x2 Newton system solvable on degenerate inputs
+    for _ in range(max_iter):
+        z = np.clip(a * s + b, -35.0, 35.0)
+        p = 1.0 / (1.0 + np.exp(-z))
+        g = p - t
+        grad = np.array([np.dot(g, s), g.sum()])
+        w = p * (1.0 - p)
+        h11 = np.dot(w, s * s) + ridge
+        h12 = np.dot(w, s)
+        h22 = w.sum() + ridge
+        det = h11 * h22 - h12 * h12
+        if not np.isfinite(det) or abs(det) < 1e-12:
+            break
+        da = (h22 * grad[0] - h12 * grad[1]) / det
+        db = (h11 * grad[1] - h12 * grad[0]) / det
+        a -= da
+        b -= db
+        if abs(da) < tol and abs(db) < tol:
+            break
+    if not np.isfinite(a) or not np.isfinite(b):
+        a, b = 1.0, 0.0
+    # A negative slope would invert the ranking — that is anti-signal, refuse it.
+    a = max(a, 1e-6)
+    grid = np.linspace(0.0, 1.0, max(21, int(grid_points)))
+    z = np.clip(a * grid + b, -35.0, 35.0)
+    curve = np.clip(1.0 / (1.0 + np.exp(-z)), EPS, 1.0 - EPS)
+    curve = np.maximum.accumulate(curve)
+    return {
+        "x": grid.tolist(),
+        "y": curve.tolist(),
+        "method": "platt",
+        "a": float(a),
+        "b": float(b),
+    }
+
+
+_CALIBRATOR_FITTERS: dict[str, Any] = {
+    "isotonic": fit_isotonic,
+    "platt": fit_platt,
+}
+
+
 def apply_isotonic(raw: Iterable[float], calibrator: dict[str, list[float]]) -> np.ndarray:
     values = _clip_probability(raw)
     x = np.asarray(calibrator.get("x", []), dtype=float)
@@ -192,25 +260,67 @@ def build_calibration_artifact(
     interval: str = "1H",
     n_splits: int = 5,
     embargo_hours: int = 1,
+    methods: tuple[str, ...] = ("isotonic", "platt"),
     candidate_sharpe: float | None = None,
     candidate_dd: float | None = None,
     baseline_sharpe: float | None = None,
     baseline_dd: float | None = None,
 ) -> dict[str, Any]:
-    """Build a candidate artifact and report sequential OOS calibration."""
+    """Build a candidate artifact and report sequential OOS calibration.
+
+    Each method in ``methods`` is cross-fitted in the same embargoed folds;
+    the winner is the method whose OOF metrics clear the most core gates
+    (Brier/log-loss improve vs raw, ECE ≤ 0.05), tie-broken by OOF log-loss.
+    Selection uses only OOF data — the final holdout stays untouched evidence.
+    """
     frame = frame.sort_values("entry_ts").reset_index(drop=True)
     folds = _folds(frame, n_splits=n_splits, embargo=timedelta(hours=embargo_hours))
     if not folds:
         raise ValueError("insufficient matured candidates for sequential calibration")
-    oof_rows: list[pd.DataFrame] = []
-    for train, test in folds:
-        calibrator = fit_isotonic(train["raw_probability"], train["label"])
-        scored = test[["entry_ts", "code", "raw_probability", "label", "realized_r"]].copy()
-        scored["calibrated_probability"] = apply_isotonic(test["raw_probability"], calibrator)
-        oof_rows.append(scored)
-    oof = pd.concat(oof_rows, ignore_index=True)
-    raw_metrics = calibration_metrics(oof["label"], oof["raw_probability"])
-    cal_metrics = calibration_metrics(oof["label"], oof["calibrated_probability"])
+    unknown = [m for m in methods if m not in _CALIBRATOR_FITTERS]
+    if unknown or not methods:
+        raise ValueError(f"unknown calibration methods: {unknown or methods}")
+
+    per_method: dict[str, dict[str, Any]] = {}
+    raw_metrics: dict[str, Any] = {}
+    for method in methods:
+        fitter = _CALIBRATOR_FITTERS[method]
+        oof_rows: list[pd.DataFrame] = []
+        for train, test in folds:
+            calibrator = fitter(train["raw_probability"], train["label"])
+            scored = test[["entry_ts", "code", "raw_probability", "label", "realized_r"]].copy()
+            scored["calibrated_probability"] = apply_isotonic(test["raw_probability"], calibrator)
+            oof_rows.append(scored)
+        m_oof = pd.concat(oof_rows, ignore_index=True)
+        if not raw_metrics:
+            raw_metrics = calibration_metrics(m_oof["label"], m_oof["raw_probability"])
+        m_metrics = calibration_metrics(m_oof["label"], m_oof["calibrated_probability"])
+        gates_cleared = sum(
+            (
+                m_metrics["brier"] <= raw_metrics["brier"],
+                m_metrics["log_loss"] <= raw_metrics["log_loss"],
+                m_metrics["ece"] <= 0.05,
+            )
+        )
+        per_method[method] = {
+            "oof": m_oof,
+            "metrics": m_metrics,
+            "gates_cleared": gates_cleared,
+        }
+
+    winner = min(
+        per_method,
+        key=lambda m: (-per_method[m]["gates_cleared"], per_method[m]["metrics"]["log_loss"]),
+    )
+    method_selection = {
+        "evaluated": list(methods),
+        "winner": winner,
+        "oof_metrics": {m: per_method[m]["metrics"] for m in methods},
+        "rule": "most core gates cleared (brier/log_loss vs raw, ece<=0.05), then lowest OOF log_loss",
+    }
+    fit_winner = _CALIBRATOR_FITTERS[winner]
+    oof = per_method[winner]["oof"]
+    cal_metrics = per_method[winner]["metrics"]
     action = oof[oof["calibrated_probability"] >= DEFAULT_ENTER]
     action_lower = bootstrap_mean_lower(action["realized_r"], seed=7) if len(action) else None
     final_test_start = frame["entry_ts"].quantile(0.8)
@@ -220,7 +330,7 @@ def build_calibration_artifact(
         timedelta(hours=embargo_hours),
     )
     final_test = frame[frame["entry_ts"] >= final_test_start]
-    final_calibrator = fit_isotonic(train["raw_probability"], train["label"])
+    final_calibrator = fit_winner(train["raw_probability"], train["label"])
     final_probs = apply_isotonic(final_test["raw_probability"], final_calibrator)
     final_raw_metrics = calibration_metrics(final_test["label"], final_test["raw_probability"])
     final_metrics = calibration_metrics(final_test["label"], final_probs)
@@ -275,6 +385,7 @@ def build_calibration_artifact(
         and promotion["portfolio"]["sharpe_gate"]
         and promotion["portfolio"]["drawdown_gate"]
     )
+    promotion["calibration_type"] = winner
     return {
         "schema_version": "confidence-calibration-v1",
         "status": "candidate",
@@ -283,6 +394,8 @@ def build_calibration_artifact(
         "interval": interval,
         "raw_probability": "adj_proba_or_meta_proba",
         "label": "realized_r > 0",
+        "calibration_type": winner,
+        "method_selection": method_selection,
         "calibrator": final_calibrator,
         "thresholds": {"watch": DEFAULT_WATCH, "enter": DEFAULT_ENTER},
         "dataset": {

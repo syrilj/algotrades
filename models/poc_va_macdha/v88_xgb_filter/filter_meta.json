@@ -1,0 +1,33 @@
+{
+  "schema_version": "xgb-filter-meta-v1",
+  "trained_at_utc": "2026-07-17T18:30:30.512338+00:00",
+  "features": [
+    "dist_ema22_atr",
+    "dist_ema50_atr",
+    "dist_vwap_atr",
+    "body_atr",
+    "bb_width",
+    "dist_hh20_atr",
+    "lower_wick_atr",
+    "dist_ema200_atr",
+    "macd_hist_slope_atr",
+    "macd_hist_atr"
+  ],
+  "threshold": 0.75,
+  "train_rows": 92,
+  "train_window_only": true,
+  "num_boost_round": 14,
+  "params": {
+    "objective": "binary:logistic",
+    "eval_metric": "logloss",
+    "eta": 0.05,
+    "max_depth": 3,
+    "min_child_weight": 2,
+    "subsample": 1.0,
+    "colsample_bytree": 0.8,
+    "lambda": 1.0,
+    "alpha": 1.0,
+    "seed": 7
+  },
+  "status": "research_only_not_promoted"
+}

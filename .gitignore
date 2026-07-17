@@ -67,3 +67,10 @@ graphify-out/
 # Manim output
 media/
 .worktrees/
+
+# Editor / agent state
+.agents/
+.claude/
+.cursor/
+.superpowers/
+.claude_resources.json

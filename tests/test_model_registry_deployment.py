@@ -54,6 +54,29 @@ def test_tampered_active_fails_over_to_declared_rollback(monkeypatch, tmp_path):
     assert registry.equity_default_model() == "v39d_confluence"
 
 
+def test_required_transitive_dependency_is_hash_verified(monkeypatch, tmp_path):
+    _, _, manifest = _setup(monkeypatch, tmp_path)
+    dependency = tmp_path / "models" / "child" / "signal_engine.py"
+    dependency.parent.mkdir(parents=True)
+    dependency.write_text("CHILD = True\n")
+    payload = json.loads(manifest.read_text())
+    payload["active"]["bundle"].update(
+        {
+            "dependency_policy": "required",
+            "dependencies": [
+                {
+                    "path": "models/child/signal_engine.py",
+                    "sha256": _sha(dependency),
+                }
+            ],
+        }
+    )
+    manifest.write_text(json.dumps(payload))
+    assert registry.load_deployment_manifest()["active"]["equity_model"] == "v72_dual_sleeve"
+    dependency.write_text("TAMPERED = True\n")
+    assert registry.load_deployment_manifest() == {}
+
+
 def test_symbol_route_remains_competitive(monkeypatch, tmp_path):
     _setup(monkeypatch, tmp_path)
     monkeypatch.setattr(

@@ -148,6 +148,32 @@ def load_deployment_manifest(*, verify_active: bool = True) -> dict[str, Any]:
                 artifact = MODELS_ROOT / model / name
                 if pinned and (not artifact.is_file() or _sha256(artifact) != pinned):
                     return {}
+            dependency_policy = str(bundle.get("dependency_policy") or "").lower()
+            dependencies = bundle.get("dependencies") or []
+            if dependency_policy == "required" and not dependencies:
+                return {}
+            if dependencies and not isinstance(dependencies, list):
+                return {}
+            # Resolve pins from the deployment tree rather than process cwd or
+            # a mutable module-level repository constant. Production uses
+            # <root>/models/poc_va_macdha; isolated tests may use <tmp>/models.
+            dependency_root = (
+                MODELS_ROOT.parent.parent
+                if MODELS_ROOT.parent.name == "models"
+                else MODELS_ROOT.parent
+            ).resolve()
+            for dependency in dependencies:
+                if not isinstance(dependency, dict):
+                    return {}
+                relative = dependency.get("path")
+                pinned = str(dependency.get("sha256") or "")
+                if not isinstance(relative, str) or not relative or not pinned:
+                    return {}
+                artifact = (dependency_root / relative).resolve()
+                if dependency_root not in artifact.parents or not artifact.is_file():
+                    return {}
+                if _sha256(artifact) != pinned:
+                    return {}
             external = [data.get("calibration"), *(data.get("promotion_evidence") or [])]
             for record in external:
                 if not isinstance(record, dict) or not record.get("artifact"):
@@ -1046,16 +1072,17 @@ def rank_models_for_symbol(symbol: str, engines_only: bool = False) -> list[dict
     # Pin desk specialist to the front for analysis / auto.
     desk = desk_specialist_for_symbol(code)
     if desk:
+        existing = next((r for r in ranked if r["model"] == desk["model"]), None)
         pinned = {
             "model": desk["model"],
             "has_engine": True,
             "code": code,
-            "win_rate": None,
-            "sharpe": None,
-            "profit_factor": None,
-            "max_drawdown": None,
-            "total_return": None,
-            "trade_count": None,
+            "win_rate": existing["win_rate"] if existing else None,
+            "sharpe": existing["sharpe"] if existing else None,
+            "profit_factor": existing["profit_factor"] if existing else None,
+            "max_drawdown": existing["max_drawdown"] if existing else None,
+            "total_return": existing["total_return"] if existing else None,
+            "trade_count": existing["trade_count"] if existing else None,
             "score": 1.0,  # display pin; not a backtest claim
             "source": "desk_specialist",
             "specialist": desk.get("specialist"),
@@ -1180,8 +1207,43 @@ def ranker_best_model(
             -(int(r.get("trade_count") or 0)),
         )
 
-    pool.sort(key=_rank_key)
-    row = pool[0]
+    # Evidence-gated confidence: prefer stored `confidence` when the artifact
+    # row already carries it (new-style RANKER writes); otherwise recompute
+    # from window_metrics so old artifacts get the same treatment. Import is
+    # lazy + guarded because symbol_ranker imports model_registry back (module
+    # cycle) — never module-level here.
+    try:
+        import symbol_ranker as _symbol_ranker
+    except Exception:
+        _symbol_ranker = None
+
+    def _row_confidence_value(r: dict[str, Any]) -> float:
+        stored = r.get("confidence")
+        if isinstance(stored, (int, float)) and not isinstance(stored, bool):
+            return float(stored)
+        if _symbol_ranker is not None:
+            try:
+                res = _symbol_ranker.row_confidence(r)
+                return float(res.get("confidence") or 0.0)
+            except Exception:
+                return 0.0
+        return 0.0
+
+    # Selection: highest-confidence row wins within the pool. Only fall back
+    # to the legacy score-based ordering (_rank_key alone) when every row in
+    # the pool has zero confidence — i.e. no statistical evidence to
+    # discriminate on, so relative_only's existing semantics still govern.
+    scored_pool = [(_row_confidence_value(r), r) for r in pool]
+    if any(c > 0 for c, _ in scored_pool):
+        scored_pool.sort(key=lambda item: (-item[0],) + _rank_key(item[1]))
+    else:
+        scored_pool.sort(key=lambda item: _rank_key(item[1]))
+    row = scored_pool[0][1]
+    row_conf = scored_pool[0][0]
+
+    thresholds = horizon_confidence_thresholds(h)
+    low_confidence = row_conf < float(thresholds.get("watch", 0.50))
+
     return {
         "model": row["model"],
         "score": float(row.get("score") or 0),
@@ -1194,6 +1256,8 @@ def ranker_best_model(
         "relative_only": relative_only,
         "reliability": row.get("reliability"),
         "trade_count": row.get("trade_count"),
+        "confidence": round(row_conf, 4),
+        "low_confidence": bool(low_confidence),
     }
 
 
@@ -1295,10 +1359,31 @@ def select_model_for_confidence(
         mid = str(row.get("model") or "")
         if mid and mid not in cands:
             cands.append(mid)
-    cands = [m for m in cands if m][: max(1, int(max_probe))]
+    all_cands = [m for m in cands if m]
+    cands = all_cands[: max(1, int(max_probe))]
+
+    # An engine without an active probability calibrator always ABSTAINs at the
+    # confidence gate, so it must never outrank a sizable engine. Lazy module
+    # import: confidence_runtime imports model_registry back (function-level).
+    def _calibratable(mid: str) -> bool:
+        try:
+            import confidence_runtime as _cr
+
+            return bool(_cr.load_active_calibrator(mid).get("available"))
+        except Exception:  # noqa: BLE001
+            return False
+
+    # Probe-cap rescue: when nothing above the cutoff can be sized, pull in the
+    # best-routed calibratable engine so the desk never bricks on selection.
+    if not any(_calibratable(m) for m in cands):
+        for mid in all_cands[len(cands):]:
+            if _calibratable(mid):
+                cands.append(mid)
+                break
 
     probes: list[dict[str, Any]] = []
     best: dict[str, Any] | None = None
+    best_calibratable: dict[str, Any] | None = None
 
     for mid in cands:
         aff = model_horizon_affinity(mid, h)
@@ -1339,10 +1424,20 @@ def select_model_for_confidence(
             conf_score = float(row_base.get("final_score") or 0.0) * (0.55 + 0.45 * aff)
             probe["ok"] = True
         probe["confidence_score"] = round(conf_score, 4)
+        probe["calibration_available"] = _calibratable(mid)
         probes.append(probe)
         if best is None or conf_score > float(best.get("confidence_score") or -1):
             best = probe
+        if probe["calibration_available"] and (
+            best_calibratable is None
+            or conf_score > float(best_calibratable.get("confidence_score") or -1)
+        ):
+            best_calibratable = probe
 
+    # Calibratable winner takes precedence; legacy ordering only when the gate
+    # is closed for every candidate (analysis still renders, fail-closed holds).
+    if best_calibratable is not None:
+        best = best_calibratable
     winner_model = (best or {}).get("model") or routed.get("model")
     winner_probe = best or {"model": winner_model, "confidence_score": 0.0}
     # Reuse router_confidence as floor; lift when probe found high raw+setup.
@@ -1365,8 +1460,10 @@ def select_model_for_confidence(
         "reason": (
             f"confidence_ranker[{h}]: {winner_model} "
             f"conf_score={winner_probe.get('confidence_score')} "
-            f"raw={raw_w} setup_ok={winner_probe.get('setup_ok')}"
+            f"raw={raw_w} setup_ok={winner_probe.get('setup_ok')} "
+            f"calibrated={bool(winner_probe.get('calibration_available'))}"
         ),
+        "calibration_available": bool(winner_probe.get("calibration_available")),
         "source": "confidence_ranker",
         "horizon": h,
         "router": routed,

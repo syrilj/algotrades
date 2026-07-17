@@ -50,6 +50,7 @@ from confidence_runtime import (  # noqa: E402
     assess_execution_readiness,
     assess_data_freshness,
     bounded_execution_risk,
+    clamp_ordinal_confidence,
     evaluate_confidence,
     load_active_calibrator,
 )
@@ -469,6 +470,13 @@ def plan_symbol(
         model_info = try_model_confidence(
             symbol, model="auto" if model in ("", "auto") else model
         )
+        if model_info.get("confidence") is not None:
+            # P0-4: display-only clamp. ``raw_probability`` is left untouched
+            # below (it feeds the real evaluate_confidence() calibration
+            # gate) — only the "confidence" field surfaced verbatim in
+            # out["model"] is capped here, matching trade_desk's own
+            # serving-boundary clamp for callers that bypass trade_desk.
+            model_info = {**model_info, "confidence": clamp_ordinal_confidence(model_info["confidence"])}
 
     go_long = bool(live.get("go_long"))
     go_short = bool(live.get("go_short"))
@@ -514,6 +522,17 @@ def plan_symbol(
         setup_trend_ok = trend_ok and bool(
             live.get("macd_positive") or go_long or soft_long or conf >= 0.65
         )
+
+    # P0-4: no active calibrator in this repo is non-identity today (see
+    # confidence_runtime.clamp_ordinal_confidence). ``conf`` here is the
+    # blended live+model *ordinal* score that feeds SetupSnapshot.model_conf
+    # (risk-manager mode/conviction) and the plan's displayed
+    # blended_confidence — clamp it so neither UI nor sizing ever consumes
+    # the unsupported 0.85-0.95 range. ``model_probability`` below is the
+    # separate raw input to the real evaluate_confidence() calibration gate
+    # and must stay unclamped so a future non-identity calibrator still sees
+    # the true raw score.
+    conf = clamp_ordinal_confidence(conf) or 0.0
 
     model_probability = model_info.get("raw_probability") if model_info.get("ok") else None
     model_setup_ok = bool(model_info.get("setup_ok")) if model_info.get("ok") else False
@@ -627,7 +646,10 @@ def plan_symbol(
         if isinstance(options_plan, dict):
             attack_path = decision.mode == "OPTIONS_ATTACK" and decision.action == "enter"
             options_plan["attack_path"] = bool(attack_path)
-            if not attack_path and options_plan.get("action") == "buy":
+            if not attack_path:
+                if options_plan.get("action") == "buy":
+                    options_plan["action"] = "skip"
+                    options_plan["reason"] = f"Reference proposal only (mode is {decision.mode}) — options entry inactive."
                 options_plan["proposal_only"] = True
                 options_plan.setdefault(
                     "note",

@@ -20,6 +20,7 @@ import {
 } from "@/components/pipeline/PipelineFlow";
 import { RiskAssessmentPanel } from "@/components/risk/RiskAssessmentPanel";
 import { PageHeader } from "@/components/shell/PageHeader";
+import { QuickActionRail } from "@/components/command-center/QuickActionRail";
 import type { AnalyzeResponse, ApiEnvelope, ModelMetaConfig } from "@/lib/types";
 
 function AnalyzePageInner() {
@@ -140,7 +141,7 @@ function AnalyzePageInner() {
   const commandCenterIdle = phase === "idle" && !symbol && !qSymbol;
 
   return (
-    <div className="td-page">
+    <div className="td-page td-command-theme">
       <PageHeader
         eyebrow="Desk"
         title="Command"
@@ -164,6 +165,8 @@ function AnalyzePageInner() {
 
       {commandCenterIdle ? (
         <div className="flex flex-col gap-6 mb-6">
+          <QuickActionRail />
+
           {/* Typographic Serif Header */}
           <header className="td-landing-hero">
             <h1 className="td-landing-title">Start with the market, not a conclusion.</h1>

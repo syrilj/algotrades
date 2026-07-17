@@ -1,0 +1,32 @@
+{
+  "schema_version": "stress-config-v1",
+  "model": "v72_dual_sleeve",
+  "note": "P0-2 cost & slippage stress scenarios (docs/ML_PROD_READINESS_PLAN.md). Baseline promotion cost model is zero commission + 5 bps slippage per side (GlobalEquityEngine US path); each scenario ADDS the costs below on top of that base. slippage_bps values are per side; thin names (IONQ, APLD) carry 2x the SPY haircut per the plan.",
+  "pass_bar": {
+    "holdout_return_gt": 0.0,
+    "holdout_sharpe_gte": 1.0
+  },
+  "scenarios": [
+    {
+      "id": "commission_2x",
+      "description": "2x the nominal 0.001 commission: 0.002 notional charged per fill (entry and exit).",
+      "stress_commission_per_side": 0.002,
+      "slippage_bps": {}
+    },
+    {
+      "id": "commission_2x_plus_spread",
+      "description": "0.002 per-side commission plus per-symbol spread haircut; thin names 2x SPY (per side).",
+      "stress_commission_per_side": 0.002,
+      "slippage_bps": {
+        "SPY.US": 5,
+        "QQQ.US": 5,
+        "XLP.US": 5,
+        "TSLA.US": 10,
+        "MU.US": 10,
+        "IONQ.US": 20,
+        "APLD.US": 20,
+        "default": 10
+      }
+    }
+  ]
+}

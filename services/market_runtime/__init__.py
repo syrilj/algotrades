@@ -1,4 +1,5 @@
 from .catalog import classify_category, instrument_from_catalog, normalize_category
+from .adaptive_replay import AdaptiveReplayStore, replay_latest_decisions
 from .contracts import (
     Bar,
     CoverageHealth,

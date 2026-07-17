@@ -81,12 +81,29 @@ def test_day_confidence_prefers_high_wr_sleeve(symbol: str):
     ],
 )
 def test_swing_confidence_prefers_desk_specialist(symbol: str, expected_swing: str):
+    """Specialist wins its symbol — unless it cannot clear the calibration gate.
+
+    P0-4: an engine without an active probability calibrator always ABSTAINs,
+    so selection must hand the desk a sizable engine and keep the specialist
+    in the probe pool as routing evidence.
+    """
+    from confidence_runtime import load_active_calibrator
+
     hit = mr.select_model_for_confidence(symbol, horizon="swing", desk_only=True, probe_fn=None)
     assert hit["source"] == "confidence_ranker"
     assert hit["horizon"] == "swing"
-    assert hit.get("model") == expected_swing, (
-        f"{symbol} swing expected {expected_swing}, got {hit.get('model')}"
-    )
+    probed = [p.get("model") for p in (hit.get("probes") or [])]
+    if load_active_calibrator(expected_swing).get("available"):
+        assert hit.get("model") == expected_swing, (
+            f"{symbol} swing expected {expected_swing}, got {hit.get('model')}"
+        )
+    else:
+        assert expected_swing in probed, (
+            f"{symbol} swing: specialist {expected_swing} missing from probes {probed}"
+        )
+        assert hit.get("calibration_available") is True, (
+            f"{symbol} swing: winner {hit.get('model')} cannot clear the calibration gate"
+        )
     if symbol == "INFQ":
         assert hit.get("code") == "IONQ.US"
 
