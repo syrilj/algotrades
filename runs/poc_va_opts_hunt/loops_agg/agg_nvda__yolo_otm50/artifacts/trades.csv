@@ -1,5 +1,0 @@
-timestamp,code,option_type,strike,expiry,side,price,qty,pnl,entry_date
-2025-01-08,NVDA.US,call,157.0,2025-01-15,buy,0.0724,422,0.0,2025-01-08
-2025-01-13,NVDA.US,call,157.0,2025-01-15,close,0.0,422,-3054.5243,2025-01-08
-2025-01-24,NVDA.US,call,160.0,2025-01-31,buy,0.1016,228,0.0,2025-01-24
-2025-01-27,NVDA.US,call,160.0,2025-01-31,close,0.0,228,-2315.064,2025-01-24
