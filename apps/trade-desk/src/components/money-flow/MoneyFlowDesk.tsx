@@ -107,7 +107,6 @@ export type MoneyFlowReport = {
   missing_themes?: string[];
 };
 
-type SourceMode = "auto" | "local" | "yfinance";
 
 /* ─── Format helpers ─── */
 
@@ -458,7 +457,7 @@ function RankTable({
 /* ─── Main desk ─── */
 
 export function MoneyFlowDesk({ showHeader = false }: { showHeader?: boolean }) {
-  const [source, setSource] = useState<SourceMode>("auto");
+  const source = "auto" as const;
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [report, setReport] = useState<MoneyFlowReport | null>(null);
@@ -550,24 +549,12 @@ export function MoneyFlowDesk({ showHeader = false }: { showHeader?: boolean }) 
       <div className="mf-banner">
         <strong>OHLCV proxy</strong>
         <span>
-          Relative strength vs SPY is a map of price leadership, not dark-pool
-          tickets. Research only — not auto-execution.
+          Relative strength vs SPY from adjusted bars — price leadership map,
+          not dark-pool or Level-2 flow.
         </span>
       </div>
 
       <div className="mf-controls">
-        <label className="mf-label">
-          Source
-          <select
-            className="mf-select"
-            value={source}
-            onChange={(e) => setSource(e.target.value as SourceMode)}
-          >
-            <option value="auto">Auto (local + SOXX/IGV Yahoo)</option>
-            <option value="local">Local + themes</option>
-            <option value="yfinance">Yahoo live</option>
-          </select>
-        </label>
         <button
           type="button"
           className="mf-btn"

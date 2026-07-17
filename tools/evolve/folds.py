@@ -1,4 +1,4 @@
-"""Fold layout, OOS slicing, and per-fold metrics for evolve_direction_v1."""
+"""Validation/lockbox layout, slicing, and fold metrics for evolve_direction_v1."""
 from __future__ import annotations
 
 import json
@@ -13,7 +13,10 @@ from tools.evolve import scoring
 
 ROOT = Path(__file__).resolve().parents[2]
 
-# Track A (1H) — OOS folds for 2025-04 through 2026-04
+# Track A (1H) — rolling validation folds for 2025-04 through 2026-04.
+# These windows are repeatedly used for model selection and are therefore not
+# a final out-of-sample claim.  The historical oos_* keys remain as wire-format
+# aliases so existing run artifacts and callers continue to work.
 FOLDS_1H: list[dict[str, Any]] = [
     {
         "name": "F1",
@@ -52,6 +55,12 @@ FOLDS_1H: list[dict[str, Any]] = [
         "warmup_start": "2025-12-02",
     },
 ]
+for _fold in FOLDS_1H:
+    _fold.setdefault("evaluation_role", "validation")
+    _fold.setdefault("validation_start", _fold["oos_start"])
+    _fold.setdefault("validation_end", _fold["oos_end"])
+
+VALIDATION_FOLDS_1H = FOLDS_1H
 
 LOCKBOX: dict[str, Any] = {
     "name": "LOCKBOX",
@@ -61,28 +70,34 @@ LOCKBOX: dict[str, Any] = {
     "oos_start": "2026-04-16",
     "oos_end": "2026-07-11",
     "warmup_start": "2026-03-02",
+    "evaluation_role": "untouched_lockbox",
+    "window_id": "equity_1h_lockbox_2026q2_v1",
 }
 
-# Track B (1D) — calendar-year OOS folds
+# Track B (1D) — independent calendar-year multi-lock validation folds
 _FOLDS_1D_YEARS = [2020, 2021, 2022, 2023, 2024, 2025]
 FOLDS_1D_TRACKB: list[dict[str, Any]] = []
 for y in _FOLDS_1D_YEARS:
-    oos_start = f"{y+1}-01-16"
+    validation_start = f"{y+1}-01-16"
     if y == 2025:
-        oos_end = "2026-07-11"
+        validation_end = "2026-07-11"
     else:
-        oos_end = f"{y+1}-12-31"
+        validation_end = f"{y+1}-12-31"
     FOLDS_1D_TRACKB.append(
         {
             "name": f"B{y+1}",
             "train_start": "2020-01-01",
             "train_end": f"{y}-12-31",
             "gap_days": 15,
-            "oos_start": oos_start,
-            "oos_end": oos_end,
+            "oos_start": validation_start,  # compatibility artifact key
+            "oos_end": validation_end,
             "warmup_start": f"{y}-12-02",
         }
     )
+for _fold in FOLDS_1D_TRACKB:
+    _fold.setdefault("evaluation_role", "multi_lock_validation")
+    _fold.setdefault("validation_start", _fold["oos_start"])
+    _fold.setdefault("validation_end", _fold["oos_end"])
 
 
 def _parse_dt(s: str | pd.Timestamp) -> pd.Timestamp:
@@ -176,10 +191,10 @@ def _raw_prices(trades: pd.DataFrame, slippage: float) -> pd.DataFrame:
     return trades
 
 
-def slice_oos(
-    run_dir: str | Path, oos_start: str, oos_end: str
+def slice_validation(
+    run_dir: str | Path, validation_start: str, validation_end: str
 ) -> tuple[pd.DataFrame, pd.Series]:
-    """Return (trades, equity) restricted to OOS window; equity rebased to 1.0.
+    """Return trades/equity restricted to a selection validation window.
 
     trades is one row per trade with entry/exit raw prices.
     """
@@ -197,8 +212,8 @@ def slice_oos(
         slippage = _load_slippage(run_dir)
         trades = _raw_prices(trades, slippage)
 
-    oos_start_ts = _parse_dt(oos_start)
-    oos_end_ts = _parse_dt(oos_end)
+    oos_start_ts = _parse_dt(validation_start)
+    oos_end_ts = _parse_dt(validation_end)
 
     if not trades.empty:
         trades = trades[
@@ -215,10 +230,28 @@ def slice_oos(
     return trades, eq
 
 
+def slice_oos(
+    run_dir: str | Path, oos_start: str, oos_end: str
+) -> tuple[pd.DataFrame, pd.Series]:
+    """Backward-compatible alias for :func:`slice_validation`.
+
+    The name describes the historical artifact schema, not a claim that a
+    repeatedly selected-on window is an untouched test set.
+    """
+    return slice_validation(run_dir, oos_start, oos_end)
+
+
+def slice_lockbox(
+    run_dir: str | Path, lockbox_start: str, lockbox_end: str
+) -> tuple[pd.DataFrame, pd.Series]:
+    """Slice a designated final lockbox window; callers must not tune on it."""
+    return slice_validation(run_dir, lockbox_start, lockbox_end)
+
+
 def fold_metrics(
     trades: pd.DataFrame, equity: pd.Series, bars_per_year: int
 ) -> dict[str, Any]:
-    """Compute metrics dict from OOS trade list and equity series."""
+    """Compute metrics for a validation or lockbox trade/equity slice."""
     if equity.empty or equity.iloc[0] <= 0:
         return {
             "ret": 0.0,

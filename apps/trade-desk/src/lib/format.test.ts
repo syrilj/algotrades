@@ -49,7 +49,9 @@ check("formatUsd and formatNum handle null safely", () => {
 
 check("sanitizeSymbol strips junk and uppercases", () => {
   assert.equal(sanitizeSymbol("  tsla  "), "TSLA");
-  assert.equal(sanitizeSymbol("MU.US"), "MUUS");
+  assert.equal(sanitizeSymbol("MU.US"), "MU");
+  assert.equal(sanitizeSymbol("INFQ"), "IONQ");
+  assert.equal(sanitizeSymbol("googl"), "GOOG");
   assert.equal(sanitizeSymbol(""), null);
   assert.equal(sanitizeSymbol(12), null);
 });

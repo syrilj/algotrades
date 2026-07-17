@@ -1,0 +1,12 @@
+{
+  "source": "local",
+  "codes": ["TSLA.US", "MU.US", "SPY.US", "IONQ.US", "APLD.US", "XLP.US", "QQQ.US"],
+  "interval": "1H",
+  "commission": 0.001,
+  "engine": "daily",
+  "strategy": {
+    "name": "v83_adaptive_regime",
+    "model_version": "v83_adaptive_regime",
+    "note": "Adaptive regime model. Milestone 1 skeleton initialization (v72 copy)."
+  }
+}

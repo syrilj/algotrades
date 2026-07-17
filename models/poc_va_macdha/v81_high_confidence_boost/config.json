@@ -1,0 +1,12 @@
+{
+  "source": "local",
+  "codes": ["TSLA.US", "MU.US", "SPY.US", "IONQ.US", "APLD.US", "XLP.US", "QQQ.US"],
+  "interval": "1H",
+  "commission": 0.001,
+  "engine": "daily",
+  "strategy": {
+    "name": "v81_high_confidence_boost",
+    "model_version": "v81_high_confidence_boost",
+    "note": "Frozen v72 book plus v70 high-confidence size-up on already-active positions only."
+  }
+}

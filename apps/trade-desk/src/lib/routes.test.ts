@@ -36,11 +36,11 @@ function check(name: string, fn: () => void) {
 }
 
 check("analyzeHref builds query", () => {
-  assert.equal(analyzeHref(), "/");
-  assert.equal(analyzeHref({ symbol: "tsla" }), "/?symbol=TSLA");
+  assert.equal(analyzeHref(), "/command");
+  assert.equal(analyzeHref({ symbol: "tsla" }), "/command?symbol=TSLA");
   assert.equal(
-    analyzeHref({ symbol: "MU.US", model: "v39d_confluence" }),
-    "/?symbol=MU.US&model=v39d_confluence",
+    analyzeHref({ symbol: "MU", model: "v39d_confluence" }),
+    "/command?symbol=MU&model=v39d_confluence",
   );
 });
 

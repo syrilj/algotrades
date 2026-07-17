@@ -1,0 +1,313 @@
+{
+  "confidence_kind": "uncalibrated_ordinal_rank_not_probability",
+  "data": {
+    "cash": 1000,
+    "codes": [
+      "APLD.US",
+      "ARM.US",
+      "COIN.US",
+      "IONQ.US",
+      "MSTR.US",
+      "MU.US",
+      "NVDA.US",
+      "PLTR.US",
+      "QQQ.US",
+      "RKLB.US",
+      "SPY.US",
+      "TSLA.US",
+      "XLP.US"
+    ],
+    "interval": "1H",
+    "source": "local"
+  },
+  "frequency": {
+    "historical_closed_trades": 26,
+    "historical_trades_per_month_approx": 2.3008849557522124
+  },
+  "model": "v82_frequent_confidence",
+  "promotion": {
+    "next_gate": "forward paper trade without retuning, then calibrate by tier",
+    "promoted": false,
+    "reasons": [
+      "routing was designed after historical review",
+      "no untouched forward window remains in the local two-year archive",
+      "ordinal confidence is not calibrated probability"
+    ]
+  },
+  "status": "retrospective_research_not_promoted",
+  "windows": {
+    "full": {
+      "by_symbol": {
+        "APLD.US": {
+          "n": 9,
+          "win_rate": 0.7777777777777778,
+          "wins": 7
+        },
+        "ARM.US": {
+          "n": 7,
+          "win_rate": 0.7142857142857143,
+          "wins": 5
+        },
+        "COIN.US": {
+          "n": 3,
+          "win_rate": 0.6666666666666666,
+          "wins": 2
+        },
+        "IONQ.US": {
+          "n": 2,
+          "win_rate": 0.5,
+          "wins": 1
+        },
+        "MSTR.US": {
+          "n": 2,
+          "win_rate": 0.5,
+          "wins": 1
+        },
+        "MU.US": {
+          "n": 8,
+          "win_rate": 0.875,
+          "wins": 7
+        },
+        "NVDA.US": {
+          "n": 7,
+          "win_rate": 0.8571428571428571,
+          "wins": 6
+        },
+        "PLTR.US": {
+          "n": 2,
+          "win_rate": 1.0,
+          "wins": 2
+        },
+        "QQQ.US": {
+          "n": 6,
+          "win_rate": 1.0,
+          "wins": 6
+        },
+        "RKLB.US": {
+          "n": 4,
+          "win_rate": 0.75,
+          "wins": 3
+        },
+        "SPY.US": {
+          "n": 8,
+          "win_rate": 1.0,
+          "wins": 8
+        },
+        "TSLA.US": {
+          "n": 6,
+          "win_rate": 0.8333333333333334,
+          "wins": 5
+        },
+        "XLP.US": {
+          "n": 5,
+          "win_rate": 0.8,
+          "wins": 4
+        }
+      },
+      "closed_trades": 69,
+      "dd": -0.28891088256574965,
+      "final": 1894.4955486149556,
+      "median_holding_days": 11.0,
+      "n": 69,
+      "p90_holding_days": 42.2,
+      "path": "runs/poc_va_dynamic_rank/runs/v82_frequent_confidence/reconcile_full__daily__c1000",
+      "ret": 0.8944955486149557,
+      "sharpe": 1.4690218088293094,
+      "tier_breakdown": {
+        "liquid_core_balanced": {
+          "n": 40,
+          "win_rate": 0.9,
+          "wins": 36
+        },
+        "strict_satellite": {
+          "n": 29,
+          "win_rate": 0.7241379310344828,
+          "wins": 21
+        }
+      },
+      "win_rate_wilson_95": [
+        0.7201637386871083,
+        0.8976163103200319
+      ],
+      "wins": 57,
+      "wr": 0.8260869565217391
+    },
+    "historical_check": {
+      "by_symbol": {
+        "APLD.US": {
+          "n": 3,
+          "win_rate": 0.6666666666666666,
+          "wins": 2
+        },
+        "ARM.US": {
+          "n": 1,
+          "win_rate": 0.0,
+          "wins": 0
+        },
+        "MU.US": {
+          "n": 5,
+          "win_rate": 0.8,
+          "wins": 4
+        },
+        "NVDA.US": {
+          "n": 3,
+          "win_rate": 1.0,
+          "wins": 3
+        },
+        "PLTR.US": {
+          "n": 1,
+          "win_rate": 1.0,
+          "wins": 1
+        },
+        "QQQ.US": {
+          "n": 3,
+          "win_rate": 1.0,
+          "wins": 3
+        },
+        "RKLB.US": {
+          "n": 1,
+          "win_rate": 1.0,
+          "wins": 1
+        },
+        "SPY.US": {
+          "n": 3,
+          "win_rate": 1.0,
+          "wins": 3
+        },
+        "TSLA.US": {
+          "n": 3,
+          "win_rate": 0.6666666666666666,
+          "wins": 2
+        },
+        "XLP.US": {
+          "n": 3,
+          "win_rate": 1.0,
+          "wins": 3
+        }
+      },
+      "closed_trades": 26,
+      "dd": -0.12970706252465145,
+      "final": 1391.2755747357758,
+      "median_holding_days": 10.0,
+      "n": 26,
+      "p90_holding_days": 38.5,
+      "path": "runs/poc_va_dynamic_rank/runs/v82_frequent_confidence/reconcile_historical_check__daily__c1000",
+      "ret": 0.3912755747357757,
+      "sharpe": 1.7834344880789554,
+      "tier_breakdown": {
+        "liquid_core_balanced": {
+          "n": 20,
+          "win_rate": 0.9,
+          "wins": 18
+        },
+        "strict_satellite": {
+          "n": 6,
+          "win_rate": 0.6666666666666666,
+          "wins": 4
+        }
+      },
+      "win_rate_wilson_95": [
+        0.6646880067178652,
+        0.9384996627642165
+      ],
+      "wins": 22,
+      "wr": 0.8461538461538461
+    },
+    "train_reference": {
+      "by_symbol": {
+        "APLD.US": {
+          "n": 4,
+          "win_rate": 1.0,
+          "wins": 4
+        },
+        "ARM.US": {
+          "n": 5,
+          "win_rate": 0.8,
+          "wins": 4
+        },
+        "COIN.US": {
+          "n": 2,
+          "win_rate": 0.5,
+          "wins": 1
+        },
+        "IONQ.US": {
+          "n": 1,
+          "win_rate": 1.0,
+          "wins": 1
+        },
+        "MSTR.US": {
+          "n": 2,
+          "win_rate": 0.5,
+          "wins": 1
+        },
+        "MU.US": {
+          "n": 3,
+          "win_rate": 0.6666666666666666,
+          "wins": 2
+        },
+        "NVDA.US": {
+          "n": 3,
+          "win_rate": 0.6666666666666666,
+          "wins": 2
+        },
+        "PLTR.US": {
+          "n": 1,
+          "win_rate": 1.0,
+          "wins": 1
+        },
+        "QQQ.US": {
+          "n": 1,
+          "win_rate": 1.0,
+          "wins": 1
+        },
+        "RKLB.US": {
+          "n": 2,
+          "win_rate": 1.0,
+          "wins": 2
+        },
+        "SPY.US": {
+          "n": 4,
+          "win_rate": 1.0,
+          "wins": 4
+        },
+        "TSLA.US": {
+          "n": 3,
+          "win_rate": 1.0,
+          "wins": 3
+        },
+        "XLP.US": {
+          "n": 2,
+          "win_rate": 0.5,
+          "wins": 1
+        }
+      },
+      "closed_trades": 33,
+      "dd": -0.10101988229742877,
+      "final": 1533.812734428381,
+      "median_holding_days": 9.0,
+      "n": 33,
+      "p90_holding_days": 19.6,
+      "path": "runs/poc_va_dynamic_rank/runs/v82_frequent_confidence/reconcile_train_reference__daily__c1000",
+      "ret": 0.533812734428381,
+      "sharpe": 2.4040939208768894,
+      "tier_breakdown": {
+        "liquid_core_balanced": {
+          "n": 16,
+          "win_rate": 0.8125,
+          "wins": 13
+        },
+        "strict_satellite": {
+          "n": 17,
+          "win_rate": 0.8235294117647058,
+          "wins": 14
+        }
+      },
+      "win_rate_wilson_95": [
+        0.6561176836533009,
+        0.9138923179105933
+      ],
+      "wins": 27,
+      "wr": 0.8181818181818182
+    }
+  }
+}

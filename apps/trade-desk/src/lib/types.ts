@@ -559,7 +559,7 @@ export interface VolPackageScore {
   error?: string;
 }
 
-/** Single unusual options print/flag from chain-aggregate proxy (not OPRA tape). */
+/** Single unusual options print/flag (LSE tape preferred; chain proxy fallback). */
 export interface UnusualOptionsFlag {
   symbol: string;
   expiry: string;
@@ -596,6 +596,9 @@ export interface UnusualOptionsFlow {
   session_label?: string;
   error?: string;
   expiries_used?: string[];
+  bias?: "call" | "put" | "balanced" | string;
+  upstream_error?: string;
+  fallback_source?: string;
 }
 
 export interface OptionsPlanResponse {
@@ -608,6 +611,9 @@ export interface OptionsPlanResponse {
   ticket?: LiveTicket | null;
   live?: LivePlanResponse["live"] | null;
   macro?: LivePlanResponse["macro"] | null;
+  /** Model path / calibrated confidence when live plan succeeds. */
+  model?: LivePlanResponse["model"] | null;
+  confidence?: LivePlanResponse["confidence"] | null;
   options_from_ticket?: LivePlanResponse["options"];
   structure?: OptionsStructure | null;
   structure_error?: string | null;
@@ -615,7 +621,7 @@ export interface OptionsPlanResponse {
   /** IV–RV package scores; null if scorer failed (directional plan still valid). */
   vol_package?: VolPackageScore | null;
   vol_package_error?: string | null;
-  /** Same-day unusual options activity (chain proxy); partial failure OK. */
+  /** Same-day unusual options activity (LSE prints preferred); partial failure OK. */
   unusual_flow?: UnusualOptionsFlow | null;
   unusual_flow_error?: string | null;
   playbook: OptionsPlaybook;
@@ -626,6 +632,52 @@ export interface OptionsPlanResponse {
     options_winner?: string;
     vol_program?: string;
   };
+  asof_utc?: string;
+}
+
+export interface OptionsBookConfidenceRead {
+  score: number;
+  label: "HIGH" | "MEDIUM" | "LOW" | "AVOID" | string;
+  stance: string;
+  reasons: string[];
+}
+
+export interface OptionsBookRow {
+  symbol: string;
+  input_symbol?: string;
+  structure?: OptionsStructure | null;
+  vol_package?: {
+    ok?: boolean;
+    recommended?: VolPackageScore["recommended"];
+    warnings?: VolPackageWarning[];
+    features?: Record<string, number | string | null | undefined>;
+    error?: string;
+  } | null;
+  unusual_flow?: {
+    ok?: boolean;
+    n_flagged?: number;
+    calls?: number;
+    puts?: number;
+    premium?: number;
+    bias?: string;
+    error?: string;
+  } | null;
+  confidence_read?: OptionsBookConfidenceRead;
+  preferred?: boolean;
+  error?: string;
+  asof_utc?: string;
+}
+
+export interface OptionsBookScanResponse {
+  ok: boolean;
+  account?: number;
+  risk_pct?: number;
+  book: string[];
+  rows: OptionsBookRow[];
+  best?: string | null;
+  n?: number;
+  errors?: string[];
+  note?: string;
   asof_utc?: string;
 }
 
@@ -828,8 +880,26 @@ export interface RankerRow {
   live?: RankerLiveStats | null;
   live_blend_applied?: boolean;
   pricing?: string;
+  /** Evidence-gated 0-1 confidence (Wilson-bound edge × sample × consistency × DD guard). */
+  confidence?: number;
+  confidence_parts?: Record<string, number>;
+  confidence_reasons?: string[];
   status: "ok" | "error" | "pending";
   error?: string | null;
+}
+/** Symbol-level highest-confidence engine read; abstains instead of forcing a pick. */
+export interface RankerRead {
+  schema: number;
+  symbol: string;
+  horizon: "day" | "swing" | "position" | string;
+  asof?: string | null;
+  verdict: "TRUST" | "WATCH" | "STAND_ASIDE";
+  model: string | null;
+  confidence: number;
+  thresholds: { watch: number; enter: number };
+  runner_up?: { model: string; confidence: number } | null;
+  gap?: number | null;
+  reasons: string[];
 }
 export interface RankerResponse {
   schema: number;
@@ -847,6 +917,7 @@ export interface RankerResponse {
   exists: boolean;
   stale: boolean;
   age_days?: number;
+  read?: RankerRead;
 }
 
 /** --- Paper ledger (tools/paper_ledger.py --json) --- */
@@ -1111,4 +1182,46 @@ export interface AnalysisAgentResponse {
   error?: string;
   asof_utc?: string;
   report?: AnalysisReport;
+}
+
+export interface PromotionEntry {
+  id: string;
+  ts: string;
+  campaign?: string;
+  family: string;
+  model_dir?: string;
+  metrics: {
+    utility?: number;
+    sharpe?: number;
+    ret?: number;
+    dd?: number;
+    n?: number;
+    [key: string]: number | undefined;
+  };
+  gates: {
+    passed: boolean;
+    claim_level?: string;
+    [key: string]: unknown;
+  };
+  status: "pending" | "approved" | "rejected";
+  approved_at?: string;
+  rejected_at?: string;
+  reject_reason?: string;
+  promoted_version?: string;
+  promoted_path?: string;
+}
+
+export interface WinnerHealth {
+  winner: string | null;
+  live_n: number;
+  live_wr: number;
+  threshold: number;
+  trailing_n: number;
+  degraded: boolean;
+  asof?: string;
+}
+
+export interface PromotionPayload {
+  queue: PromotionEntry[];
+  winner_health: WinnerHealth;
 }

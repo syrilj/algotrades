@@ -24,8 +24,8 @@ const PLAYBOOK = {
     "Small book: risk only the debit you can lose on one structure. Prefer 1 defined-risk spread at a time.",
   default_structure:
     "Default: bull call debit spread, ~14–45 DTE. Single long call only if max loss fits the risk budget.",
-  preferred: ["IONQ", "APLD", "AVGO", "HOOD", "TSLA"],
-  avoid_atm: ["MU"],
+  preferred: ["IONQ", "APLD", "AVGO", "HOOD", "TSLA", "MSTR", "SKHY"],
+  avoid_atm: ["MU", "TSLA", "MSTR", "SKHY"],
   rules: [
     "Only size when mode is OPTIONS_ATTACK and structure action is buy.",
     "Defined risk only — never naked short premium on a small account.",
@@ -33,11 +33,13 @@ const PLAYBOOK = {
     "Cut losers early (−30% of premium). Trail after +40%. Flat by ~5 DTE.",
     "No new risk on FOMC day or when VIX is elevated and the book is already hot.",
     "Vol package scores are research context only — they never green-light a trade alone.",
+    "MSTR / TSLA / SKHY often need tighter OTM debit spreads on $1k — picker searches affordability.",
+    "INFQ aliases to IONQ on the desk.",
   ],
   live_variant: "v35_softstruct_bag8",
   equity_winner: "v72_dual_sleeve",
   live_engine_note:
-    "Side and size still come from the live equity ticket. Options structure is a defined-risk proposal from the options picker. Desk does not auto-send to IB.",
+    "Side and size still come from the live equity ticket (desk routing / dual-sleeve era). Options structure is a defined-risk proposal from the options picker. Desk does not auto-send to IB.",
   oos_artifact: "models/poc_va_macdha/OPTIONS_WINNER.json",
   ib_ticket_path: "runs/live_adapt/LAST_TICKET.json",
 };
@@ -156,7 +158,7 @@ export async function POST(req: Request) {
     volPackageError = e instanceof Error ? e.message : String(e);
   }
 
-  // Same-day unusual options flags from chain aggregates (partial failure OK).
+  // Same-day LSE time-and-sales flags; chain aggregate is the fallback.
   let unusualFlow: UnusualOptionsFlow | null = null;
   let unusualFlowError: string | null = null;
   try {
@@ -247,6 +249,8 @@ export async function POST(req: Request) {
     ticket: ticket ?? null,
     live: live?.live ?? null,
     macro: live?.macro ?? null,
+    model: live?.model ?? null,
+    confidence: live?.confidence ?? null,
     options_from_ticket: live?.options ?? null,
     structure,
     structure_error: structureError,

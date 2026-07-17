@@ -69,11 +69,20 @@ export function actionColorClass(action: string | null | undefined): string {
   return `text-[color:var(${v})]`;
 }
 
+/** Desk aliases mirrored from models/poc_va_macdha/DESK_ROUTING.json */
+const SYMBOL_ALIASES: Record<string, string> = {
+  INFQ: "IONQ",
+  GOOGL: "GOOG",
+};
+
 export function sanitizeSymbol(raw: unknown): string | null {
   if (typeof raw !== "string") return null;
-  const s = raw.trim().toUpperCase().replace(/[^A-Z0-9]/g, "");
+  let s = raw.trim().toUpperCase();
+  // Strip Yahoo / LSE style suffixes before stripping punctuation
+  s = s.replace(/\.US$/i, "").replace(/\.US\b/i, "");
+  s = s.replace(/[^A-Z0-9]/g, "");
   if (!s || s.length > 12) return null;
-  return s;
+  return SYMBOL_ALIASES[s] ?? s;
 }
 
 export function isValidModelId(id: string): boolean {

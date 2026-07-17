@@ -1,23 +1,162 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense, useCallback, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
-import { ListChecks } from "lucide-react";
-import type { ApiEnvelope, OptionsPlanResponse, UnusualOptionsFlag } from "@/lib/types";
-import { formatNum, formatUsd } from "@/lib/format";
+import { Activity, Clock3, ShieldCheck } from "lucide-react";
+import type {
+  ApiEnvelope,
+  OptionsBookRow,
+  OptionsBookScanResponse,
+  OptionsPlanResponse,
+  UnusualOptionsFlag,
+} from "@/lib/types";
+import { formatNum, formatPct, formatUsd, sanitizeSymbol } from "@/lib/format";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { analyzeHref, liveHref } from "@/lib/routes";
 import { Chip } from "@/components/ui/Chip";
-import { EmptyState } from "@/components/ui/EmptyState";
 import { Stat } from "@/components/ui/Stat";
 import { colorVarFor } from "@/lib/actionColors";
 
-function severityColor(severity: string | undefined): string {
-  if (severity === "high") return "var(--td-action-avoid)";
-  if (severity === "watch") return "var(--td-action-breakout-watch)";
-  return "var(--td-ink-500)";
+const QUICK_BOOK = ["MSTR", "TSLA", "SKHY", "IONQ"] as const;
+
+function confColor(label: string | undefined): string {
+  const u = (label || "").toUpperCase();
+  if (u === "HIGH") return colorVarFor("mode", "OPTIONS_ATTACK");
+  if (u === "MEDIUM") return colorVarFor("mode", "WAIT");
+  if (u === "LOW") return colorVarFor("mode", "STAND_ASIDE");
+  return colorVarFor("mode", "STAND_ASIDE");
 }
+
+function BookBoard({
+  book,
+  loading,
+  error,
+  activeSymbol,
+  onSelect,
+  onRefresh,
+}: {
+  book: OptionsBookScanResponse | null;
+  loading: boolean;
+  error: string | null;
+  activeSymbol: string;
+  onSelect: (sym: string) => void;
+  onRefresh: () => void;
+}) {
+  const rows: OptionsBookRow[] = book?.rows ?? [];
+  return (
+    <section className="td-panel flex flex-col gap-3 p-5">
+      <div className="flex flex-wrap items-start justify-between gap-2 border-b border-[var(--td-hairline)] pb-3">
+        <div>
+          <span className="td-label uppercase tracking-wider text-[11px] font-semibold text-[var(--td-ink-100)]">Best options setups</span>
+          <p className="text-[12px] text-[var(--td-muted)] mt-1">
+            Ranked by price structure, option cost, and market activity.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onRefresh}
+          disabled={loading}
+          className="td-btn td-btn-ghost"
+        >
+          {loading ? "Scanning book…" : "Scan book"}
+        </button>
+      </div>
+
+      {error ? (
+        <p className="text-[12px] text-[var(--td-action-avoid)]" role="alert">
+          Book scan: {error.slice(0, 200)}
+        </p>
+      ) : null}
+
+      {!book && !loading ? (
+        <p className="text-[13px]" style={{ color: "var(--td-ink-400)" }}>
+          Press Scan book for a ranked multi-name options read.
+        </p>
+      ) : null}
+
+      {loading && !book ? (
+        <p className="text-[13px] td-muted">Scanning chains for MSTR / TSLA / SKHY / IONQ…</p>
+      ) : null}
+
+      {rows.length > 0 ? (
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-[12px] border-collapse">
+            <thead>
+              <tr className="border-b border-[var(--td-hairline)]" style={{ color: "var(--td-ink-400)" }}>
+                <th className="py-2 pr-3 font-semibold uppercase tracking-wider text-[10px]">Symbol</th>
+                <th className="py-2 pr-3 font-semibold uppercase tracking-wider text-[10px]">Conf</th>
+                <th className="py-2 pr-3 font-semibold uppercase tracking-wider text-[10px]">Structure</th>
+                <th className="py-2 pr-3 font-semibold uppercase tracking-wider text-[10px] text-right">Max loss</th>
+                <th className="py-2 pr-3 font-semibold uppercase tracking-wider text-[10px]">Flow</th>
+                <th className="py-2 font-semibold uppercase tracking-wider text-[10px]">Read</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => {
+                const conf = row.confidence_read;
+                const st = row.structure;
+                const active = row.symbol === activeSymbol;
+                return (
+                  <tr
+                    key={row.symbol}
+                    className="cursor-pointer hover:bg-[var(--td-surface-soft)] transition-colors"
+                    style={{
+                      borderBottom: "1px solid var(--td-hairline)",
+                      background: active
+                        ? "color-mix(in srgb, var(--td-brand) 8%, transparent)"
+                        : undefined,
+                    }}
+                    onClick={() => onSelect(row.symbol)}
+                  >
+                    <td className="py-2.5 pr-3 font-mono font-bold text-[var(--td-ink)]">
+                      {row.symbol}
+                      {book?.best === row.symbol ? (
+                        <span className="ml-1.5 text-[10px] text-[var(--td-brand)] font-semibold">
+                          BEST
+                        </span>
+                      ) : null}
+                    </td>
+                    <td className="py-2.5 pr-3">
+                      <Chip
+                        label={`${conf?.label ?? "—"} ${conf?.score != null ? conf.score.toFixed(2) : ""}`.trim()}
+                        colorVar={confColor(conf?.label)}
+                      />
+                    </td>
+                    <td className="py-2.5 pr-3" style={{ color: "var(--td-ink-200)" }}>
+                      {st?.action === "buy"
+                        ? `${st.structure ?? "structure"} · ${st.expiry ?? "—"}`
+                        : st?.reason || st?.error || row.error || "skip"}
+                    </td>
+                    <td className="py-2.5 pr-3 font-mono text-right">
+                      {st?.action === "buy" ? formatUsd(st.max_loss_1_contract, 0) : "—"}
+                    </td>
+                    <td className="py-2.5 pr-3 font-mono" style={{ color: "var(--td-ink-300)" }}>
+                      {row.unusual_flow?.bias ?? "—"}
+                      {row.unusual_flow?.n_flagged != null
+                        ? ` · ${row.unusual_flow.n_flagged}f`
+                        : ""}
+                    </td>
+                    <td className="py-2.5 text-[11px]" style={{ color: "var(--td-ink-400)" }}>
+                      {(conf?.reasons ?? []).slice(0, 1).join("") || conf?.stance || "—"}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+
+      {book?.note ? (
+        <p className="text-[11px]" style={{ color: "var(--td-ink-500)" }}>
+          {book.note}
+        </p>
+      ) : null}
+    </section>
+  );
+}
+
 
 function UnusualFlowPanel({
   flags,
@@ -32,127 +171,300 @@ function UnusualFlowPanel({
   nScanned?: number;
   asof?: string | null;
 }) {
+  const [selectedExpiry, setSelectedExpiry] = useState("all");
+
+  const listedExpiries = useMemo(() => {
+    const dates = new Set(flags.map(f => f.expiry).filter(Boolean));
+    return Array.from(dates).sort();
+  }, [flags]);
+
+  const filteredFlags = useMemo(() => {
+    if (selectedExpiry === "all") return flags;
+    return flags.filter(f => f.expiry === selectedExpiry);
+  }, [flags, selectedExpiry]);
+
+  // Compute flow summary metrics based on filtered flags
+  const callFlags = filteredFlags.filter(f => f.right === "C" || f.right?.toUpperCase() === "CALL");
+  const putFlags = filteredFlags.filter(f => f.right === "P" || f.right?.toUpperCase() === "PUT");
+  const totalPremium = filteredFlags.reduce((acc, f) => acc + (f.premium || 0), 0);
+  const totalVolume = filteredFlags.reduce((acc, f) => acc + (f.volume || 0), 0);
+
+  let sentimentImplication = "Neutral / Balanced Flow";
+  let sentimentColorClass = "text-[var(--td-muted)] bg-[var(--td-surface-elevated)]";
+  if (callFlags.length > putFlags.length * 1.5) {
+    sentimentImplication = "Strong Bullish Speculative Activity (Call Buying Dominant)";
+    sentimentColorClass = "text-[#8fc39d] bg-[#2F6B4F1A] border border-[#2F6B4F33]";
+  } else if (callFlags.length > putFlags.length) {
+    sentimentImplication = "Moderately Bullish Flow";
+    sentimentColorClass = "text-[#8fc39d] bg-[#2F6B4F0A]";
+  } else if (putFlags.length > callFlags.length * 1.5) {
+    sentimentImplication = "Strong Bearish Bias / Downside Hedging (Put Buying Dominant)";
+    sentimentColorClass = "text-[#dc7e76] bg-[#A348481A] border border-[#A3484833]";
+  } else if (putFlags.length > callFlags.length) {
+    sentimentImplication = "Moderately Bearish Flow";
+    sentimentColorClass = "text-[#dc7e76] bg-[#A348480A]";
+  }
+
   return (
-    <section className="td-panel flex flex-col gap-3 p-5">
-      <div className="flex flex-wrap items-start justify-between gap-2">
+    <section className="td-panel flex flex-col gap-4 p-5">
+      <div className="flex flex-wrap items-start justify-between gap-2 border-b border-[var(--td-hairline)] pb-3">
         <div>
-          <span className="td-label">Unusual options flow · same day</span>
-          <p className="text-[12px]" style={{ color: "var(--td-ink-500)" }}>
-            Chain volume / OI / premium pressure (not OPRA prints). Flags contracts that look
-            unusually active vs open interest or size.
+          <span className="td-label uppercase tracking-wider text-[11px] font-semibold text-[var(--td-ink-100)]">
+            Unusual Options Flow · Chain-Proxy Monitor
+          </span>
+          <p className="text-[12px] text-[var(--td-muted)] mt-1">
+            Detects same-day contracts with abnormal volume, open interest ratios, or aggressive premium spikes.
           </p>
         </div>
-        <Chip
-          label={
-            flags.length > 0
-              ? `${flags.length} flag${flags.length === 1 ? "" : "s"}`
-              : "no flags"
-          }
-          colorVar={
-            flags.length > 0
-              ? colorVarFor("mode", "WAIT")
-              : colorVarFor("mode", "STAND_ASIDE")
-          }
-        />
+        <div className="flex items-center gap-3">
+          {listedExpiries.length > 0 && (
+            <label className="flex items-center gap-2 text-[12px] text-[var(--td-muted)]">
+              <span>Expiry Filter:</span>
+              <select
+                value={selectedExpiry}
+                onChange={(e) => setSelectedExpiry(e.target.value)}
+                className="td-input py-1 px-2 text-[12px]"
+                style={{ fontFamily: "var(--td-font-mono)", background: "var(--td-surface-soft)" }}
+              >
+                <option value="all">All Expirations</option>
+                {listedExpiries.map((d) => (
+                  <option key={`opt-expiry-${d}`} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          <Chip
+            label={
+              filteredFlags.length > 0
+                ? `${filteredFlags.length} flag${filteredFlags.length === 1 ? "" : "s"} detected`
+                : "no active flags"
+            }
+            colorVar={
+              filteredFlags.length > 0
+                ? colorVarFor("mode", "WAIT")
+                : colorVarFor("mode", "STAND_ASIDE")
+            }
+          />
+        </div>
       </div>
 
       {error ? (
-        <p className="text-[12px]" style={{ color: "var(--td-action-breakout-watch)" }}>
+        <div className="text-[12px] text-[var(--td-action-avoid)] bg-[var(--td-action-avoid-soft)] p-2.5 rounded border border-[var(--td-action-avoid)]">
           Flow scanner partial: {error.slice(0, 180)}
-        </p>
+        </div>
       ) : null}
 
-      {flags.length === 0 && !error ? (
+      {filteredFlags.length === 0 && !error ? (
         <p className="text-[13px]" style={{ color: "var(--td-ink-400)" }}>
-          No unusual flow on the latest chain snapshot
+          No unusual flow matches filter
           {nScanned != null ? ` (${nScanned} contracts scanned)` : ""}.
         </p>
       ) : null}
 
-      {flags.length > 0 ? (
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-[12px]">
-            <thead>
-              <tr style={{ color: "var(--td-ink-500)" }}>
-                <th className="py-1 pr-3 font-medium">Contract</th>
-                <th className="py-1 pr-3 font-medium">Vol / OI</th>
-                <th className="py-1 pr-3 font-medium">Premium</th>
-                <th className="py-1 pr-3 font-medium">Score</th>
-                <th className="py-1 font-medium">Why unusual</th>
-              </tr>
-            </thead>
-            <tbody>
-              {flags.map((f) => {
-                const key = `${f.expiry}-${f.right}-${f.strike}-${f.score}`;
-                const border = severityColor(f.severity);
-                return (
-                  <tr
-                    key={key}
-                    style={{
-                      color: "var(--td-ink-100)",
-                      borderTop: "1px solid var(--td-line)",
-                    }}
-                  >
-                    <td
-                      className="py-1.5 pr-3 tabular"
-                      style={{ fontFamily: "var(--td-font-mono)" }}
+      {filteredFlags.length > 0 ? (
+        <>
+          {/* Sentiment Summary Card */}
+          <div className={`p-3.5 rounded-lg flex flex-col md:flex-row md:items-center justify-between gap-3 ${sentimentColorClass}`}>
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-current animate-pulse shrink-0" />
+              <div className="flex flex-col">
+                <span className="text-[10px] uppercase font-bold tracking-wider opacity-85">Net Flow Implication</span>
+                <strong className="text-sm font-semibold">{sentimentImplication}</strong>
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-[11px] opacity-90">
+              <div>Calls: <strong className="font-bold">{callFlags.length}</strong></div>
+              <div className="text-[var(--td-hairline)] md:block hidden">|</div>
+              <div>Puts: <strong className="font-bold">{putFlags.length}</strong></div>
+              <div className="text-[var(--td-hairline)] md:block hidden">|</div>
+              <div>Vol: <strong className="font-bold">{formatNum(totalVolume, 0)}</strong></div>
+              <div className="text-[var(--td-hairline)] md:block hidden">|</div>
+              <div>Premium: <strong className="font-bold">{formatUsd(totalPremium, 0)}</strong></div>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-[12px] border-collapse">
+              <thead>
+                <tr className="border-b border-[var(--td-hairline)]" style={{ color: "var(--td-ink-400)" }}>
+                  <th className="py-2.5 pr-3 font-semibold uppercase tracking-wider text-[10px]">Ticker</th>
+                  <th className="py-2.5 pr-3 font-semibold uppercase tracking-wider text-[10px]">Type</th>
+                  <th className="py-2.5 pr-3 font-semibold uppercase tracking-wider text-[10px] text-right">Strike</th>
+                  <th className="py-2.5 pr-3 font-semibold uppercase tracking-wider text-[10px]">Expiry / DTE</th>
+                  <th className="py-2.5 pr-3 font-semibold uppercase tracking-wider text-[10px] text-right">Volume</th>
+                  <th className="py-2.5 pr-3 font-semibold uppercase tracking-wider text-[10px] text-right">Premium</th>
+                  <th className="py-2.5 pr-3 font-semibold uppercase tracking-wider text-[10px] text-right">Vol / OI</th>
+                  <th className="py-2.5 pr-3 font-semibold uppercase tracking-wider text-[10px] text-center">Sentiment Bias</th>
+                  <th className="py-2.5 font-semibold uppercase tracking-wider text-[10px] pl-2">Why Flagged</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredFlags.map((f, i) => {
+                  const key = `${f.symbol}-${f.expiry}-${f.right}-${f.strike}-${i}`;
+                  const isCall = f.right === "C" || f.right?.toUpperCase() === "CALL";
+                  return (
+                    <tr
+                      key={key}
+                      className="hover:bg-[var(--td-surface-soft)] transition-colors"
+                      style={{
+                        color: "var(--td-ink-100)",
+                        borderBottom: "1px solid var(--td-hairline)",
+                      }}
                     >
-                      <span style={{ color: border, fontWeight: 600 }}>
-                        {f.right}
-                        {formatNum(f.strike)}
-                      </span>{" "}
-                      <span style={{ color: "var(--td-ink-500)" }}>
-                        {f.expiry}
-                        {f.dte != null ? ` · ${f.dte}d` : ""}
-                      </span>
-                    </td>
-                    <td className="py-1.5 pr-3 tabular">
-                      {formatNum(f.volume, 0)}
-                      {f.open_interest != null
-                        ? ` / ${formatNum(f.open_interest, 0)}`
-                        : ""}
-                      {f.vol_oi != null ? (
-                        <span style={{ color: "var(--td-ink-500)" }}>
-                          {" "}
-                          ({formatNum(f.vol_oi, 1)}x)
+                      {/* Ticker */}
+                      <td className="py-2.5 pr-3 font-mono font-bold text-[var(--td-ink)]">
+                        {f.symbol || "—"}
+                      </td>
+
+                      {/* Type (Call / Put) */}
+                      <td className="py-2.5 pr-3">
+                        <span className={`px-1.5 py-0.5 rounded font-mono text-[10px] font-bold ${
+                          isCall
+                            ? "bg-[#2F6B4F1A] text-[#8fc39d]"
+                            : "bg-[#A348481A] text-[#dc7e76]"
+                        }`}>
+                          {isCall ? "CALL" : "PUT"}
                         </span>
-                      ) : null}
-                    </td>
-                    <td className="py-1.5 pr-3 tabular">
-                      {f.premium != null ? formatUsd(f.premium, 0) : "—"}
-                    </td>
-                    <td
-                      className="py-1.5 pr-3 tabular"
-                      style={{ color: border, fontFamily: "var(--td-font-mono)" }}
-                    >
-                      {formatNum(f.score, 1)}
-                    </td>
-                    <td className="py-1.5" style={{ color: "var(--td-ink-400)" }}>
-                      {f.reason || (f.reasons ?? []).slice(0, 3).join(" · ")}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                      </td>
+
+                      {/* Strike */}
+                      <td className="py-2.5 pr-3 font-mono font-semibold text-right text-[13px] text-[var(--td-ink)]">
+                        {formatUsd(f.strike)}
+                      </td>
+
+                      {/* Expiry / DTE */}
+                      <td className="py-2.5 pr-3">
+                        <span className="font-semibold font-mono text-[var(--td-ink)] mr-1.5">{f.dte}d</span>
+                        <span className="text-[11px] text-[var(--td-muted)]">({f.expiry})</span>
+                      </td>
+
+                      {/* Volume */}
+                      <td className="py-2.5 pr-3 font-mono font-bold text-right text-[13px] text-[var(--td-ink)]">
+                        {formatNum(f.volume, 0)}
+                      </td>
+
+                      {/* Premium */}
+                      <td className="py-2.5 pr-3 font-mono text-right text-[var(--td-ink)]">
+                        {f.premium != null ? formatUsd(f.premium, 0) : "—"}
+                      </td>
+
+                      {/* Vol / OI */}
+                      <td className="py-2.5 pr-3 font-mono text-right text-[var(--td-body)]">
+                        <span className="font-semibold">{formatNum(f.vol_oi ?? 0, 1)}x</span>
+                        {f.open_interest != null && (
+                          <span className="text-[10px] text-[var(--td-muted)] ml-1">
+                            (OI {formatNum(f.open_interest, 0)})
+                          </span>
+                        )}
+                      </td>
+
+                      {/* Sentiment Bias */}
+                      <td className="py-2.5 pr-3 text-center">
+                        <span className={`px-2 py-0.5 rounded text-[11px] font-semibold ${
+                          isCall
+                            ? "bg-[#2F6B4F1A] text-[#8fc39d]"
+                            : "bg-[#A348481A] text-[#dc7e76]"
+                        }`}>
+                          {isCall ? "Bullish Spec / Hedge" : "Bearish Spec / Hedge"}
+                        </span>
+                      </td>
+
+                      {/* Why Flagged */}
+                      <td className="py-2.5 text-[11px] text-[var(--td-body)] max-w-xs truncate pl-2" title={f.reason || (f.reasons ?? []).join(" · ")}>
+                        {f.reason || (f.reasons ?? []).slice(0, 3).join(" · ")}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
       ) : null}
 
-      <p className="text-[11px]" style={{ color: "var(--td-ink-500)" }}>
-        {note ||
-          "Proxy from listed chain aggregates — not multi-exchange sweeps or dark-pool tape."}
-        {asof ? ` · as-of ${asof}` : ""}
-      </p>
+      <div className="flex justify-between items-center text-[11px] text-[var(--td-muted)] mt-2">
+        <span>{note || "Proxy from listed chain aggregates — not multi-exchange sweeps or dark-pool tape."}</span>
+        {asof ? <span>As-of {asof}</span> : null}
+      </div>
+    </section>
+  );
+}
+
+function OptionsVisualGuide({
+  symbol,
+  loading,
+  ready,
+  structure,
+  budget,
+  maxLoss,
+  dte,
+  impliedVol,
+}: {
+  symbol: string;
+  loading: boolean;
+  ready: boolean;
+  structure?: string | null;
+  budget?: number | null;
+  maxLoss?: number | null;
+  dte?: number | null;
+  impliedVol?: number | null;
+}) {
+  const volPercent = impliedVol != null && Number.isFinite(impliedVol)
+    ? Math.max(8, Math.min(96, impliedVol * 100))
+    : 58;
+
+  return (
+    <section className={`options-visual${loading ? " is-loading" : ""}`} aria-label="Options risk overview">
+      <div className="options-visual__payoff">
+        <header>
+          <div><span>{symbol || "SYMBOL"} · PAYOFF SHAPE</span><strong>{structure || "Defined-risk spread"}</strong></div>
+          <b className={ready ? "is-ready" : ""}>{loading ? "CHECKING" : ready ? "READY" : "PREVIEW"}</b>
+        </header>
+        <svg viewBox="0 0 620 250" role="img" aria-label="Limited loss and limited gain payoff diagram">
+          <line x1="30" y1="178" x2="590" y2="178" className="axis" />
+          <line x1="280" y1="26" x2="280" y2="220" className="strike" />
+          <path d="M30 207 L280 207 L430 66 L590 66" className="payoff" />
+          <path d="M30 207 L280 207 L430 66 L590 66 L590 178 L30 178 Z" className="payoff-fill" />
+          <text x="36" y="235">LOSS IS CAPPED</text>
+          <text x="448" y="46">PROFIT IS CAPPED</text>
+          <text x="292" y="168">BREAKEVEN</text>
+        </svg>
+        <div className="options-visual__legend"><span><i className="is-loss" /> Loss area</span><span><i className="is-profit" /> Profit area</span><small>Illustrative until a live chain loads</small></div>
+      </div>
+
+      <div className="options-visual__facts">
+        <article>
+          <ShieldCheck size={17} />
+          <span>MOST YOU RISK</span>
+          <strong>{maxLoss != null ? formatUsd(maxLoss, 0) : budget != null ? `Up to ${formatUsd(budget, 0)}` : "Set by budget"}</strong>
+          <small>Known before the paper plan</small>
+        </article>
+        <article>
+          <Clock3 size={17} />
+          <span>TIME WINDOW</span>
+          <strong>{dte != null ? `${dte} days` : "14–45 days"}</strong>
+          <small>Avoids same-week guessing</small>
+        </article>
+        <article className="options-visual__vol">
+          <Activity size={17} />
+          <span>OPTION COST</span>
+          <strong>{impliedVol != null ? `${(impliedVol * 100).toFixed(0)}% volatility` : "Checking volatility"}</strong>
+          <div><i style={{ width: `${volPercent}%` }} /></div>
+          <small>Higher means options are pricier</small>
+        </article>
+      </div>
     </section>
   );
 }
 
 function OptionsDeskInner({ showHeader = true }: { showHeader?: boolean }) {
   const searchParams = useSearchParams();
-  const qSymbol = searchParams.get("symbol")?.toUpperCase() ?? "";
+  const qSymbol = sanitizeSymbol(searchParams.get("symbol") ?? "") ?? "";
   const qAccount = Number(searchParams.get("account") || "1000");
 
-  const [symbol, setSymbol] = useState(qSymbol || "APLD");
+  const [symbol, setSymbol] = useState(qSymbol || "IONQ");
   const [account, setAccount] = useState(
     Number.isFinite(qAccount) && qAccount > 0 ? qAccount : 1000,
   );
@@ -160,6 +472,9 @@ function OptionsDeskInner({ showHeader = true }: { showHeader?: boolean }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [plan, setPlan] = useState<OptionsPlanResponse | null>(null);
+  const [book, setBook] = useState<OptionsBookScanResponse | null>(null);
+  const [bookLoading, setBookLoading] = useState(false);
+  const [bookError, setBookError] = useState<string | null>(null);
 
   useEffect(() => {
     if (qSymbol) setSymbol(qSymbol);
@@ -167,7 +482,8 @@ function OptionsDeskInner({ showHeader = true }: { showHeader?: boolean }) {
 
   const run = useCallback(
     async (symOverride?: string) => {
-      const sym = (symOverride ?? symbol).trim().toUpperCase();
+      const raw = (symOverride ?? symbol).trim();
+      const sym = sanitizeSymbol(raw) ?? raw.toUpperCase().replace(/[^A-Z0-9]/g, "");
       if (!sym) return;
       setSymbol(sym);
       setLoading(true);
@@ -197,9 +513,40 @@ function OptionsDeskInner({ showHeader = true }: { showHeader?: boolean }) {
     [symbol, account, riskPct],
   );
 
+  const runBook = useCallback(async () => {
+    setBookLoading(true);
+    setBookError(null);
+    try {
+      const res = await fetch("/api/options-book", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          symbols: QUICK_BOOK.join(","),
+          account,
+          risk_pct: riskPct,
+          workers: 4,
+        }),
+      });
+      const json = (await res.json()) as ApiEnvelope<OptionsBookScanResponse>;
+      if (!res.ok || json.ok === false || !json.data) {
+        throw new Error(json.error ?? `options-book failed (${res.status})`);
+      }
+      setBook(json.data);
+      // Auto-focus best name when no deep-link symbol
+      if (!qSymbol && json.data.best) {
+        void run(json.data.best);
+      }
+    } catch (e) {
+      setBookError(e instanceof Error ? e.message : "options book scan failed");
+    } finally {
+      setBookLoading(false);
+    }
+  }, [account, riskPct, qSymbol, run]);
+
   useEffect(() => {
     // Deep-link or default symbol — always pull the live chain so the board is not empty.
     void run(qSymbol || symbol);
+    void runBook();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [qSymbol]);
 
@@ -207,12 +554,22 @@ function OptionsDeskInner({ showHeader = true }: { showHeader?: boolean }) {
   const isBuy = structure?.action === "buy";
   const attack =
     plan?.mode?.toUpperCase().includes("OPTIONS") === true && isBuy;
+  const modelId = plan?.model?.model ?? null;
+  const confState = plan?.confidence?.state ?? null;
+  const confProb =
+    plan?.confidence?.calibrated_probability ??
+    plan?.model?.confidence ??
+    plan?.live?.confidence ??
+    null;
+
+  const optionBudget =
+    structure?.budget ?? (Number.isFinite(account) ? account * (riskPct / 100) : null);
 
   const body = (
     <>
       {showHeader && <PageHeader
         title="Options"
-        description="Unusual same-day flow flags + defined-risk structure ticket. Flow is chain-proxy research; never auto-trades."
+        description="Book board + unusual flow + defined-risk structure. Flow is chain-proxy research; never auto-trades."
         actions={
           symbol ? (
             <div className="flex flex-wrap gap-2">
@@ -242,6 +599,9 @@ function OptionsDeskInner({ showHeader = true }: { showHeader?: boolean }) {
               onChange={(e) => setSymbol(e.target.value.toUpperCase())}
               className="td-input"
               style={{ fontFamily: "var(--td-font-mono)" }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void run();
+              }}
             />
           </label>
           <label className="td-field td-field--account">
@@ -273,11 +633,44 @@ function OptionsDeskInner({ showHeader = true }: { showHeader?: boolean }) {
             {loading ? "Loading live feed…" : "Load live options feed"}
           </button>
         </div>
-        <p className="text-[11px]" style={{ color: "var(--td-ink-500)" }}>
-          Pulls the live chain + risk mode + a defined-risk structure. Prefer APLD / IONQ on small
-          books · avoid MU ATM weeklies · default bull call debit spread 14–45 DTE
-        </p>
+        <div className="flex flex-wrap items-center gap-2 mt-2">
+          <span className="text-[11px]" style={{ color: "var(--td-ink-500)" }}>
+            Quick:
+          </span>
+          {QUICK_BOOK.map((s) => (
+            <button
+              key={s}
+              type="button"
+              className="td-btn td-btn-ghost"
+              style={{
+                fontFamily: "var(--td-font-mono)",
+                fontSize: 12,
+                padding: "4px 10px",
+                borderColor:
+                  symbol === s ? "var(--td-brand)" : undefined,
+              }}
+              onClick={() => void run(s)}
+              disabled={loading}
+            >
+              {s}
+            </button>
+          ))}
+          <span className="text-[11px]" style={{ color: "var(--td-ink-500)" }}>
+            Defined-risk spreads · only sizes when every safety check passes
+          </span>
+        </div>
       </section>
+
+      <OptionsVisualGuide
+        symbol={symbol}
+        loading={loading}
+        ready={attack}
+        structure={structure?.structure}
+        budget={optionBudget}
+        maxLoss={structure?.max_loss_1_contract}
+        dte={structure?.dte}
+        impliedVol={structure?.iv_long}
+      />
 
       {error ? (
         <p className="td-alert td-alert--error" role="alert">
@@ -285,19 +678,14 @@ function OptionsDeskInner({ showHeader = true }: { showHeader?: boolean }) {
         </p>
       ) : null}
 
-      {!plan && !loading && !error ? (
-        <section className="td-panel p-5">
-          <EmptyState
-            icon={ListChecks}
-            title="No live options feed yet"
-            steps={[
-              "Enter a symbol (start with APLD or IONQ)",
-              "Press Load live options feed",
-              "Read risk mode + structure — only size when mode is OPTIONS_ATTACK and structure is buy",
-            ]}
-          />
-        </section>
-      ) : null}
+      <BookBoard
+        book={book}
+        loading={bookLoading}
+        error={bookError}
+        activeSymbol={symbol}
+        onSelect={(sym) => void run(sym)}
+        onRefresh={() => void runBook()}
+      />
 
       {plan ? (
         <UnusualFlowPanel
@@ -365,6 +753,20 @@ function OptionsDeskInner({ showHeader = true }: { showHeader?: boolean }) {
                       ? "blocked"
                       : plan.macro?.qqq_trend ?? "—"
                 }
+              />
+              <Stat label="Model" value={modelId ?? "—"} />
+              <Stat label="Conf gate" value={confState ?? "—"} />
+              <Stat
+                label="Conf / model"
+                value={
+                  confProb == null || !Number.isFinite(Number(confProb))
+                    ? "—"
+                    : formatPct(Number(confProb))
+                }
+              />
+              <Stat
+                label="Live src"
+                value={plan.live?.source ?? "—"}
               />
             </div>
 

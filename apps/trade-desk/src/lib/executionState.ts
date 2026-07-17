@@ -194,7 +194,22 @@ export function decisionPresentation(plan: ExecutionPlanLike): {
   };
 }
 
-export function buildPaperOrder(plan: ExecutionPlanLike) {
+export type PaperOrder = {
+  symbol: string;
+  side: "long" | "short";
+  shares: number;
+  entry: number;
+  stop: number;
+  dollarRisk: number;
+  model: string;
+  account: number;
+};
+
+/**
+ * Executable paper size — only when every gate passes.
+ * Never invents stop, never floors shares to 1 on stand-aside.
+ */
+export function buildPaperOrder(plan: ExecutionPlanLike): PaperOrder | null {
   if (!isExecutionActionable(plan)) return null;
   const entry = plan.model?.entry ?? plan.live?.price;
   const stop = plan.model?.stop;
@@ -222,6 +237,82 @@ export function buildPaperOrder(plan: ExecutionPlanLike) {
     model: plan.model?.model ?? "auto",
     account: plan.account,
   };
+}
+
+/**
+ * Display-only ticket fields from the backend plan.
+ * Does not invent stop (no entry*0.95), shares, or risk when the book is stand-aside.
+ * `shares` / `dollarRisk` are set only via {@link buildPaperOrder}.
+ */
+export type TicketDisplay = {
+  symbol: string;
+  side: "long" | "short" | "flat";
+  /** Model entry or live mark when model entry missing — not a fabricated fill. */
+  entry: number | null;
+  /** Model stop only; null if backend did not provide one. */
+  stop: number | null;
+  shares: number | null;
+  /** Sized risk when executable; otherwise null (do not fake risk from account%). */
+  dollarRisk: number | null;
+  /** Backend ticket max_loss budget (may be 0 on abstain). */
+  maxLossBudget: number | null;
+  model: string;
+  account: number | null;
+  executable: boolean;
+  action: string;
+};
+
+export function ticketDisplayFromPlan(plan: ExecutionPlanLike): TicketDisplay {
+  const order = buildPaperOrder(plan);
+  const entryRaw = plan.model?.entry ?? plan.live?.price;
+  const entry = finitePositive(entryRaw) ? entryRaw : null;
+  const stop = finitePositive(plan.model?.stop) ? plan.model!.stop! : null;
+  const maxLossBudget =
+    typeof plan.ticket?.max_loss_dollars === "number" &&
+    Number.isFinite(plan.ticket.max_loss_dollars)
+      ? plan.ticket.max_loss_dollars
+      : null;
+  const action = String(plan.ticket?.action ?? plan.decision?.action ?? "abstain");
+  const side: TicketDisplay["side"] = plan.live?.go_short && !plan.live?.go_long
+    ? "short"
+    : plan.live?.go_long
+      ? "long"
+      : "flat";
+
+  if (order) {
+    return {
+      symbol: order.symbol,
+      side: order.side,
+      entry: order.entry,
+      stop: order.stop,
+      shares: order.shares,
+      dollarRisk: order.dollarRisk,
+      maxLossBudget: maxLossBudget ?? order.dollarRisk,
+      model: order.model,
+      account: order.account,
+      executable: true,
+      action,
+    };
+  }
+
+  return {
+    symbol: String(plan.symbol ?? "").toUpperCase(),
+    side,
+    entry,
+    stop,
+    shares: null,
+    dollarRisk: null,
+    maxLossBudget,
+    model: plan.model?.model ?? "auto",
+    account: finitePositive(plan.account) ? plan.account! : null,
+    executable: false,
+    action,
+  };
+}
+
+/** Paper ledger only accepts a fully gated buildPaperOrder result — never overrides. */
+export function paperExecutionAllowed(plan: ExecutionPlanLike): boolean {
+  return buildPaperOrder(plan) != null;
 }
 
 export function gammaMethodology(gamma: { exposure_kind?: string } | null | undefined) {

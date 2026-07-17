@@ -56,6 +56,13 @@ from confidence_runtime import (  # noqa: E402
 from confidence_shadow import ShadowDecisionLedger  # noqa: E402
 
 
+def _production_lse_only() -> bool:
+    return os.environ.get("MARKET_RUNTIME_ENV", "development").strip().lower() in {
+        "production",
+        "prod",
+    }
+
+
 def _yf_symbol(sym: str) -> str:
     s = sym.strip().upper().replace(".US", "")
     return s
@@ -137,12 +144,22 @@ def macro_regime(adapter: LSEAdapter | None = None) -> dict[str, Any]:
     try:
         if adapter is not None:
             qqq = _daily_close_lse(adapter, "QQQ")
+            if qqq.empty and not _production_lse_only():
+                qqq = _daily_close("QQQ")
             spy = _daily_close_lse(adapter, "SPY")
+            if spy.empty and not _production_lse_only():
+                spy = _daily_close("SPY")
             xlp = _daily_close_lse(adapter, "XLP")
-        else:
+            if xlp.empty and not _production_lse_only():
+                xlp = _daily_close("XLP")
+        elif not _production_lse_only():
             qqq = _daily_close("QQQ")
             spy = _daily_close("SPY")
             xlp = _daily_close("XLP")
+        else:
+            raise RuntimeError("LSE adapter is required for production macro data")
+        if _production_lse_only() and any(series.empty for series in (qqq, spy, xlp)):
+            raise RuntimeError("LSE macro candles are incomplete")
         if len(qqq) >= 50:
             ema20 = qqq.ewm(span=20, adjust=False).mean()
             ema50 = qqq.ewm(span=50, adjust=False).mean()
@@ -179,19 +196,32 @@ def try_model_confidence(symbol: str, model: str | None = None) -> dict[str, Any
     try:
         from trade_desk import analyze  # local tools/
 
-        payload = analyze(symbol, account=100_000, risk_pct=0.01, period="60d", model=model)
+        history_period = "2y" if str(model).startswith("v85") else "60d"
+        payload = analyze(
+            symbol,
+            account=100_000,
+            risk_pct=0.01,
+            period=history_period,
+            model=model,
+        )
         state = payload.get("state") or {}
-        raw_probability = state.get("hit_probability")
-        raw_source = "trade_desk_hit_probability"
-        if raw_probability is None:
-            raw_probability = state.get("confidence")
-            raw_source = "trade_desk_confidence_fallback"
+        confidence_kind = str(state.get("confidence_kind") or "")
+        if "not_probability" in confidence_kind:
+            raw_probability = state.get("engine_confidence")
+            raw_source = f"engine_score:{confidence_kind}"
+        else:
+            raw_probability = state.get("hit_probability")
+            raw_source = "trade_desk_hit_probability"
+            if raw_probability is None:
+                raw_probability = state.get("confidence")
+                raw_source = "trade_desk_confidence_fallback"
         return {
             "ok": True,
             "model": payload.get("model") or model,
             "confidence": float(raw_probability) if raw_probability is not None else None,
             "raw_probability": float(raw_probability) if raw_probability is not None else None,
             "raw_probability_source": raw_source,
+            "source_confidence_kind": confidence_kind or None,
             "setup_ok": state.get("setup_ok"),
             "price": state.get("price"),
             "entry": state.get("entry"),
@@ -387,13 +417,29 @@ def plan_symbol(
         and open_options >= 0
     )
 
-    # Prefer LSE when an adapter is available, otherwise live_signal fetches yfinance.
+    # Production is LSE-only. Development retains yfinance as an explicit
+    # convenience fallback so research workflows remain usable offline.
     adapter = lse_adapter
     if adapter is None and os.environ.get("LSE_API_KEY"):
         adapter = LSEAdapter(api_key=os.environ.get("LSE_API_KEY"))
     df = _intraday_df_lse(adapter, symbol) if adapter is not None else None
     if df is not None and (df.empty or len(df) < 20):
         df = None
+    if _production_lse_only() and df is None:
+        return {
+            "ok": False,
+            "symbol": symbol,
+            "error": "LSE intraday candles unavailable; production fallback is disabled",
+            "runtime": {"data_path": "lse_unavailable", "production_lse_only": True},
+            "confidence": evaluate_confidence(
+                None,
+                model_ok=False,
+                setup_ok=False,
+                freshness=assess_data_freshness(None),
+                model=model,
+            ),
+            "asof_utc": datetime.now(timezone.utc).isoformat(),
+        }
     live = eng.analyze(symbol, df=df)
     live["source"] = "lse" if df is not None else "yfinance"
     live["interval"] = "1h" if h == "day" else ("1d" if h == "position" else "1h")
@@ -526,6 +572,8 @@ def plan_symbol(
         gex_data = compute_gamma_exposure(symbol, spot_source="auto", source=gex_src)
     except Exception:
         try:
+            if _production_lse_only():
+                raise RuntimeError("non-LSE GEX fallback disabled in production")
             from gamma_exposure import compute_gamma_exposure
             gex_data = compute_gamma_exposure(symbol, spot_source="yfinance", source="oi")
         except Exception:
@@ -885,8 +933,15 @@ def plan_symbol(
                 "ticket_action": ticket.get("action"),
                 "raw_probability": confidence.get("raw_probability"),
                 "calibrated_probability": confidence.get("calibrated_probability"),
+                "confidence_score": confidence.get("confidence_score"),
+                "confidence_kind": confidence.get("confidence_kind"),
+                "probability_calibrated": confidence.get("probability_calibrated"),
                 "size_limit": confidence.get("size_limit"),
                 "data_freshness": confidence.get("data_freshness"),
+                "reference_price": entry_val,
+                "horizon": h,
+                "direction": "short" if go_short and not go_long else "long",
+                "calibration_version": confidence.get("calibration_version"),
                 "asof_utc": out["asof_utc"],
             }
         )
@@ -1040,7 +1095,14 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--ac-adv-days", type=int, default=20)
     ap.add_argument("--ac-vol-days", type=int, default=20)
     ap.add_argument("--json", action="store_true")
+    ap.add_argument(
+        "--allow-uncalibrated",
+        action="store_true",
+        help="Expose an ordinal identity score for research diagnostics; live ENTER/sizing remains blocked",
+    )
     args = ap.parse_args(argv)
+    if args.allow_uncalibrated:
+        os.environ["CONFIDENCE_ALLOW_UNCALIBRATED"] = "1"
     # Leave empty model as auto so plan_symbol can confidence-rank.
 
     hist = []

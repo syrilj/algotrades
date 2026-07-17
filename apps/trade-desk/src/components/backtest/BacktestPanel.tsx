@@ -90,7 +90,7 @@ export function BacktestPanel({ showHeader = true }: { showHeader?: boolean }) {
       {showHeader ? (
         <PageHeader
           title="v22 Robust backtest"
-          description="Research only — offline options variants. Live structure lives on Options desk; risk mode on Live."
+          description="Offline options variant study. Live structure lives on Options desk; risk mode on Live."
           actions={
             <Link href="/options" className="td-btn td-btn-primary no-underline">
               Options desk
@@ -111,7 +111,7 @@ export function BacktestPanel({ showHeader = true }: { showHeader?: boolean }) {
               </select>
             </label>
             <label>
-              <span className="text-[12px]" style={{ color: "var(--td-ink-300)" }}>Symbols (comma separated, .US added)</span>
+              <span className="text-[12px]" style={{ color: "var(--td-ink-300)" }}>Symbols (comma separated)</span>
               <input className="td-input w-full" value={symbols} onChange={(e) => setSymbols(e.target.value)} />
             </label>
             <div className="grid grid-cols-2 gap-3">

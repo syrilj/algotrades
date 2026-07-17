@@ -394,7 +394,7 @@ _PRIOR_WR = {
 _GENERATE_CONF_PREFIXES = (
     "v41", "v45", "v46", "v47", "v48", "v49", "v50", "v51",
     "v60", "v61", "v63", "v64", "v65", "v66", "v67",
-    "v70", "v71", "v72",
+    "v70", "v71", "v72", "v85",
 )
 
 
@@ -504,8 +504,8 @@ def _engine_last_signal(
     mod: Any,
     code: str,
     frame: pd.DataFrame,
-) -> tuple[float | None, str | None, float | None]:
-    """Run SignalEngine.generate on the latest bar; return (weight, error, conf).
+) -> tuple[float | None, str | None, float | None, str | None]:
+    """Return latest (weight, error, confidence score, confidence kind).
 
     Newer research engines (v45+, v50/v71/v72, …) expose generate() rather than
     the classic VA/MACD helpers. Desk uses the last non-null target weight as the
@@ -515,9 +515,10 @@ def _engine_last_signal(
     try:
         eng = mod.SignalEngine()
     except Exception as exc:  # noqa: BLE001
-        return None, f"SignalEngine init failed: {exc}", None
+        return None, f"SignalEngine init failed: {exc}", None, None
     if not hasattr(eng, "generate"):
-        return None, None, None
+        return None, None, None, None
+    confidence_kind = getattr(eng, "confidence_kind", None)
 
     yf = _to_yf(code)
     keys = [code, yf, f"{yf}.US"]
@@ -532,10 +533,10 @@ def _engine_last_signal(
     try:
         out = eng.generate(data_map)
     except Exception as exc:  # noqa: BLE001
-        return None, f"generate failed: {exc}", None
+        return None, f"generate failed: {exc}", None, confidence_kind
 
     if not isinstance(out, dict):
-        return None, "generate returned non-dict", None
+        return None, "generate returned non-dict", None, confidence_kind
 
     sig = None
     used_key: str | None = None
@@ -548,7 +549,7 @@ def _engine_last_signal(
         used_key = next(iter(out.keys()))
         sig = out[used_key]
     if sig is None:
-        return None, "generate returned no series", None
+        return None, "generate returned no series", None, confidence_kind
 
     conf_val: float | None = None
     raw_conf = getattr(eng, "last_confidence", None)
@@ -571,10 +572,10 @@ def _engine_last_signal(
     try:
         s = pd.Series(sig).dropna()
         if s.empty:
-            return 0.0, None, conf_val
-        return float(s.iloc[-1]), None, conf_val
+            return 0.0, None, conf_val, confidence_kind
+        return float(s.iloc[-1]), None, conf_val, confidence_kind
     except Exception as exc:  # noqa: BLE001
-        return None, f"signal parse failed: {exc}", None
+        return None, f"signal parse failed: {exc}", None, confidence_kind
 
 
 def _fallback_kelly(conf: float, atr_pct: float, med_atr_pct: float, kelly_fraction: float = 0.5) -> float:
@@ -877,6 +878,7 @@ def _compute_state(mod, code: str, df: pd.DataFrame, model_name: str, live: bool
     gen_signal: float | None = None
     gen_error: str | None = None
     gen_conf: float | None = None
+    gen_conf_kind: str | None = None
     uses_classic = _has_classic_desk_helpers(desk_mod)
     is_generate_model = model_name.startswith(_GENERATE_CONF_PREFIXES) or (
         "spec_" in model_name or "router" in model_name or "bounce" in model_name
@@ -888,7 +890,9 @@ def _compute_state(mod, code: str, df: pd.DataFrame, model_name: str, live: bool
     if should_try_generate:
         # Prefer original loaded module so wrappers keep their own generate()
         gen_mod = mod if hasattr(mod, "SignalEngine") else desk_mod
-        gen_signal, gen_error, gen_conf = _engine_last_signal(gen_mod, code, frame)
+        gen_signal, gen_error, gen_conf, gen_conf_kind = _engine_last_signal(
+            gen_mod, code, frame
+        )
         if gen_signal is not None:
             gen_long = gen_signal > 1e-9
             # Target weight may be 0–1 (fraction) or ~0.2 (v50 scale) or 1.0 flat.
@@ -1116,10 +1120,13 @@ def _compute_state(mod, code: str, df: pd.DataFrame, model_name: str, live: bool
         "hard_gates_ok": hard,
         "sleeve_fraction": round(float(sleeve), 3),
         "hit_probability": round(hit_prob, 3),
+        "hit_probability_kind": "heuristic_probability_like_score_not_calibrated",
         "prior_wr": prior,
         "prior_source": prior_source,
         "gen_signal": None if gen_signal is None else round(float(gen_signal), 4),
         "engine_confidence": None if gen_conf is None else round(float(gen_conf), 4),
+        "engine_confidence_kind": gen_conf_kind,
+        "confidence_kind": gen_conf_kind or "heuristic_probability_like_score_not_calibrated",
         "confidence_source": (
             "engine_last_confidence"
             if (gen_conf is not None and gen_signal is not None and float(gen_signal) > 1e-9)

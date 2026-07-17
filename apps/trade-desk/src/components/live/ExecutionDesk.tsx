@@ -4,15 +4,17 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   AlertTriangle,
+  ArrowRight,
+  BarChart3,
   CheckCircle2,
   Crosshair,
   Loader2,
-  LockKeyhole,
   Radar,
   Radio,
   RefreshCw,
   Search,
   ShieldCheck,
+  TicketCheck,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -26,6 +28,7 @@ import {
   feedPresentation,
   gammaMethodology,
   riskModeLabel,
+  ticketDisplayFromPlan,
 } from "@/lib/executionState";
 import { formatNum, formatPct, formatPctPoints, formatUsd } from "@/lib/format";
 import { analyzeHref, gammaHref, liveHref, optionsHref, positionsHref, watchHref } from "@/lib/routes";
@@ -80,9 +83,11 @@ function formatAsOf(value: string | null | undefined): string {
 function PaperExecution({
   order,
   plan,
+  override = false,
 }: {
   order: PaperOrder;
   plan: LivePlanResponse;
+  override?: boolean;
 }) {
   const [armed, setArmed] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -105,7 +110,8 @@ function PaperExecution({
           riskPct: plan.ticket?.risk_pct,
           action: plan.ticket?.action,
           confidence: plan.confidence?.calibrated_probability,
-          reason: "Verified in the guided Execution workspace",
+          reason: override ? "Simulated trade override logged by user" : "Verified in the guided Execution workspace",
+          override,
         }),
       });
       const json = (await response.json()) as ApiEnvelope<{ position: PaperPosition }>;
@@ -126,7 +132,7 @@ function PaperExecution({
       <div className="exec-order-confirmed" role="status">
         <CheckCircle2 aria-hidden="true" />
         <div>
-          <strong>Paper position logged</strong>
+          <strong>Paper position logged {override && "(Overridden)"}</strong>
           <span>{position.id}</span>
         </div>
         <Link href={positionsHref()} className="td-btn td-btn-ghost no-underline">
@@ -139,7 +145,7 @@ function PaperExecution({
   return (
     <div className="exec-paper-order">
       <div>
-        <span className="td-eyebrow">PAPER EXECUTION</span>
+        <span className="td-eyebrow">PAPER EXECUTION {override && "(OVERRIDE ENABLED)"}</span>
         <strong>{armed ? "Confirm the simulated order" : "Test this plan safely"}</strong>
         <p>
           {armed
@@ -189,6 +195,7 @@ export function ExecutionDesk() {
   const [optionsFeed, setOptionsFeed] = useState<OptionsPlanResponse | null>(null);
   const [optionsFeedError, setOptionsFeedError] = useState<string | null>(null);
   const [optionsLoading, setOptionsLoading] = useState(false);
+  const [showReadinessDetails, setShowReadinessDetails] = useState(false);
   const lastPlannedRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -202,6 +209,8 @@ export function ExecutionDesk() {
       setSymbol(sym);
       setLoading(true);
       setError(null);
+
+      setShowReadinessDetails(false);
       try {
         const response = await fetch("/api/live-plan", {
           method: "POST",
@@ -323,7 +332,10 @@ export function ExecutionDesk() {
   const freshness = plan?.live?.freshness ?? plan?.confidence?.data_freshness;
   const feed = useMemo(() => feedPresentation(freshness), [freshness]);
   const decision = useMemo(() => (plan ? decisionPresentation(plan) : null), [plan]);
+  // Executable size only from buildPaperOrder (gates + real stop + positive max_loss).
+  // Never invent shares/stop on stand-aside — that fabricated risk and unlocks false fills.
   const order = useMemo(() => (plan ? buildPaperOrder(plan) : null), [plan]);
+  const ticketView = useMemo(() => (plan ? ticketDisplayFromPlan(plan) : null), [plan]);
   const setupLabel = plan ? analysisSetupLabel(plan) : "—";
   const riskLabel = plan ? riskModeLabel(plan) : "—";
   const gex = gammaFeed ?? plan?.gex ?? null;
@@ -425,36 +437,51 @@ export function ExecutionDesk() {
       ) : null}
 
       {!plan && !loading ? (
-        <section className="exec-empty">
-          <div className="exec-empty__mark"><ShieldCheck aria-hidden="true" /></div>
-          <div>
-            <span className="td-eyebrow">GUIDED EXECUTION</span>
-            <h2>Evidence before action.</h2>
-            <p>
-              The desk will verify the price source, market timestamp, model gate, risk budget,
-              and options context before it unlocks a paper order.
-            </p>
-            <p className="td-muted" style={{ marginTop: "0.75rem" }}>
-              No name yet? Discover first:{" "}
-              <Link href={liveHref(undefined, "bias", account)} className="no-underline">
-                Bias
-              </Link>
-              {" · "}
-              <Link href={liveHref(undefined, "picks", account)} className="no-underline">
-                Picks
-              </Link>
-              {" · "}
-              <Link href={watchHref(undefined, account)} className="no-underline">
-                Watch
-              </Link>
-              , or run <strong>Scan market</strong> above for an execution-grade shortlist.
-            </p>
+        <section className="exec-onboard" aria-label="How to build a paper decision">
+          <header>
+            <span className="td-eyebrow">YOUR PAPER-TRADE PATH</span>
+            <h2>Find it. Check it. Plan it.</h2>
+          </header>
+          <div className="exec-onboard__flow">
+            <article className="exec-onboard__card exec-onboard__card--discover">
+              <div className="exec-onboard__icon"><BarChart3 aria-hidden="true" /></div>
+              <span>STEP 1</span>
+              <h3>Find a stock</h3>
+              <div className="exec-onboard__bars" aria-hidden="true">
+                {[28, 42, 36, 58, 49, 72, 64, 84].map((height, index) => <i key={index} style={{ height: `${height}%` }} />)}
+              </div>
+              <div className="exec-onboard__links">
+                <Link href={liveHref(undefined, "picks", account)}>Picks</Link>
+                <Link href={watchHref(undefined, account)}>Watchlist</Link>
+                <button type="button" onClick={() => void runScan()}>Scan now</button>
+              </div>
+            </article>
+            <ArrowRight className="exec-onboard__arrow" aria-hidden="true" />
+            <article className="exec-onboard__card exec-onboard__card--verify">
+              <div className="exec-onboard__icon"><ShieldCheck aria-hidden="true" /></div>
+              <span>STEP 2</span>
+              <h3>Pass the checks</h3>
+              <div className="exec-onboard__checks">
+                <div><i>1</i><span>Fresh price</span><b>—</b></div>
+                <div><i>2</i><span>Model agrees</span><b>—</b></div>
+                <div><i>3</i><span>Risk fits</span><b>—</b></div>
+                <div><i>4</i><span>Stop is valid</span><b>—</b></div>
+              </div>
+            </article>
+            <ArrowRight className="exec-onboard__arrow" aria-hidden="true" />
+            <article className="exec-onboard__card exec-onboard__card--ticket">
+              <div className="exec-onboard__icon"><TicketCheck aria-hidden="true" /></div>
+              <span>STEP 3</span>
+              <h3>Get one paper plan</h3>
+              <div className="exec-onboard__ticket">
+                <div><span>ENTRY</span><b>—</b></div>
+                <div><span>STOP</span><b>—</b></div>
+                <div><span>SIZE</span><b>—</b></div>
+                <strong>WAITING FOR A SYMBOL</strong>
+              </div>
+            </article>
           </div>
-          <ol>
-            <li><span>01</span> Choose a symbol</li>
-            <li><span>02</span> Verify the feed</li>
-            <li><span>03</span> Follow one decision</li>
-          </ol>
+          <footer><span>Nothing is sent to a broker.</span><span>Every paper plan shows its maximum loss.</span></footer>
         </section>
       ) : null}
 
@@ -534,55 +561,128 @@ export function ExecutionDesk() {
             </div>
 
             <div className="exec-decision__body">
-              <div className="exec-decision__evidence">
-                <span className="td-eyebrow">WHY PAPER ORDER IS {order ? "OPEN" : "LOCKED"}</span>
-                <ul>
-                  {(reasons.length ? reasons : ["No confirmed live entry edge"]).slice(0, 6).map((reason) => (
-                    <li key={reason}>
-                      {order ? <CheckCircle2 aria-hidden="true" /> : <LockKeyhole aria-hidden="true" />}
-                      {cleanReason(reason)}
-                    </li>
-                  ))}
-                </ul>
-                <div className="exec-confidence-line">
-                  <Stat label="Confidence gate" value={plan.confidence?.state ?? "ABSTAIN"} emphasize />
-                  <Stat
-                    label="Calibrated probability"
-                    value={plan.confidence?.calibrated_probability == null ? "Unavailable" : formatPct(plan.confidence.calibrated_probability)}
-                    emphasize
-                  />
-                  <Stat label="Max loss" value={formatUsd(plan.ticket?.max_loss_dollars, 0)} emphasize />
-                  <Stat label="Volatility z" value={formatNum(plan.live?.vol_z, 2)} emphasize />
-                </div>
-              </div>
-
-              <div className="exec-decision__order">
-                {order ? (
-                  <>
-                    <div className="exec-order-grid">
-                      <Stat label="Side" value={order.side.toUpperCase()} emphasize />
-                      <Stat label="Entry" value={formatUsd(order.entry)} emphasize />
-                      <Stat label="Stop" value={formatUsd(order.stop)} emphasize />
-                      <Stat label="Shares" value={String(order.shares)} emphasize />
-                      <Stat label="Planned risk" value={formatUsd(order.dollarRisk, 0)} emphasize />
-                      <Stat label="Account" value={formatUsd(order.account, 0)} emphasize />
+              <div className="exec-decision__order w-full">
+                <span className="td-eyebrow block mb-3">SIMULATED TRADE TICKET SUGGESTION</span>
+                {ticketView ? (
+                  <div className="mb-4">
+                    <div className="exec-order-grid mb-4">
+                      <Stat label="Side" value={ticketView.side.toUpperCase()} emphasize />
+                      <Stat
+                        label={ticketView.executable ? "Entry" : "Mark / entry"}
+                        value={formatUsd(ticketView.entry)}
+                        emphasize
+                      />
+                      <Stat
+                        label="Stop"
+                        value={ticketView.stop != null ? formatUsd(ticketView.stop) : "—"}
+                        emphasize
+                      />
+                      <Stat
+                        label="Shares"
+                        value={ticketView.shares != null ? String(ticketView.shares) : "—"}
+                        emphasize
+                      />
+                      <Stat
+                        label={ticketView.executable ? "Planned risk" : "Risk budget (backend)"}
+                        value={
+                          ticketView.executable
+                            ? formatUsd(ticketView.dollarRisk, 0)
+                            : formatUsd(ticketView.maxLossBudget, 0)
+                        }
+                        emphasize
+                      />
+                      <Stat
+                        label="Account"
+                        value={formatUsd(ticketView.account ?? plan.account ?? account, 0)}
+                        emphasize
+                      />
                     </div>
-                    <PaperExecution order={order} plan={plan} />
-                  </>
-                ) : (
-                  <div className="exec-locked">
-                    <LockKeyhole aria-hidden="true" />
-                    <div>
-                      <span className="td-eyebrow">PAPER ORDER LOCKED</span>
-                      <strong>No sized equity order yet</strong>
-                      <p>
-                        Setup can still be {setupLabel}. This lock only blocks paper size until feed,
-                        calibration, confidence ENTER, and risk checks all pass. Use Options / Gamma live
-                        feeds below for structure — they are not blocked by this gate.
+                    {!ticketView.executable ? (
+                      <p className="text-[11px] mb-3" style={{ color: "var(--td-muted)" }}>
+                        Action <strong>{ticketView.action}</strong> — shares and sized risk only appear when
+                        every execution gate passes. The desk does not invent stop levels or force ≥1 share.
                       </p>
-                    </div>
+                    ) : null}
+
+                    {order ? (
+                      <div
+                        className="p-3 mb-4 text-[12px] flex items-center gap-2 border"
+                        style={{
+                          background: "color-mix(in oklch, var(--td-gate-pass) 8%, transparent)",
+                          borderColor: "color-mix(in oklch, var(--td-gate-pass) 28%, transparent)",
+                          borderRadius: "var(--td-radius-md)",
+                          color: "var(--td-gate-pass)",
+                        }}
+                      >
+                        <CheckCircle2 className="shrink-0" size={16} />
+                        <span>All live verification checks passed. Order calculation unlocked.</span>
+                      </div>
+                    ) : (
+                      <div
+                        className="p-4 mb-4 flex flex-col gap-2.5 border"
+                        style={{
+                          background: "color-mix(in oklch, var(--td-gate-fail) 6%, transparent)",
+                          borderColor: "color-mix(in oklch, var(--td-gate-fail) 24%, transparent)",
+                          borderRadius: "var(--td-radius-md)",
+                        }}
+                      >
+                        <div
+                          className="flex items-center gap-2 text-[12px] font-medium"
+                          style={{ color: "var(--td-gate-fail)" }}
+                        >
+                          <AlertTriangle className="shrink-0" size={16} />
+                          <span>
+                            Paper fill locked — stand-aside / failed gates. No client-side size override.
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {order ? (
+                      <PaperExecution order={order} plan={plan} override={false} />
+                    ) : null}
                   </div>
+                ) : (
+                  <p className="text-[13px] text-[var(--td-muted)]">No ticket details available.</p>
                 )}
+
+                {/* Readiness Details Accordion */}
+                <div className="border-t border-[var(--td-hairline)] pt-3 mt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowReadinessDetails(!showReadinessDetails)}
+                    className="td-btn td-btn-ghost text-[11px] uppercase tracking-wider font-semibold flex items-center gap-1.5"
+                  >
+                    {showReadinessDetails ? "Hide Readiness Details" : "Show Readiness Details"}
+                  </button>
+                  {showReadinessDetails && (
+                    <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="p-3 bg-[var(--td-surface-soft)] border border-[var(--td-hairline)] rounded-lg">
+                        <span className="td-eyebrow mb-2 block">Failed checks</span>
+                        <ul className="list-none p-0 m-0 flex flex-col gap-1.5 text-[12px]">
+                          {(reasons.length ? reasons : ["No active entry edge"]).map((reason) => (
+                            <li key={reason} className="flex items-start gap-2 text-[var(--td-ink-300)]">
+                              <AlertTriangle size={13} className="shrink-0 mt-0.5" style={{ color: "var(--td-gate-fail)" }} />
+                              <span>{cleanReason(reason)}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                      <div className="p-3 bg-[var(--td-surface-soft)] border border-[var(--td-hairline)] rounded-lg flex flex-col gap-2 justify-between">
+                        <span className="td-eyebrow block">Metrics Context</span>
+                        <div className="grid grid-cols-2 gap-3">
+                          <Stat label="Confidence gate" value={plan.confidence?.state ?? "ABSTAIN"} />
+                          <Stat
+                            label="Calibrated prob"
+                            value={plan.confidence?.calibrated_probability == null ? "Unavailable" : formatPct(plan.confidence.calibrated_probability)}
+                          />
+                          <Stat label="Max loss" value={formatUsd(plan.ticket?.max_loss_dollars, 0)} />
+                          <Stat label="Volatility z" value={formatNum(plan.live?.vol_z, 2)} />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </section>

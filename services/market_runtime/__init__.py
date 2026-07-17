@@ -20,3 +20,4 @@ from .lse_adapter import LSEAdapter
 from .persistence import TickPersistence
 from .state import LatestTickState, TickBarAggregator
 from .supervisor import StreamSupervisor
+from .vault_client import LSEVaultClient, LSEVaultError, VaultResult

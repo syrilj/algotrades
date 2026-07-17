@@ -1,10 +1,32 @@
 {
   "symbol": "TSLA",
-  "action": "skip",
-  "reason": "spread max_loss $930 > budget $180 \u2014 wait cheaper IV/DTE",
-  "spot": 394.4599914550781,
+  "action": "buy",
+  "structure": "bull_call_debit_spread",
+  "spot": 391.05999755859375,
   "expiry": "2026-08-14",
-  "proposed_debit": 9.300000000000002,
-  "long_strike": 405.0,
-  "short_strike": 435.0
+  "dte": 29,
+  "long_strike": 410.0,
+  "short_strike": 415.0,
+  "long_delta": 0.405,
+  "short_delta": 0.372,
+  "iv_long": 0.5,
+  "debit_per_share": 1.65,
+  "max_loss_1_contract": 165.0,
+  "contracts": 1,
+  "account": 1000.0,
+  "budget": 180.0,
+  "theta_day_approx": -0.3862,
+  "note": "OIC bull call spread \u2014 defined risk",
+  "warnings": [
+    "structure found via affordability search (d0.45_w0.03)"
+  ],
+  "asof_utc": "2026-07-16T23:26:48.961930+00:00",
+  "exit_plan": {
+    "cut_loser": "exit if premium \u2264 -30% from entry (do not hope)",
+    "stagnant": "if 2 sessions pass with |opt| <8% and underlying <2% move \u2192 exit",
+    "big_move": "after +40% premium, trail: exit if give back 25% of peak premium",
+    "time": "flat by 5 DTE \u2014 no lottery holds",
+    "goal": "catch big moves; cut dead trades; react"
+  },
+  "search_tag": "d0.45_w0.03"
 }

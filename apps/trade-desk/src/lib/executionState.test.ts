@@ -9,6 +9,8 @@ import {
   gammaMethodology,
   gammaFreshness,
   isExecutionActionable,
+  paperExecutionAllowed,
+  ticketDisplayFromPlan,
 } from "./executionState.ts";
 
 test("closed-market latest session data is usable and explicitly labeled", () => {
@@ -335,4 +337,125 @@ test("no gamma payload means no levels to show", () => {
   const empty = gammaDeskPresentation(null);
   assert.equal(empty.showLevels, false);
   assert.equal(empty.hasSnapshot, false);
+});
+
+/** Stand-aside plan shaped like live SPY abstain (max_loss 0, no model stop). */
+function standAsidePlan() {
+  return {
+    ok: true,
+    symbol: "SPY",
+    account: 1000,
+    live_ready: true,
+    decision_support_ready: true,
+    execution_readiness: { ready: false, blockers: ["setup_not_ready"] },
+    live: {
+      price: 594.8,
+      go_long: false,
+      go_short: false,
+      freshness: { available: true, stale: false },
+    },
+    confidence: { state: "ABSTAIN", reasons: ["setup_not_ready"] },
+    ticket: {
+      action: "abstain",
+      mode: "STAND_ASIDE",
+      vehicle: "none",
+      max_loss_dollars: 0,
+      execution_blocked: true,
+    },
+    decision: { action: "abstain", mode: "STAND_ASIDE", analysis_action: "WAIT" },
+    model: { model: "auto", entry: undefined, stop: undefined },
+  };
+}
+
+test("stand-aside plan never gets a paper order (no invented shares)", () => {
+  const plan = standAsidePlan();
+  assert.equal(buildPaperOrder(plan), null);
+  assert.equal(isExecutionActionable(plan), false);
+  assert.equal(paperExecutionAllowed(plan), false);
+});
+
+test("ticketDisplayFromPlan does not invent stop, shares, or fake risk on abstain", () => {
+  const plan = standAsidePlan();
+  const view = ticketDisplayFromPlan(plan);
+
+  assert.equal(view.executable, false);
+  assert.equal(view.shares, null);
+  assert.equal(view.dollarRisk, null);
+  assert.equal(view.stop, null); // no model stop → null, not entry*0.95
+  assert.equal(view.entry, 594.8); // live mark only
+  assert.equal(view.maxLossBudget, 0); // backend truth, not account*0.02
+  assert.equal(view.action, "abstain");
+  // Critical: never force ≥1 share or non-zero planned risk when backend says 0
+  assert.notEqual(view.shares, 1);
+  assert.ok(view.dollarRisk == null || view.dollarRisk === 0);
+});
+
+test("ticketDisplayFromPlan does not invent stop when only entry/mark exists", () => {
+  const plan = {
+    ...standAsidePlan(),
+    model: { model: "v39d", entry: 100, stop: undefined },
+    live: {
+      price: 100,
+      go_long: true,
+      go_short: false,
+      freshness: { available: true, stale: false },
+    },
+  };
+  const view = ticketDisplayFromPlan(plan);
+  assert.equal(view.stop, null);
+  assert.equal(view.shares, null);
+  assert.equal(view.executable, false);
+});
+
+test("ticketDisplayFromPlan matches buildPaperOrder when fully gated", () => {
+  const plan = {
+    ok: true,
+    live_ready: true,
+    symbol: "APLD",
+    account: 1000,
+    decision_support_ready: true,
+    execution_readiness: { ready: true },
+    live: {
+      price: 100,
+      go_long: true,
+      freshness: { available: true, stale: false },
+    },
+    confidence: { state: "ENTER" },
+    ticket: { action: "enter", vehicle: "equity", max_loss_dollars: 120 },
+    model: { model: "v39d_confluence", entry: 101, stop: 95 },
+  };
+  const order = buildPaperOrder(plan);
+  const view = ticketDisplayFromPlan(plan);
+  assert.ok(order);
+  assert.equal(view.executable, true);
+  assert.equal(view.shares, order!.shares);
+  assert.equal(view.dollarRisk, order!.dollarRisk);
+  assert.equal(view.stop, 95);
+  assert.equal(paperExecutionAllowed(plan), true);
+});
+
+test("max_loss_dollars 0 never sizes a paper order even with entry and stop", () => {
+  const plan = {
+    ok: true,
+    live_ready: true,
+    symbol: "SPY",
+    account: 1000,
+    decision_support_ready: true,
+    execution_readiness: { ready: true },
+    live: {
+      price: 100,
+      go_long: true,
+      freshness: { available: true, stale: false },
+    },
+    confidence: { state: "ENTER" },
+    ticket: { action: "enter", vehicle: "equity", max_loss_dollars: 0 },
+    model: { model: "x", entry: 100, stop: 95 },
+  };
+  // isExecutionActionable requires positive max_loss
+  assert.equal(isExecutionActionable(plan), false);
+  assert.equal(buildPaperOrder(plan), null);
+  const view = ticketDisplayFromPlan(plan);
+  assert.equal(view.shares, null);
+  assert.equal(view.maxLossBudget, 0);
+  assert.equal(view.executable, false);
 });

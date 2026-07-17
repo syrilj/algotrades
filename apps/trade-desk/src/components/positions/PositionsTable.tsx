@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { Briefcase, History, Wallet } from "lucide-react";
 
+import { EmptyState } from "@/components/ui/EmptyState";
 import { formatNum, formatUsd } from "@/lib/format";
 import { analyzeHref, liveHref, modelHref } from "@/lib/routes";
 import type { LedgerStatsRow, PaperPosition } from "@/lib/types";
@@ -234,7 +236,8 @@ function OpenRow({
               </button>
               <button
                 type="button"
-                className="td-btn td-btn-ghost text-[11px] px-1 text-[var(--td-avoid)]"
+                className="td-btn td-btn-ghost text-[11px] px-1"
+                style={{ color: "var(--td-action-avoid)" }}
                 onClick={() => void deleteRow()}
               >
                 Delete
@@ -266,27 +269,35 @@ export function PositionsTable({
 
   if (positions.length === 0) {
     return (
-      <p className="text-[13px]" style={{ color: "var(--td-ink-300)" }}>
-        No paper trades yet — log one from Analyze → Verdict → Log paper trade,
-        or from Execution → Decision when gates pass.
-      </p>
+      <EmptyState
+        icon={Wallet}
+        title="No paper trades yet"
+        hint="Log one from Command → Verdict → Log paper trade, or Execution → Decision when gates pass."
+        steps={[
+          "Open Command and run a symbol analyze",
+          "Or open Execution, load a live plan, and paper-fill when ready",
+        ]}
+      />
     );
   }
 
   if (showOpen && open.length === 0 && !showHistory) {
     return (
-      <p className="text-[13px]" style={{ color: "var(--td-ink-300)" }}>
-        No open paper positions. Closed history is under History / Risk.
-      </p>
+      <EmptyState
+        icon={Briefcase}
+        title="No open positions"
+        hint="Closed outcomes live under History. Open risk appears after a paper fill."
+      />
     );
   }
 
   if (showHistory && closed.length === 0 && statsRows.length === 0 && !showOpen) {
     return (
-      <p className="text-[13px]" style={{ color: "var(--td-ink-300)" }}>
-        No closed trades or model stats yet. Close an open position to record
-        outcomes.
-      </p>
+      <EmptyState
+        icon={History}
+        title="No closed trades yet"
+        hint="Close an open position to record P&L and model stats."
+      />
     );
   }
 

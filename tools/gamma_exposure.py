@@ -234,21 +234,24 @@ def _compute_squeeze_score(
         if put_wall is not None and abs(s["strike"] - put_wall) < 1e-9:
             put_wall_gex = abs(s.get("put_gex", 0.0))
 
+    # Dynamic Volatility-scaled proximity based on Expected Move
+    em_pct = expected_move_pct if (expected_move_pct is not None and expected_move_pct > 0.1) else 5.0
+
     # 1. Call wall proximity (0 to +30)
     # Positive when spot is near the call wall: close from below (breakout) or
-    # just above from support. Tapers to zero outside ±5%.
+    # just above from support. Tapers to zero outside ±em_pct.
     call_wall_dist_pct = ((call_wall - spot) / spot * 100) if call_wall is not None else 999.0
-    if -5 <= call_wall_dist_pct <= 5:
-        call_prox_score = 30.0 * (1 - abs(call_wall_dist_pct) / 5)
+    if -em_pct <= call_wall_dist_pct <= em_pct:
+        call_prox_score = 30.0 * (1 - abs(call_wall_dist_pct) / em_pct)
     else:
         call_prox_score = 0.0
 
     # 2. Put wall proximity (0 to -30)
     # Negative when spot is near the put wall: close from below (support broken)
-    # or close from above (break risk). Tapers to zero outside ±5%.
+    # or close from above (break risk). Tapers to zero outside ±em_pct.
     put_wall_dist_pct = ((put_wall - spot) / spot * 100) if put_wall is not None else 999.0
-    if -5 <= put_wall_dist_pct <= 5:
-        put_prox_score = -30.0 * (1 - abs(put_wall_dist_pct) / 5)
+    if -em_pct <= put_wall_dist_pct <= em_pct:
+        put_prox_score = -30.0 * (1 - abs(put_wall_dist_pct) / em_pct)
     else:
         put_prox_score = 0.0
 

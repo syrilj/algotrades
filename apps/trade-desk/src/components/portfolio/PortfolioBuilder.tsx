@@ -317,12 +317,16 @@ export function PortfolioBuilder() {
 
         <div className="mt-3 flex flex-wrap gap-2">
           <button className="td-btn td-btn-primary" onClick={optimize} disabled={loading || basket.length < 2}>
-            {loading ? "Optimizing…" : "Optimize portfolio"}
+            {loading ? "Computing…" : "Compute weight scenarios"}
           </button>
           <button className="td-btn td-btn-ghost" onClick={analyzeBasket} disabled={analyzing || basket.length === 0}>
-            {analyzing ? "Analyzing…" : "Analyze holdings"}
+            {analyzing ? "Loading path…" : "Load model path per symbol"}
           </button>
         </div>
+        <p className="mt-2 text-[11px]" style={{ color: "var(--td-ink-400)" }}>
+          Scenarios and path labels are metrics under the chosen model contract —
+          not target trades or sizing instructions.
+        </p>
       </div>
 
       {error ? (
@@ -338,32 +342,29 @@ export function PortfolioBuilder() {
   );
 }
 
-function suggestionFor(row: PickRow): string {
-  if (row.error) return "Review";
-  const action = (row.action || "").toUpperCase();
-  if (action.includes("AVOID")) return "Let go / avoid";
-  if (action.startsWith("BUY")) return "Keep / add";
-  if (action.includes("WATCH") || action.includes("ALMOST")) return "Watch / keep";
-  return "Trim / wait";
-}
-
 function PortfolioAnalysis({ analysis }: { analysis: PickRow[] }) {
   const sorted = [...analysis].sort((a, b) => (b.score ?? -1) - (a.score ?? -1));
   return (
     <div className="td-panel p-3">
-      <div className="text-[var(--td-ink-400)] text-[11px] uppercase tracking-wide mb-2">
-        Holdings analysis
+      <div className="flex flex-wrap items-baseline justify-between gap-2 mb-2">
+        <div className="text-[var(--td-ink-400)] text-[11px] uppercase tracking-wide">
+          Path metrics by symbol
+        </div>
+        <div className="text-[var(--td-ink-400)] text-[11px]">
+          Sorted by setup score · model path state only
+        </div>
       </div>
       <div className="overflow-x-auto">
         <table className="scan-table">
           <thead>
             <tr>
               <th>Symbol</th>
-              <th>Signal</th>
+              <th>Path label</th>
+              <th>Setup</th>
               <th className="text-right">Score</th>
-              <th className="text-right">Price</th>
+              <th className="text-right">Mark</th>
               <th className="text-right">Confidence</th>
-              <th>Suggestion</th>
+              <th>Model</th>
             </tr>
           </thead>
           <tbody>
@@ -372,11 +373,18 @@ function PortfolioAnalysis({ analysis }: { analysis: PickRow[] }) {
               return (
                 <tr key={row.symbol}>
                   <td className="font-medium">{row.symbol}</td>
-                  <td className="text-[12px]">{row.action ?? row.error ?? "—"}</td>
+                  <td className="text-[12px] font-medium" style={{ color }}>
+                    {row.action ?? row.error ?? "—"}
+                  </td>
+                  <td className="text-[12px] text-[var(--td-ink-300)]">
+                    {row.setup_kind ?? "—"}
+                  </td>
                   <td className="tabular text-right">{formatNum(row.score ?? 0, 3)}</td>
                   <td className="tabular text-right">{row.price ? formatUsd(row.price) : "—"}</td>
                   <td className="tabular text-right">{formatPct(row.confidence ?? 0, 0)}</td>
-                  <td className="text-[12px] font-medium" style={{ color }}>{suggestionFor(row)}</td>
+                  <td className="text-[11px] font-mono text-[var(--td-ink-300)]">
+                    {row.model ?? "auto"}
+                  </td>
                 </tr>
               );
             })}
@@ -384,7 +392,8 @@ function PortfolioAnalysis({ analysis }: { analysis: PickRow[] }) {
         </table>
       </div>
       <div className="mt-2 text-[var(--td-ink-400)] text-[11px]">
-        Sorted by setup score. Strongest = keep/add; weakest = trim/avoid.
+        Labels and scores come from the current model path (structure, filters, meta).
+        Higher score ≠ instruction to size up; compare columns side by side.
       </div>
     </div>
   );
@@ -464,12 +473,12 @@ function PortfolioResult({ result }: { result: PortfolioOptimizationResponse }) 
               <thead>
                 <tr>
                   <th>Symbol</th>
-                  <th className="text-right">Current %</th>
-                  <th className="text-right">Target %</th>
-                  <th className="text-right">Δ %</th>
-                  <th className="text-right">Buy/Sell $</th>
-                  <th className="text-right">Shares</th>
-                  <th className="text-right">Price</th>
+                  <th className="text-right">Current wt</th>
+                  <th className="text-right">Scenario wt</th>
+                  <th className="text-right">Δ wt</th>
+                  <th className="text-right">Δ $</th>
+                  <th className="text-right">Δ shares</th>
+                  <th className="text-right">Mark</th>
                 </tr>
               </thead>
               <tbody>
@@ -492,11 +501,15 @@ function PortfolioResult({ result }: { result: PortfolioOptimizationResponse }) 
             <div className="mt-3 text-[12px] text-[var(--td-ink-200)]">
               {selected === "max_sharpe" || selected === "min_variance" ? (
                 <span>
-                  Expected return {formatPct(strategy?.return, 1)} · risk {formatPct(strategy?.risk, 1)} · Sharpe {formatNum(strategy?.sharpe, 2)}
+                  Scenario ret {formatPct(strategy?.return, 1)} · vol {formatPct(strategy?.risk, 1)} · Sharpe {formatNum(strategy?.sharpe, 2)}
+                  <span className="text-[var(--td-ink-400)]"> · mean-variance math on lookback window</span>
                 </span>
               ) : (
                 <span>
-                  Target risk {formatPct(strategy?.risk, 1)} · {Object.entries(strategy?.risk_contribution || {}).map(([k, v]) => `${k} ${formatPct(v, 0)}`).join(" / ")}
+                  Scenario vol {formatPct(strategy?.risk, 1)} · risk contrib{" "}
+                  {Object.entries(strategy?.risk_contribution || {})
+                    .map(([k, v]) => `${k} ${formatPct(v, 0)}`)
+                    .join(" / ")}
                 </span>
               )}
             </div>

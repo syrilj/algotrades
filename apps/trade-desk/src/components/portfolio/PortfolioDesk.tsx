@@ -584,7 +584,7 @@ export function PortfolioDesk({ showHeader = true }: { showHeader?: boolean }) {
       {showHeader ? (
         <PageHeader
           title="Portfolio"
-          description="Modern portfolio construction: mean-variance, efficient frontier, risk parity, and factor tilt."
+          description="Construction metrics on inputs you set — mean-variance, efficient frontier, risk parity, and factor tilt."
         />
       ) : null}
 

@@ -25,12 +25,17 @@ API is vectorized and can be ported to Polars later if required.
 """
 from __future__ import annotations
 
-import warnings
+from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Dict, Iterable, Optional, Sequence, Union
 
 import numpy as np
 import pandas as pd
+
+
+DurationLike = Union[str, pd.Timedelta]
+PerAssetDuration = Union[DurationLike, Mapping[str, DurationLike]]
+FractionalD = Union[float, Mapping[str, float]]
 
 
 # ─── Fractional differentiation ─────────────────────────────────────────────
@@ -352,12 +357,18 @@ def regime_features(
     out = pd.DataFrame(index=df.index)
     if vix_col in df.columns:
         vix = df[vix_col].astype(float)
+        min_periods = max(2, lookback // 4)
+        rolling_vix = vix.rolling(lookback, min_periods=min_periods)
         out["vix_level"] = vix
-        out["vix_zscore"] = (vix - vix.rolling(lookback, min_periods=lookback // 4).mean()) / (
-            vix.rolling(lookback, min_periods=lookback // 4).std().replace(0, np.nan)
+        out["vix_zscore"] = (vix - rolling_vix.mean()) / (
+            rolling_vix.std().replace(0, np.nan)
         )
-        rank = vix.rank()
-        out["vix_pct_low"] = 1.0 - (rank - 1.0) / (rank.rolling(lookback, min_periods=lookback // 4).max() - 1.0).replace(0, np.nan)
+        # Rank the current observation only within its trailing window.  A
+        # full-series ``vix.rank()`` changes historical values whenever future
+        # rows are appended and therefore leaks the future distribution.
+        rank = rolling_vix.rank(method="average")
+        count = rolling_vix.count()
+        out["vix_pct_low"] = 1.0 - (rank - 1.0) / (count - 1.0).replace(0, np.nan)
 
         # Term structure: VIX3M / VIX9D if available
         if "vix3m_close" in df.columns and "vix9d_close" in df.columns:
@@ -402,25 +413,32 @@ def regime_features(
 def long_memory_features(
     df: pd.DataFrame,
     cols: Sequence[str] = ("close", "volume"),
-    d: Optional[float] = None,
+    d: Optional[FractionalD] = None,
     d_train: Optional[pd.Series] = None,
     threshold: float = 1e-5,
     method: str = "hurst",
 ) -> pd.DataFrame:
     """Fractionally differentiate selected price/volume series.
 
-    If ``d`` is None and ``d_train`` is provided, ``d`` is estimated on the
-    training series.  When neither is provided, ``d`` is estimated from the
-    full column (intended only for exploratory use; for production, fit on a
-    training window).  ``method`` controls ``d`` estimation (``hurst`` or
-    ``adf``; the latter requires ``statsmodels``).
+    ``d`` may be one scalar for every column or a mapping of column name to a
+    value fitted on training data.  If ``d`` is None and ``d_train`` is
+    provided, ``d`` is estimated on the training series.  When neither is
+    provided, ``d`` is estimated from the full column (intended only for
+    exploratory use; for production, fit on a training window).  ``method``
+    controls ``d`` estimation (``hurst`` or ``adf``; the latter requires
+    ``statsmodels``).
     """
     out = pd.DataFrame(index=df.index)
     for col in cols:
         if col not in df.columns:
             continue
         s = df[col].astype(float)
-        d_est = d
+        if isinstance(d, Mapping):
+            if col not in d:
+                raise ValueError(f"missing fitted fractional-d value for column: {col}")
+            d_est = float(d[col])
+        else:
+            d_est = d
         if d_est is None:
             train = d_train if d_train is not None else s
             d_est = estimate_d(train, method=method)
@@ -487,12 +505,21 @@ def align_cross_asset_bars(
     tlt_df: Optional[pd.DataFrame] = None,
     vix_df: Optional[pd.DataFrame] = None,
     suffix_map: Optional[Dict[str, str]] = None,
+    availability_lag: Optional[PerAssetDuration] = None,
+    tolerance: Optional[PerAssetDuration] = None,
 ) -> pd.DataFrame:
     """Align cross-asset bars to the target index and rename columns.
 
     This is the cross-asset data aligner.  It takes optional DataFrames for
     SPY/SPX, TLT/rate proxy, and VIX and merges them onto ``target_df`` using
     backward-as-of joins.  Column names are prefixed by asset class.
+
+    ``availability_lag`` shifts source timestamps forward to the time at which
+    a value is actually observable (for example, a daily close published after
+    the intraday decision timestamp). ``tolerance`` limits how long a source
+    observation may be carried forward. Each accepts one duration for every
+    source or a mapping keyed by ``spy_df``/``tlt_df``/``vix_df`` (the shorter
+    ``spy``/``tlt``/``vix`` aliases are also accepted).
     """
     out = target_df.copy().sort_index()
     out.index = pd.to_datetime(out.index)
@@ -505,7 +532,21 @@ def align_cross_asset_bars(
         "vix_df": "vix_",
     }
 
-    def _join(other: Optional[pd.DataFrame], prefix: str) -> pd.DataFrame:
+    def _duration_for(value: Optional[PerAssetDuration], asset_key: str) -> Optional[pd.Timedelta]:
+        if value is None:
+            return None
+        raw: Any = value
+        if isinstance(value, Mapping):
+            short_key = asset_key.removesuffix("_df")
+            raw = value.get(asset_key, value.get(short_key))
+        if raw is None:
+            return None
+        duration = pd.Timedelta(raw)
+        if pd.isna(duration) or duration < pd.Timedelta(0):
+            raise ValueError(f"{asset_key} duration must be finite and non-negative")
+        return duration
+
+    def _join(other: Optional[pd.DataFrame], prefix: str, asset_key: str) -> pd.DataFrame:
         if other is None or other.empty:
             return out
         other = other.copy().sort_index()
@@ -513,18 +554,23 @@ def align_cross_asset_bars(
         if other.index.tz is None:
             other.index = other.index.tz_localize("UTC")
         other = other.tz_convert(out.index.tz)
+        lag = _duration_for(availability_lag, asset_key)
+        if lag is not None:
+            other.index = other.index + lag
         other = other.add_prefix(prefix)
+        max_age = _duration_for(tolerance, asset_key)
         joined = pd.merge_asof(
             out.reset_index(names="ts"),
             other.reset_index(names="ts"),
             on="ts",
             direction="backward",
+            tolerance=max_age,
         )
         return joined.set_index("ts").sort_index()
 
-    out = _join(spy_df, suffix_map.get("spy_df", "spy_"))
-    out = _join(tlt_df, suffix_map.get("tlt_df", "tlt_"))
-    out = _join(vix_df, suffix_map.get("vix_df", "vix_"))
+    out = _join(spy_df, suffix_map.get("spy_df", "spy_"), "spy_df")
+    out = _join(tlt_df, suffix_map.get("tlt_df", "tlt_"), "tlt_df")
+    out = _join(vix_df, suffix_map.get("vix_df", "vix_"), "vix_df")
     return out
 
 
@@ -534,7 +580,7 @@ def macro_feature_matrix(
     tlt_df: Optional[pd.DataFrame] = None,
     vix_df: Optional[pd.DataFrame] = None,
     events_df: Optional[pd.DataFrame] = None,
-    d: Optional[float] = None,
+    d: Optional[FractionalD] = None,
     d_train_col: Optional[str] = None,
     high_beta_col: Optional[str] = None,
     cfg: Optional[Dict[str, Any]] = None,
@@ -546,7 +592,8 @@ def macro_feature_matrix(
     target_df: OHLCV bars for the target symbol.
     spy_df/tlt_df/vix_df: optional cross-asset bars.
     events_df: macro calendar DataFrame (see ``parse_macro_calendar``).
-    d: optional fixed fractional differencing parameter.
+    d: optional fixed fractional differencing parameter, either one scalar or
+        a mapping keyed by target column.
     d_train_col: column name in ``target_df`` whose training history is used
         to estimate ``d``.  If None, ``d`` is estimated on the full column
         (use only for exploration; in walk-forward, pass a training slice).
@@ -563,7 +610,14 @@ def macro_feature_matrix(
     fd_method = cfg.get("fd_method", "hurst")
 
     # Align cross-asset data
-    aligned = align_cross_asset_bars(target_df, spy_df, tlt_df, vix_df)
+    aligned = align_cross_asset_bars(
+        target_df,
+        spy_df,
+        tlt_df,
+        vix_df,
+        availability_lag=cfg.get("cross_asset_availability_lag"),
+        tolerance=cfg.get("cross_asset_tolerance"),
+    )
 
     # Base features from target
     features = pd.DataFrame(index=aligned.index)
@@ -585,9 +639,11 @@ def macro_feature_matrix(
     # Regime features
     regime = regime_features(
         aligned,
-        vix_col="vix_close" if "vix_close" in aligned.columns else "close",
-        spy_col="spy_close" if "spy_close" in aligned.columns else "close",
-        tlt_col="tlt_close" if "tlt_close" in aligned.columns else "close",
+        # Missing cross-asset series remain missing.  Substituting target close
+        # silently turns target momentum into VIX/rates/benchmark features.
+        vix_col="vix_close",
+        spy_col="spy_close",
+        tlt_col="tlt_close",
         lookback=regime_lookback,
     )
     features = pd.concat([features, regime], axis=1)
@@ -604,7 +660,15 @@ def macro_feature_matrix(
     if d_train_col and d_train_col in aligned.columns:
         d_train = aligned[d_train_col]
     fd_cols = cfg.get("fd_cols", ["close"])
-    fd = long_memory_features(aligned, cols=fd_cols, d=d, d_train=d_train, threshold=fd_threshold, method=fd_method)
+    fixed_d = d if d is not None else cfg.get("d")
+    fd = long_memory_features(
+        aligned,
+        cols=fd_cols,
+        d=fixed_d,
+        d_train=d_train,
+        threshold=fd_threshold,
+        method=fd_method,
+    )
     features = pd.concat([features, fd], axis=1)
 
     # Interaction features
@@ -641,9 +705,11 @@ class MacroCrossAssetEngine:
     ) -> "MacroCrossAssetEngine":
         """Fit ``d`` and normalization stats on training data only."""
         # Estimate d per column
+        self.d_estimates.clear()
+        fd_method = self.cfg.get("fd_method", "hurst")
         for col in self.cfg.get("fd_cols", ["close"]):
             if col in target_train.columns:
-                self.d_estimates[col] = estimate_d(target_train[col])
+                self.d_estimates[col] = estimate_d(target_train[col], method=fd_method)
         # Regime / macro normalization stats are handled inside functions
         # by expanding/rolling windows, so no explicit fit needed.
         return self
@@ -659,16 +725,16 @@ class MacroCrossAssetEngine:
     ) -> pd.DataFrame:
         """Build feature matrix using the fitted ``d`` values."""
         cfg = self.cfg.copy()
-        if "fd_cols" in cfg:
-            # Use the first fitted d for all cols, or per-col logic in future
-            d = next(iter(self.d_estimates.values()), None) if self.d_estimates else None
-            cfg["d"] = d
+        fitted_d: Optional[FractionalD] = (
+            dict(self.d_estimates) if self.d_estimates else cfg.get("d")
+        )
         return macro_feature_matrix(
             target_df,
             spy_df=spy_df,
             tlt_df=tlt_df,
             vix_df=vix_df,
             events_df=events_df,
+            d=fitted_d,
             high_beta_col=high_beta_col,
             cfg=cfg,
         )

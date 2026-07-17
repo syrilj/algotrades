@@ -386,6 +386,196 @@ def window_utility(m: dict[str, Any] | None) -> float:
     )
 
 
+# --- Confidence layer: conservative, evidence-gated (anti-false-signal) ---
+
+Z_ONE_SIDED_90 = 1.645
+MIN_TRADES_FULL = 12  # below this the read is capped hard (THIN evidence)
+TRUST_MIN_TRADES = 20  # a TRUST verdict needs at least this many full-window trades
+CONF_THIN_CAP = 0.35
+DD_HARD_GATE = 0.25
+DD_SOFT_KNEE = 0.15
+OPTIONS_CONF_CAP = 0.55  # synthetic BS pricing can never earn a trusted read
+
+
+def _norm_horizon(horizon: str | None) -> str:
+    h = str(horizon or "swing").strip().lower()
+    if h in ("intraday", "daytrade", "day_trade", "1h", "hourly", "short"):
+        return "day"
+    if h in ("long", "long_term", "longterm", "invest", "buy_hold"):
+        return "position"
+    return h if h in ("day", "swing", "position") else "swing"
+
+
+def wilson_lower_bound(wins: float, n: int, z: float = Z_ONE_SIDED_90) -> float:
+    """Conservative lower bound of a win rate given the sample size."""
+    if n <= 0:
+        return 0.0
+    p = max(0.0, min(1.0, wins / n))
+    z2 = z * z
+    centre = p + z2 / (2 * n)
+    spread = z * math.sqrt((p * (1.0 - p) + z2 / (4 * n)) / n)
+    return max(0.0, (centre - spread) / (1.0 + z2 / n))
+
+
+def breakeven_win_rate(profit_loss_ratio: float) -> float:
+    """Win rate needed to break even given the avg win / avg loss ratio."""
+    plr = min(10.0, max(0.1, _f(profit_loss_ratio, 1.0) or 1.0))
+    return 1.0 / (1.0 + plr)
+
+
+def row_confidence(row: dict[str, Any], *, options_track: bool = False) -> dict[str, Any]:
+    """Evidence-gated confidence in [0,1] for one engine on one symbol.
+
+    Gates are multiplicative so a single disqualifier (no statistical edge,
+    blow-up drawdown, thin sample) zeroes or caps the read instead of being
+    averaged away by strong-looking headline metrics.
+    """
+    reasons: list[str] = []
+    parts: dict[str, Any] = {}
+    wm = row.get("window_metrics") or {}
+    full = wm.get("full") or {}
+    if row.get("status") != "ok" or full.get("status") != "ok":
+        return {"confidence": 0.0, "parts": {}, "reasons": ["no_valid_full_window"]}
+
+    n = int(_f(full.get("trade_count")))
+    if n <= 0:
+        return {"confidence": 0.0, "parts": {"n_full": 0}, "reasons": ["no_trades"]}
+    wr = _f(full.get("win_rate"))
+    lb = wilson_lower_bound(wr * n, n)
+    plr = _f(full.get("profit_loss_ratio"), 0.0) or _f(full.get("profit_factor"), 1.0)
+    be = breakeven_win_rate(plr)
+    margin = lb - be
+    # Full credit only when the *lower bound* clears breakeven by 10 points.
+    edge = max(0.0, min(1.0, margin / 0.10))
+    parts.update(
+        {
+            "n_full": n,
+            "win_rate": round(wr, 4),
+            "wilson_lb": round(lb, 4),
+            "breakeven_wr": round(be, 4),
+            "edge_margin": round(margin, 4),
+            "edge": round(edge, 4),
+        }
+    )
+    if margin <= 0:
+        reasons.append("win_rate_lb_below_breakeven")
+
+    sample = math.sqrt(n / (n + 20.0))
+    parts["sample"] = round(sample, 4)
+
+    oos = max(0.0, min(1.0, _f(row.get("oos_consistency"))))
+    consistency = 0.5 + 0.5 * oos
+    recent = wm.get("recent") or {}
+    if recent.get("status") == "ok" and _f(recent.get("total_return")) < 0:
+        consistency *= 0.7
+        reasons.append("recent_window_negative")
+    parts["consistency"] = round(consistency, 4)
+
+    dd = abs(_f(full.get("max_drawdown")))
+    if dd >= DD_HARD_GATE:
+        return {"confidence": 0.0, "parts": parts, "reasons": reasons + ["drawdown_gate"]}
+    dd_factor = max(0.5, 1.0 - max(0.0, dd - DD_SOFT_KNEE) * 3.0)
+    parts["dd_factor"] = round(dd_factor, 4)
+
+    conf = edge * sample * consistency * dd_factor
+
+    live = row.get("live")
+    if isinstance(live, dict) and int(live.get("n") or 0) >= 5:
+        adj = max(-0.10, min(0.10, 0.2 * _f(live.get("avg_R"))))
+        conf += adj
+        parts["live_adj"] = round(adj, 4)
+        if adj < 0:
+            reasons.append("live_underperformance")
+
+    if n < MIN_TRADES_FULL and conf > CONF_THIN_CAP:
+        conf = CONF_THIN_CAP
+        reasons.append("thin_sample_capped")
+    if options_track and conf > OPTIONS_CONF_CAP:
+        conf = OPTIONS_CONF_CAP
+        reasons.append("synthetic_options_pricing_capped")
+
+    return {"confidence": round(max(0.0, min(1.0, conf)), 4), "parts": parts, "reasons": reasons}
+
+
+def _apply_confidence(rows: list[dict[str, Any]], *, options_track: bool = False) -> None:
+    for row in rows:
+        res = row_confidence(row, options_track=options_track)
+        row["confidence"] = res["confidence"]
+        row["confidence_parts"] = res["parts"]
+        row["confidence_reasons"] = res["reasons"]
+
+
+def confidence_read(art: dict[str, Any], *, horizon: str = "swing") -> dict[str, Any]:
+    """Symbol-level highest-confidence engine read with honest abstain.
+
+    A verdict is only TRUST when the top engine's evidence-gated confidence
+    clears the horizon enter threshold on a non-thin sample; otherwise the
+    read degrades to WATCH or STAND_ASIDE with named reasons.
+    """
+    h = _norm_horizon(horizon)
+    try:
+        import model_registry as mr
+
+        thresholds = mr.horizon_confidence_thresholds(h)
+    except Exception:
+        thresholds = {"watch": 0.50, "enter": 0.60}
+    reasons: list[str] = []
+    read: dict[str, Any] = {
+        "schema": 1,
+        "symbol": art.get("symbol"),
+        "horizon": h,
+        "asof": art.get("asof"),
+        "verdict": "STAND_ASIDE",
+        "model": None,
+        "confidence": 0.0,
+        "thresholds": {k: round(float(v), 4) for k, v in thresholds.items()},
+        "runner_up": None,
+        "gap": None,
+        "reasons": reasons,
+    }
+    if art.get("stale"):
+        reasons.append("ranker_stale_refresh_required")
+        return read
+    rows = [
+        r
+        for r in (art.get("rows") or [])
+        if r.get("status") == "ok" and r.get("desk_runnable")
+    ]
+    if not rows:
+        reasons.append("no_desk_runnable_evidence")
+        return read
+    ranked = sorted(
+        rows,
+        key=lambda r: (-_f(r.get("confidence")), -_f(r.get("score")), r.get("model") or ""),
+    )
+    best = ranked[0]
+    conf = _f(best.get("confidence"))
+    read["model"] = best.get("model")
+    read["confidence"] = conf
+    reasons.extend(str(x) for x in (best.get("confidence_reasons") or []))
+    if len(ranked) > 1:
+        second = ranked[1]
+        read["runner_up"] = {
+            "model": second.get("model"),
+            "confidence": _f(second.get("confidence")),
+        }
+        read["gap"] = round(conf - _f(second.get("confidence")), 4)
+
+    verdict = "STAND_ASIDE"
+    if conf >= float(thresholds.get("enter", 0.60)):
+        verdict = "TRUST"
+    elif conf >= float(thresholds.get("watch", 0.50)):
+        verdict = "WATCH"
+    n_full = int(_f((best.get("confidence_parts") or {}).get("n_full")))
+    if verdict == "TRUST" and n_full < TRUST_MIN_TRADES:
+        verdict = "WATCH"
+        reasons.append("sample_below_trust_floor")
+    if verdict == "STAND_ASIDE" and not reasons:
+        reasons.append("confidence_below_watch_threshold")
+    read["verdict"] = verdict
+    return read
+
+
 def composite_score(utils: dict[str, float], *, quick: bool) -> tuple[float, float]:
     if quick:
         u = utils.get("full", -0.5)
@@ -576,9 +766,12 @@ def _assemble_row(
 
 
 def _rank_sort(rows: list[dict[str, Any]]) -> None:
+    # Confidence first: an unproven high-score row must not outrank proven
+    # evidence. Score remains the tie-break within a confidence tier.
     rows.sort(
         key=lambda r: (
             0 if r.get("status") == "ok" else 1,
+            -float(r.get("confidence") or 0.0),
             -float(r.get("score") or -999),
             r.get("model") or "",
         )
@@ -724,10 +917,12 @@ def build_ranker(
             )
         enrich_live(rows, sym)
         enrich_live(opt_rows, sym)
+        _apply_confidence(rows)
+        _apply_confidence(opt_rows, options_track=True)
         _rank_sort(rows)
         _rank_sort(opt_rows)
-        return {
-            "schema": 2,
+        art = {
+            "schema": 3,
             "symbol": sym,
             "code": code,
             "horizon": h,
@@ -741,6 +936,8 @@ def build_ranker(
             "options_rows": opt_rows,
             "errors": errors,
         }
+        art["read"] = confidence_read(art, horizon=h)
+        return art
 
     path = _artifact_path(sym, h)
 
@@ -787,7 +984,7 @@ def show_payload(symbol: str, *, horizon: str = "swing") -> dict[str, Any]:
     sym, code = _sym(symbol)
     art = load_artifact(sym, horizon=horizon)
     if not art:
-        return {
+        out = {
             "exists": False,
             "symbol": sym,
             "code": code,
@@ -795,16 +992,20 @@ def show_payload(symbol: str, *, horizon: str = "swing") -> dict[str, Any]:
             "stale": True,
             "rows": [],
             "options_rows": [],
-            "schema": 2,
+            "schema": 3,
             "asof": _utc_now(),
             "cash": CASH,
             "status": "partial",
             "windows": window_specs(horizon=horizon),
         }
+        out["read"] = confidence_read(out, horizon=horizon)
+        return out
     rows = list(art.get("rows") or [])
     opt_rows = list(art.get("options_rows") or [])
     enrich_live(rows, sym)
     enrich_live(opt_rows, sym)
+    _apply_confidence(rows)
+    _apply_confidence(opt_rows, options_track=True)
     _rank_sort(rows)
     _rank_sort(opt_rows)
     art["rows"] = rows
@@ -813,6 +1014,7 @@ def show_payload(symbol: str, *, horizon: str = "swing") -> dict[str, Any]:
     art["exists"] = True
     art["age_days"] = age
     art["stale"] = age is None or age > STALE_DAYS
+    art["read"] = confidence_read(art, horizon=horizon)
     return art
 
 
@@ -853,6 +1055,12 @@ def cmd_show(ns: argparse.Namespace) -> int:
     return _print_json(show_payload(ns.symbol, horizon=horizon))
 
 
+def cmd_read(ns: argparse.Namespace) -> int:
+    horizon = getattr(ns, "horizon", "swing") or "swing"
+    art = show_payload(ns.symbol, horizon=horizon)
+    return _print_json(art.get("read") or confidence_read(art, horizon=horizon))
+
+
 def cmd_best(ns: argparse.Namespace) -> int:
     import model_registry as mr
 
@@ -871,6 +1079,7 @@ def cmd_best(ns: argparse.Namespace) -> int:
                 hit = {
                     "model": row["model"],
                     "score": row["score"],
+                    "confidence": row.get("confidence"),
                     "code": art.get("code"),
                     "asof": art.get("asof"),
                     "win_rate": row.get("win_rate"),
@@ -912,6 +1121,11 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("symbol")
     s.add_argument("--horizon", choices=["day", "swing", "position"], default="swing")
     s.set_defaults(func=cmd_show)
+
+    rd = sub.add_parser("read", help="Highest-confidence engine read (abstains when weak)")
+    rd.add_argument("symbol")
+    rd.add_argument("--horizon", choices=["day", "swing", "position"], default="swing")
+    rd.set_defaults(func=cmd_read)
 
     b = sub.add_parser("best")
     b.add_argument("symbol")

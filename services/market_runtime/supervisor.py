@@ -147,6 +147,11 @@ class StreamSupervisor:
             pass
         if self._thread is not None and self._thread.is_alive():
             self._thread.join(timeout=timeout)
+        if self._persistence is not None:
+            try:
+                self._persistence.flush()
+            except Exception:  # noqa: BLE001
+                pass
         self._running = False
 
     def is_running(self) -> bool:

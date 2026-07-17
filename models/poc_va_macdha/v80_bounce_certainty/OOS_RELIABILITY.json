@@ -1,0 +1,112 @@
+{
+  "ok": true,
+  "model_version": "v80_bounce_certainty",
+  "horizon_bars": 5,
+  "training_context": "down_days_only_ret_1d_lt_0",
+  "label": "max_high_within_5_bars_ge_plus_2pct",
+  "n_total": 8294,
+  "n_train": 6220,
+  "n_holdout": 2074,
+  "holdout_base_rate": 0.7328833172613307,
+  "train_end": "2024-10-15 00:00:00",
+  "holdout_start": "2024-10-15 00:00:00",
+  "holdout_metrics": {
+    "n": 2074,
+    "positive_rate": 0.7328833172613307,
+    "brier": 0.1625392037818546,
+    "log_loss": 0.5012311120527629,
+    "ece": 0.01809873538386926,
+    "reliability": [
+      {
+        "bin": 0,
+        "n": 9,
+        "mean_probability": 0.0551323938254015,
+        "event_rate": 0.0
+      },
+      {
+        "bin": 1,
+        "n": 26,
+        "mean_probability": 0.14762770850797605,
+        "event_rate": 0.07692307692307693
+      },
+      {
+        "bin": 2,
+        "n": 40,
+        "mean_probability": 0.2512803352856988,
+        "event_rate": 0.125
+      },
+      {
+        "bin": 3,
+        "n": 54,
+        "mean_probability": 0.3494233672544529,
+        "event_rate": 0.3148148148148148
+      },
+      {
+        "bin": 4,
+        "n": 107,
+        "mean_probability": 0.45618982159440324,
+        "event_rate": 0.42990654205607476
+      },
+      {
+        "bin": 5,
+        "n": 115,
+        "mean_probability": 0.560628245269263,
+        "event_rate": 0.5826086956521739
+      },
+      {
+        "bin": 6,
+        "n": 229,
+        "mean_probability": 0.6689787512365932,
+        "event_rate": 0.6724890829694323
+      },
+      {
+        "bin": 7,
+        "n": 886,
+        "mean_probability": 0.7667706567830396,
+        "event_rate": 0.7821670428893905
+      },
+      {
+        "bin": 8,
+        "n": 443,
+        "mean_probability": 0.868258188084455,
+        "event_rate": 0.8758465011286681
+      },
+      {
+        "bin": 9,
+        "n": 165,
+        "mean_probability": 0.9280935790125516,
+        "event_rate": 0.896969696969697
+      }
+    ]
+  },
+  "high_confidence_band": {
+    "threshold": 0.78,
+    "watch_threshold": 0.7000000000000001,
+    "n": 832,
+    "hit_rate": 0.8725961538461539,
+    "brier": 0.11188612513467594,
+    "lift_vs_base": 0.13971283658482314,
+    "definition": "chronological holdout rows with calibrated p_bounce >= threshold; threshold chosen for hit_rate>=0.60 with n>=20 when possible"
+  },
+  "baseline_base_rate_brier": 0.19790233015904932,
+  "symbols": [
+    "SPY",
+    "QQQ",
+    "TSLA",
+    "MSTR",
+    "IONQ",
+    "MU",
+    "NVDA",
+    "APLD",
+    "COIN",
+    "PLTR"
+  ],
+  "asof_utc": "2026-07-16T17:56:07.416965+00:00",
+  "notes": [
+    "Train features: OHLCV structure + support/resistance + QQQ/SPY macro (PIT, no look-ahead).",
+    "Live inference also folds desk live_plan model signals, macro_regime, options/GEX.",
+    "Training restricted to down days (ret_1d < 0) \u2014 the bounce-from-here question.",
+    "Label = max high over next horizon bars reaches +2% from today close.",
+    "High certainty band is threshold-gated; model abstains below watch / OOD up-days."
+  ]
+}

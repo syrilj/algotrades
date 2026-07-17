@@ -447,7 +447,11 @@ def build_identity_artifact(
     isotonic_artifact: dict[str, Any],
     threshold_meta: dict[str, Any],
 ) -> dict[str, Any]:
-    """Active identity calibrator: raw==calibrated, thresholds from OOF expectancy."""
+    """Build a candidate-only ordinal-score artifact.
+
+    An identity transform does not calibrate a score into a probability, so it
+    must never satisfy active runtime probability-calibration gates.
+    """
     from evolve.calibration import calibration_metrics
 
     ordered = frame.sort_values("entry_ts").reset_index(drop=True)
@@ -470,6 +474,9 @@ def build_identity_artifact(
         "raw_probability": "engine_or_ledger",
         "label": "realized_r > 0",
         "calibration_type": "identity",
+        "probability_semantics": "uncalibrated_ordinal_score_not_probability",
+        "calibrated_probability_available": False,
+        "runtime_eligible": False,
         "calibrator": {"x": [0.0, 1.0], "y": [0.0, 1.0]},
         "thresholds": {"watch": watch, "enter": enter},
         "threshold_selection": threshold_meta,
@@ -500,14 +507,14 @@ def build_identity_artifact(
             "enter": enter,
         },
         "promotion": {
-            "all_calibration_gates_pass": True,
-            "all_promotion_gates_pass": True,
-            "justified_activate": True,
+            "all_calibration_gates_pass": False,
+            "all_promotion_gates_pass": False,
+            "justified_activate": False,
             "calibration_type": "identity",
             "justification": (
-                "Isotonic map failed OOS reliability vs raw. Activated identity "
-                "calibrator so live uses true raw probability with expectancy-tuned "
-                "ENTER/WATCH thresholds — no fake probability remapping."
+                "Isotonic OOS reliability gates failed. Identity preserves the raw "
+                "ordinal score but is not probability calibration; retain only as "
+                "research evidence and do not activate."
             ),
             "portfolio": {
                 "candidate_sharpe": sharpe,
@@ -575,7 +582,7 @@ def calibrate_one(model: str, cfg: dict[str, Any], *, dry_run: bool = False) -> 
     print(f"  isotonic_justified={ok}  reasons={reasons or ['ok']}")
 
     cand_path = OUT_CAND / f"{model}.json"
-    mode = "isotonic" if ok else "identity"
+    mode = "isotonic" if ok else "ordinal_identity_candidate"
     thr_meta = tune_thresholds_oof(frame)
     print(f"  threshold_tune: {thr_meta}")
 
@@ -601,9 +608,8 @@ def calibrate_one(model: str, cfg: dict[str, Any], *, dry_run: bool = False) -> 
             write_artifact(artifact, active_path, activate=True, force=False)
             print(f"  ACTIVE (isotonic) → {active_path}")
         else:
-            # Honest fallback: identity map + expectancy thresholds.
-            # Still better than a harmful isotonic or silent identity fallback
-            # with default 0.60 that never matches this model's score scale.
+            # Identity may preserve an ordinal score for threshold research,
+            # but it cannot be activated as probability calibration.
             oof_n = int(thr_meta.get("oof_n") or 0)
             # Discrimination check: if raw conf is constant, thresholding is fake.
             p_std = float(frame["raw_probability"].std() or 0.0)
@@ -629,13 +635,14 @@ def calibrate_one(model: str, cfg: dict[str, Any], *, dry_run: bool = False) -> 
                     threshold_meta=thr_meta,
                 )
                 write_artifact(identity, OUT_CAND / f"{model}_identity.json", activate=False)
-                write_artifact(identity, active_path, activate=True, force=False)
-                mode = "identity"
+                mode = "ordinal_identity_candidate"
                 print(
-                    f"  ACTIVE (identity+tuned enter={thr_meta['enter']}) → {active_path}  "
+                    f"  CANDIDATE ONLY (uncalibrated ordinal score; "
+                    f"research enter={thr_meta['enter']})  "
                     f"[isotonic rejected: {reasons[0] if reasons else 'n/a'}]"
                 )
-                ok = True
+                reasons.append("identity_is_ordinal_not_probability_calibration")
+                ok = False
             else:
                 mode = "none"
                 why = thr_meta.get("reason")
@@ -714,8 +721,8 @@ def main(argv: list[str] | None = None) -> int:
         "schema": "main-model-calibration-v2",
         "policy": (
             "no silent identity fallback at runtime; activate only with OOS evidence; "
-            "isotonic only if Brier+logloss improve; else identity+expectancy thresholds "
-            "when conf has discrimination; specialists without own map inherit v39d DNA"
+            "isotonic only if Brier+logloss improve; identity maps remain candidate-only "
+            "ordinal-score research artifacts; specialists without own map inherit v39d DNA"
         ),
         "models": summary,
         "active_dir": str(OUT_ACTIVE),

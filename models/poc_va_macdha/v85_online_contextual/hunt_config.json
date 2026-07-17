@@ -1,0 +1,39 @@
+{
+  "selection_rule": "single_pre_registered_configuration_no_holdout_retune",
+  "train_window_end": "2025-08-01",
+  "min_history_bars": 800,
+  "prior": [0.62, 0.20, 0.13, 0.05],
+  "router": {
+    "eta": 0.16,
+    "share": 0.02,
+    "utility_bound": 0.03,
+    "one_way_cost": 0.001,
+    "context_blend": 0.65,
+    "warmup_updates": 40,
+    "min_bucket_updates": 8,
+    "entry_margin_over_cash": 0.02,
+    "fallback_expert": 0,
+    "stress_size": 0.70,
+    "high_vol_size": 0.85,
+    "stress_high_vol_size": 0.60,
+    "max_weight": 0.50,
+    "drift_primary_weight": 0.20,
+    "min_context_quality": 0.6666666666666666
+  },
+  "dual": {
+    "core_scale": 0.85,
+    "both_core_fraction": 0.35,
+    "max_weight": 0.50,
+    "sniper_min_confidence": 0.0
+  },
+  "sniper": {
+    "trend_lookback": 250,
+    "min_quality": 1,
+    "quality_weight": 0.65,
+    "rsi_weight": 0.35,
+    "base_scale": 0.225,
+    "min_scale_frac": 1.0,
+    "max_scale_frac": 1.55,
+    "max_scale_cap": 0.40
+  }
+}

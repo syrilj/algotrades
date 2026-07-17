@@ -1,0 +1,14 @@
+{
+  "base_model": "v72_dual_sleeve",
+  "macro_proxy_symbol": "SPY.US",
+  "macro_floor": 0.2,
+  "macro_cap": 1.0,
+  "trend_low_vol_scale": 1.0,
+  "trend_high_vol_scale": 0.7,
+  "chop_low_vol_scale": 0.5,
+  "chop_high_vol_scale": 0.2,
+  "max_weight": 0.5,
+  "selection_rule": "frozen_before_oos_eval",
+  "train_window_end": "2025-08-01",
+  "hypothesis": "Global macro overlay on v72. Scale all target weights by SPY trend/vol regime: full size in low-vol uptrend, reduced in high-vol/chop/downtrend."
+}

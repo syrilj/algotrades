@@ -1,0 +1,12 @@
+{
+  "source": "local",
+  "codes": ["TSLA.US", "MU.US", "SPY.US", "IONQ.US", "APLD.US", "XLP.US", "QQQ.US"],
+  "interval": "1H",
+  "commission": 0.001,
+  "engine": "daily",
+  "strategy": {
+    "name": "v84_macro_sleeve_up",
+    "model_version": "v84_macro_sleeve_up",
+    "note": "v72 with global SPY macro size-up overlay: upsize in low-vol uptrend, downsize otherwise."
+  }
+}

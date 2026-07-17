@@ -1,0 +1,12 @@
+# Production market-runtime dependencies. Keep exact direct pins so image
+# rebuilds do not silently change the service's numerical or API behavior.
+fastapi==0.139.0
+httpx==0.28.1
+lse-data==0.14.0
+numpy==2.4.6
+pandas==2.3.3
+python-dotenv==1.2.2
+scipy==1.17.1
+uvicorn==0.51.0
+xgboost==3.2.0
+yfinance==1.5.1

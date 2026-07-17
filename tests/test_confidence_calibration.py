@@ -89,6 +89,8 @@ def test_runtime_enters_only_with_active_gated_calibrator():
             "status": "active",
             "schema_version": "confidence-calibration-v1",
             "model": "v39d_confluence",
+            "calibration_type": "isotonic",
+            "probability_calibrated": True,
             "promotion": {"all_calibration_gates_pass": True, "all_promotion_gates_pass": True},
             "thresholds": {"watch": 0.50, "enter": 0.60},
             "calibrator": {"x": [0.0, 1.0], "y": [0.0, 1.0]},
@@ -134,7 +136,7 @@ def test_identity_fallback_is_rejected_no_cheat():
     assert result["state"] == "ABSTAIN"
     assert result["size_limit"] == 0.0
     assert result["uncalibrated"] is True
-    assert "uncalibrated_model_no_cheat_fallback" in result["reasons"]
+    assert "ordinal_score_not_probability_calibrated" in result["reasons"]
     assert "active_calibration" in result["failed_checks"]
 
 
@@ -156,7 +158,8 @@ def test_specialist_inherits_v39d_dna_when_active(tmp_path, monkeypatch):
         "schema_version": "confidence-calibration-v1",
         "status": "active",
         "model": "v39d_confluence",
-        "calibration_type": "identity",
+        "calibration_type": "isotonic",
+        "probability_calibrated": True,
         "calibrator": {"x": [0.0, 1.0], "y": [0.0, 1.0]},
         "thresholds": {"watch": 0.525, "enter": 0.625},
         "promotion": {"all_promotion_gates_pass": True, "all_calibration_gates_pass": True},
@@ -181,6 +184,8 @@ def test_high_cal_without_setup_stays_watch():
             "status": "active",
             "schema_version": "confidence-calibration-v1",
             "model": "v39d_confluence",
+            "calibration_type": "isotonic",
+            "probability_calibrated": True,
             "promotion": {"all_promotion_gates_pass": True},
             "thresholds": {"watch": 0.50, "enter": 0.60},
             "calibrator": {"x": [0.0, 1.0], "y": [0.0, 1.0]},
@@ -307,6 +312,36 @@ def test_live_readiness_requires_verified_portfolio_and_execution_feed():
         portfolio_state_verified=True,
     )
     assert "trusted_execution_feed" in bad_live["blockers"]
+
+
+def test_production_execution_rejects_non_lse_feed(monkeypatch):
+    monkeypatch.setenv("MARKET_RUNTIME_ENV", "production")
+    result = assess_execution_readiness(
+        live={
+            "source": "yfinance",
+            "price": 100.0,
+            "go_long": True,
+            "freshness": {"available": True, "stale": False},
+        },
+        macro={"qqq_trend": "up", "xlp_spy_ratio_state": "risk_on"},
+        model={"ok": True, "entry": 100.0, "stop": 98.0},
+        confidence={
+            "state": "ENTER",
+            "raw_probability": 0.8,
+            "calibration_available": True,
+            "probability_calibrated": True,
+        },
+        decision={"action": "enter", "vehicle": "equity"},
+        options_plan=None,
+        gex=None,
+        execution_risk={
+            "effective_max_loss_dollars": 20.0,
+            "effective_risk_pct": 0.02,
+            "hard_cap_risk_pct": 0.02,
+        },
+        portfolio_state_verified=True,
+    )
+    assert "trusted_execution_feed" in result["blockers"]
 
 
 def test_shadow_ledger_records_and_settles(tmp_path):

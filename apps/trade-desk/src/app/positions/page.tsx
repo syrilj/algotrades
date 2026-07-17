@@ -133,7 +133,7 @@ function PositionsDesk() {
       <PageHeader
         eyebrow="Desk"
         title="Portfolio"
-        description="Paper ledger and construction tools — open risk, closed outcomes, and portfolio optimizers."
+        description="Paper ledger, marks, and weight scenarios — open risk, closed outcomes, and construction metrics on your basket."
         meta={
           data?.asof && view !== "portfolio" ? (
             <span className="tabular" style={{ fontFamily: "var(--td-font-mono)" }}>
@@ -183,7 +183,11 @@ function PositionsDesk() {
 
             {error ? (
               <div className="td-alert td-alert--error" role="alert">
-                {error}
+                <strong>Ledger load failed.</strong> {error}
+                {" — "}
+                Check network, then Refresh marks. If this is a remote deploy,
+                confirm the paper ledger API path is available (local monorepo
+                or mounted ledger store).
               </div>
             ) : null}
 

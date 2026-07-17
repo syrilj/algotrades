@@ -4,10 +4,17 @@ import fs from "fs/promises";
 import os from "os";
 import path from "path";
 import {
+  analyzeEndpointUrl,
+  marketRuntimeBaseUrl,
+  marketRuntimeEndpointUrl,
+  planEndpointUrl,
+} from "./backendUrl";
+import {
   analysisAgentScript,
   gammaExposureScript,
   livePlanScript,
   modelsRoot,
+  optionsBookScanScript,
   optionsPickerScript,
   optionsUnusualFlowScript,
   volPackageScoreScript,
@@ -25,6 +32,7 @@ import {
   vpaScanScript,
 } from "./paths";
 import type { ModelMetaConfig, ModelsCatalog, ModelRankRow } from "./types";
+import { normalizeLseOptionsFlow } from "./lseOptionsFlow";
 
 const DEFAULT_TIMEOUT_MS = 120_000;
 
@@ -149,25 +157,26 @@ function livePlanArgsToBody(
   return body;
 }
 
-async function callMarketRuntimePlan(
-  args: string[],
+async function callMarketRuntimeJson(
+  endpointUrl: string,
+  body: Record<string, unknown>,
+  label: string,
   timeoutMs: number,
 ): Promise<unknown> {
-  const url = process.env.MARKET_RUNTIME_URL;
-  if (!url) {
-    throw new Error("MARKET_RUNTIME_URL not set");
-  }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(`${url.replace(/\/$/, "")}/plan`, {
+    const res = await fetch(endpointUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(livePlanArgsToBody(args)),
+      headers: marketRuntimeHeaders(true),
+      body: JSON.stringify(body),
       signal: controller.signal,
     });
     if (!res.ok) {
-      throw new Error(`market-runtime /plan returned ${res.status}`);
+      const detail = await res.text().catch(() => "");
+      throw new Error(
+        `${label} returned ${res.status}${detail ? `: ${detail.slice(0, 400)}` : ""}`,
+      );
     }
     return await res.json();
   } finally {
@@ -175,24 +184,184 @@ async function callMarketRuntimePlan(
   }
 }
 
+function marketRuntimeHeaders(json = false): Record<string, string> {
+  const headers: Record<string, string> = {
+    Accept: "application/json",
+  };
+  if (json) headers["Content-Type"] = "application/json";
+  const token = process.env.MARKET_RUNTIME_API_TOKEN?.trim();
+  if (token) headers["X-API-Key"] = token;
+  return headers;
+}
+
+type MarketRuntimeDataEnvelope = {
+  ok?: boolean;
+  data?: unknown;
+  detail?: string;
+};
+
+async function callMarketRuntimeData(
+  pathName: string,
+  params: Record<string, string | number | undefined>,
+  label: string,
+  timeoutMs: number,
+): Promise<unknown> {
+  const endpoint = marketRuntimeEndpointUrl(pathName);
+  if (!endpoint) throw new Error("MARKET_RUNTIME_URL not set");
+  const url = new URL(endpoint);
+  for (const [key, value] of Object.entries(params)) {
+    if (value != null && value !== "") url.searchParams.set(key, String(value));
+  }
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, {
+      headers: marketRuntimeHeaders(),
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    const payload = (await res.json().catch(() => ({}))) as MarketRuntimeDataEnvelope;
+    if (!res.ok || payload.ok === false) {
+      throw new Error(
+        `${label} returned ${res.status}${payload.detail ? `: ${payload.detail}` : ""}`,
+      );
+    }
+    return payload.data;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** Live macro release calendar from the LSE vault. */
+export async function runLseEconomicCalendar(
+  params: { start: string; end: string; region?: string; limit?: number },
+  timeoutMs = 12_000,
+): Promise<unknown[]> {
+  const data = await callMarketRuntimeData(
+    "/data/reference/economic_calendar",
+    {
+      start: params.start,
+      end: params.end,
+      region: params.region ?? "US",
+      order: "asc",
+      limit: params.limit ?? 100,
+    },
+    "market-runtime economic calendar",
+    timeoutMs,
+  );
+  return Array.isArray(data) ? data : [];
+}
+
+/** Genuine LSE options time-and-sales rows; the API key remains server-side. */
+export async function runLseOptionsFlow(
+  params: {
+    underlying: string;
+    maxDte?: number;
+    minPremium?: number;
+    limit?: number;
+  },
+  timeoutMs = 15_000,
+): Promise<unknown[]> {
+  const data = await callMarketRuntimeData(
+    "/data/options/flow",
+    {
+      underlying: params.underlying,
+      max_dte: params.maxDte,
+      min_premium: params.minPremium,
+      order: "desc",
+      limit: params.limit ?? 500,
+    },
+    "market-runtime options flow",
+    timeoutMs,
+  );
+  return Array.isArray(data) ? data : [];
+}
+
+async function callMarketRuntimePlan(
+  args: string[],
+  timeoutMs: number,
+): Promise<unknown> {
+  const url = planEndpointUrl();
+  if (!url) {
+    throw new Error("MARKET_RUNTIME_URL not set");
+  }
+  return callMarketRuntimeJson(
+    url,
+    livePlanArgsToBody(args) as Record<string, unknown>,
+    "market-runtime /plan",
+    timeoutMs,
+  );
+}
+
+function analysisAgentArgsToBody(
+  args: string[],
+): Record<string, string | number | undefined> {
+  const body: Record<string, string | number | undefined> = {};
+  for (let i = 0; i < args.length; i++) {
+    const key = args[i];
+    switch (key) {
+      case "--symbol":
+        body.symbol = args[++i];
+        break;
+      case "--account":
+        body.account = Number(args[++i]);
+        break;
+      case "--model":
+        body.model = args[++i];
+        break;
+      case "--horizon":
+        body.horizon = args[++i];
+        break;
+      case "--top-n":
+        body.top_n = Number(args[++i]);
+        break;
+      default:
+        break;
+    }
+  }
+  return body;
+}
+
+async function callMarketRuntimeAnalyze(
+  args: string[],
+  timeoutMs: number,
+): Promise<unknown> {
+  const url = analyzeEndpointUrl();
+  if (!url) {
+    throw new Error("MARKET_RUNTIME_URL not set");
+  }
+  return callMarketRuntimeJson(
+    url,
+    analysisAgentArgsToBody(args) as Record<string, unknown>,
+    "market-runtime /analyze",
+    timeoutMs,
+  );
+}
+
 /** Full live ticket: features + macro + v25 risk + options structure.
- *  Prefers the streaming market-runtime service when MARKET_RUNTIME_URL is set.
+ *  Prefers remote market-runtime when MARKET_RUNTIME_URL is set (production).
+ *  Local monorepo spawn is dev fallback only.
  */
 export async function runLivePlan(
   args: string[],
   timeoutMs = 90_000,
 ): Promise<unknown> {
-  if (process.env.MARKET_RUNTIME_URL) {
+  if (marketRuntimeBaseUrl()) {
     return callMarketRuntimePlan(args, timeoutMs);
   }
   return runPythonScript(livePlanScript(), args, "live_plan", timeoutMs);
 }
 
-/** Structured Facts → Decision → Suggestion report for a single ticker. */
+/** Structured Facts → Decision → Suggestion report for a single ticker.
+ *  Prefers remote /analyze when MARKET_RUNTIME_URL is set.
+ */
 export async function runAnalysisAgent(
   args: string[],
   timeoutMs = 120_000,
 ): Promise<unknown> {
+  if (marketRuntimeBaseUrl()) {
+    return callMarketRuntimeAnalyze(args, timeoutMs);
+  }
   return runPythonScript(analysisAgentScript(), args, "analysis_agent", timeoutMs);
 }
 
@@ -239,15 +408,76 @@ export async function runGammaExposure(
   return runPythonScript(gammaExposureScript(), args, "gamma_exposure", timeoutMs);
 }
 
-/** Same-day unusual options activity flags from chain aggregates (not OPRA tape). */
+function cliValue(args: string[], flag: string): string | undefined {
+  const index = args.indexOf(flag);
+  return index >= 0 ? args[index + 1] : undefined;
+}
+
+/** Prefer genuine LSE time-and-sales; retain the chain proxy as local fallback. */
 export async function runOptionsUnusualFlow(
   args: string[],
   timeoutMs = 90_000,
 ): Promise<unknown> {
+  const symbol = cliValue(args, "--symbol");
+  if (marketRuntimeBaseUrl() && symbol) {
+    try {
+      const maxDte = Number(cliValue(args, "--max-dte") ?? 45);
+      const topN = Number(cliValue(args, "--top") ?? 20);
+      const rows = await runLseOptionsFlow(
+        {
+          underlying: symbol,
+          maxDte: Number.isFinite(maxDte) ? maxDte : 45,
+          minPremium: 25_000,
+          limit: 1000,
+        },
+        Math.min(timeoutMs, 20_000),
+      );
+      return normalizeLseOptionsFlow(rows, symbol, {
+        topN: Number.isFinite(topN) ? topN : 20,
+        minPremium: 25_000,
+      });
+    } catch (lseError) {
+      try {
+        const fallback = await runPythonScript(
+          optionsUnusualFlowScript(),
+          args,
+          "options_unusual_flow",
+          timeoutMs,
+        );
+        if (fallback && typeof fallback === "object") {
+          return {
+            ...(fallback as Record<string, unknown>),
+            upstream_error:
+              lseError instanceof Error ? lseError.message : String(lseError),
+            fallback_source: "yfinance_chain_aggregate",
+          };
+        }
+        return fallback;
+      } catch (fallbackError) {
+        throw new Error(
+          `LSE options flow failed: ${lseError instanceof Error ? lseError.message : String(lseError)}; ` +
+            `chain fallback failed: ${fallbackError instanceof Error ? fallbackError.message : String(fallbackError)}`,
+        );
+      }
+    }
+  }
   return runPythonScript(
     optionsUnusualFlowScript(),
     args,
     "options_unusual_flow",
+    timeoutMs,
+  );
+}
+
+/** Multi-symbol options book scan (structure + vol + flow confidence read). */
+export async function runOptionsBookScan(
+  args: string[],
+  timeoutMs = 180_000,
+): Promise<unknown> {
+  return runPythonScript(
+    optionsBookScanScript(),
+    args,
+    "options_book_scan",
     timeoutMs,
   );
 }

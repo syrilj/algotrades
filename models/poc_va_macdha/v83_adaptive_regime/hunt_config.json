@@ -1,0 +1,18 @@
+{
+  "sniper_model": "v71_live_confidence",
+  "core_model": "v39d_confluence",
+  "core_scale": 0.85,
+  "both_core_frac": 0.35,
+  "max_weight": 0.5,
+  "sniper_min_conf": 0.0,
+  "selection_rule": "frozen_before_oos_eval",
+  "train_window_end": "2025-08-01",
+  "hypothesis": "v83 adaptive regime starting as hierarchical book similar to v72.",
+  "core_trend_low_vol_scale": 1.0,
+  "core_trend_high_vol_scale": 0.6,
+  "core_chop_low_vol_scale": 0.3,
+  "core_chop_high_vol_scale": 0.0,
+  "enable_rsi_vol_gate": true,
+  "core_rsi_ob_filter": 70.0,
+  "core_rsi_os_filter": 30.0
+}

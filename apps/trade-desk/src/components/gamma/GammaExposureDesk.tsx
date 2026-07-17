@@ -304,29 +304,6 @@ function buildNotes(gamma: GammaResponse): string[] {
   return notes;
 }
 
-/** Pick default from/to from real listed expiries (within ~45 DTE when possible). */
-function defaultsFromListedExpiries(listed: string[]): { from: string; to: string } {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const future = listed
-    .filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d))
-    .filter((d) => {
-      const t = new Date(`${d}T00:00:00`);
-      return Number.isFinite(t.getTime()) && t >= today;
-    })
-    .sort();
-  if (future.length === 0) {
-    return { from: listed[0] ?? "", to: listed[listed.length - 1] ?? "" };
-  }
-  const from = future[0];
-  const within45 = future.filter((d) => {
-    const t = new Date(`${d}T00:00:00`);
-    const days = Math.round((t.getTime() - today.getTime()) / 86_400_000);
-    return days <= 45;
-  });
-  const to = within45.length > 0 ? within45[within45.length - 1] : future[Math.min(3, future.length - 1)];
-  return { from, to };
-}
 
 export function GammaExposureDesk({
   showHeader = true,
@@ -339,8 +316,7 @@ export function GammaExposureDesk({
   const account = Number.isFinite(qAccount) && qAccount > 0 ? qAccount : 1000;
   const [symbol, setSymbol] = useState(qSymbol || "APLD");
   // Empty until first options chain returns real listed expiries — never invent calendar dates.
-  const [expiryFrom, setExpiryFrom] = useState("");
-  const [expiryTo, setExpiryTo] = useState("");
+  const [selectedExpiry, setSelectedExpiry] = useState("all");
   const [listedExpiries, setListedExpiries] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -353,7 +329,7 @@ export function GammaExposureDesk({
   }, [qSymbol]);
 
   const run = useCallback(
-    async (symOverride?: string, opts?: { resetExpiry?: boolean }) => {
+    async (symOverride?: string, opts?: { resetExpiry?: boolean; targetExpiry?: string }) => {
       const sym = (symOverride ?? symbol).trim().toUpperCase();
       if (!sym) return;
       const resetExpiry = opts?.resetExpiry === true || sym !== symbol;
@@ -361,9 +337,14 @@ export function GammaExposureDesk({
       setLoading(true);
       setError(null);
       setLiveError(null);
+
+      let currentExp = selectedExpiry;
+      if (opts?.targetExpiry !== undefined) {
+        currentExp = opts.targetExpiry;
+      }
       if (resetExpiry) {
-        setExpiryFrom("");
-        setExpiryTo("");
+        currentExp = "all";
+        setSelectedExpiry("all");
         setListedExpiries([]);
       }
 
@@ -374,10 +355,9 @@ export function GammaExposureDesk({
 
       try {
         const body: Record<string, unknown> = { symbol: sym, source: "auto" };
-        // Only filter when both bounds are real listed option dates for *this* symbol.
-        if (!resetExpiry && expiryFrom && expiryTo) {
-          body.expiryFrom = expiryFrom;
-          body.expiryTo = expiryTo;
+        if (currentExp && currentExp !== "all") {
+          body.expiryFrom = currentExp;
+          body.expiryTo = currentExp;
         }
 
         const [gammaRes, liveRes] = await Promise.allSettled([
@@ -414,12 +394,6 @@ export function GammaExposureDesk({
         ).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d));
         if (listed.length > 0) {
           setListedExpiries(listed);
-          // Seed pickers from the real chain after a fresh symbol load or empty bounds.
-          if (resetExpiry || !expiryFrom || !expiryTo) {
-            const defaults = defaultsFromListedExpiries(listed);
-            setExpiryFrom(defaults.from);
-            setExpiryTo(defaults.to);
-          }
         }
 
         if (liveRes.status === "fulfilled") {
@@ -438,14 +412,20 @@ export function GammaExposureDesk({
         setLoading(false);
       }
     },
-    [symbol, expiryFrom, expiryTo, account],
+    [symbol, selectedExpiry, account],
   );
 
   useEffect(() => {
-    // Deep-link or default symbol — auto-pull the live chain so the board is not empty.
     void run(qSymbol || symbol, { resetExpiry: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [qSymbol]);
+
+  useEffect(() => {
+    if (symbol) {
+      void run(symbol, { resetExpiry: false });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedExpiry]);
 
   const verdict = useVerdict(gamma, live);
   const notes = useMemo(() => (gamma ? buildNotes(gamma) : []), [gamma]);
@@ -542,56 +522,20 @@ export function GammaExposureDesk({
             />
           </label>
           <label className="td-field">
-            <span className="td-label">Expiry from</span>
-            {listedExpiries.length > 0 ? (
-              <select
-                value={expiryFrom}
-                onChange={(e) => setExpiryFrom(e.target.value)}
-                className="td-input"
-                style={{ fontFamily: "var(--td-font-mono)" }}
-              >
-                {listedExpiries.map((d) => (
-                  <option key={`from-${d}`} value={d} disabled={Boolean(expiryTo && d > expiryTo)}>
-                    {d}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <input
-                type="text"
-                value={expiryFrom || "—"}
-                readOnly
-                className="td-input"
-                title="Loads from the option chain after refresh"
-                style={{ fontFamily: "var(--td-font-mono)", color: "var(--td-ink-500)" }}
-              />
-            )}
-          </label>
-          <label className="td-field">
-            <span className="td-label">Expiry to</span>
-            {listedExpiries.length > 0 ? (
-              <select
-                value={expiryTo}
-                onChange={(e) => setExpiryTo(e.target.value)}
-                className="td-input"
-                style={{ fontFamily: "var(--td-font-mono)" }}
-              >
-                {listedExpiries.map((d) => (
-                  <option key={`to-${d}`} value={d} disabled={Boolean(expiryFrom && d < expiryFrom)}>
-                    {d}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <input
-                type="text"
-                value={expiryTo || "—"}
-                readOnly
-                className="td-input"
-                title="Loads from the option chain after refresh"
-                style={{ fontFamily: "var(--td-font-mono)", color: "var(--td-ink-500)" }}
-              />
-            )}
+            <span className="td-label">Expiry Date</span>
+            <select
+              value={selectedExpiry}
+              onChange={(e) => setSelectedExpiry(e.target.value)}
+              className="td-input"
+              style={{ fontFamily: "var(--td-font-mono)" }}
+            >
+              <option value="all">All Expirations</option>
+              {listedExpiries.map((d) => (
+                <option key={`expiry-${d}`} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
           </label>
           <button
             type="button"

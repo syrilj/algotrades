@@ -1,0 +1,13 @@
+{
+  "source": "local",
+  "codes": ["TSLA.US", "MU.US", "SPY.US", "IONQ.US", "APLD.US", "XLP.US", "QQQ.US"],
+  "interval": "1H",
+  "commission": 0.001,
+  "causal_execution": true,
+  "engine": "daily",
+  "strategy": {
+    "name": "v85_online_contextual",
+    "model_version": "v85_online_contextual",
+    "note": "Frozen dual/core/sniper experts, causal Fixed-Share contextual routing, episode lock, stress-only de-risking, ordinal support (not probability)."
+  }
+}

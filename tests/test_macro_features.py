@@ -7,6 +7,7 @@ import pandas as pd
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 
+import evolve.macro_features as macro_features_module
 from evolve.macro_features import (
     MacroCrossAssetEngine,
     align_cross_asset_bars,
@@ -15,6 +16,7 @@ from evolve.macro_features import (
     macro_event_features,
     macro_feature_matrix,
     parse_macro_calendar,
+    regime_features,
     rolling_betas,
     rolling_correlations,
 )
@@ -114,6 +116,39 @@ def test_align_cross_asset_bars_is_backward_only():
     assert aligned["spy_close"].iloc[-2] != 999.0
 
 
+def test_align_cross_asset_bars_honors_availability_lag_and_tolerance():
+    target = _ohlcv(5)
+    vix = _ohlcv(1)
+    expected = float(vix["close"].iloc[0])
+
+    aligned = align_cross_asset_bars(
+        target,
+        vix_df=vix,
+        availability_lag={"vix": "2h"},
+        tolerance={"vix": "1h"},
+    )
+
+    assert aligned["vix_close"].iloc[:2].isna().all()
+    assert aligned["vix_close"].iloc[2] == expected
+    assert aligned["vix_close"].iloc[3] == expected
+    assert pd.isna(aligned["vix_close"].iloc[4])
+
+
+def test_vix_percentile_is_prefix_invariant():
+    idx = pd.date_range("2024-01-01", periods=120, freq="h", tz="UTC")
+    values = np.r_[
+        np.linspace(12.0, 28.0, 80) + np.sin(np.arange(80)),
+        np.linspace(1.0, 60.0, 40),
+    ]
+    frame = pd.DataFrame({"vix_close": values}, index=idx)
+
+    prefix = regime_features(frame.iloc[:80], lookback=20)["vix_pct_low"]
+    full = regime_features(frame, lookback=20)["vix_pct_low"].iloc[:80]
+
+    pd.testing.assert_series_equal(prefix, full, check_names=False)
+    assert full.dropna().between(0.0, 1.0).all()
+
+
 def test_macro_feature_matrix_is_finite():
     target = _ohlcv(200)
     spy = _ohlcv(200)
@@ -134,6 +169,23 @@ def test_macro_feature_matrix_is_finite():
     assert any("_fd" in c for c in features.columns)
 
 
+def test_missing_cross_assets_do_not_substitute_target_close():
+    target = _ohlcv(200)
+
+    features = macro_feature_matrix(
+        target,
+        cfg={"beta_windows": (20,), "corr_windows": (20,), "regime_lookback": 20},
+    )
+
+    assert "vix_level" not in features.columns
+    assert "vix_pct_low" not in features.columns
+    assert "spy_above_sma" not in features.columns
+    assert "spy_momentum_1h" not in features.columns
+    assert "equity_rate_corr" not in features.columns
+    assert "rates_down_eq_up" not in features.columns
+    assert features["risk_on_score"].isna().all()
+
+
 def test_macro_cross_asset_engine_fit_transform():
     train = _ohlcv(200)
     test = _ohlcv(100)
@@ -142,6 +194,25 @@ def test_macro_cross_asset_engine_fit_transform():
     out = engine.transform(test)
     assert np.isfinite(out.to_numpy(dtype=float, na_value=0.0)).all()
     assert "close_fd" in "".join(out.columns)
+
+
+def test_macro_cross_asset_engine_reuses_training_d(monkeypatch):
+    train = _ohlcv(200)
+    test = _ohlcv(100, seed=7)
+    calls: list[tuple[int, str]] = []
+
+    def fake_estimate_d(series, method="hurst", **_kwargs):
+        calls.append((len(series), method))
+        return 0.35 if len(series) == len(train) else 0.75
+
+    monkeypatch.setattr(macro_features_module, "estimate_d", fake_estimate_d)
+    engine = MacroCrossAssetEngine(cfg={"fd_cols": ["close"], "fd_method": "hurst"})
+    engine.fit(train)
+    out = engine.transform(test)
+
+    assert calls == [(len(train), "hurst")]
+    assert "close_fd0.35" in out.columns
+    assert "close_fd0.75" not in out.columns
 
 
 def test_macro_event_features_use_backward_only_surprise():

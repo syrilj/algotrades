@@ -5,7 +5,7 @@ export type AnalyzeQuery = {
   model?: string;
 };
 
-/** Home Analyze desk. Prefer this over legacy `/analyze`. */
+/** Command Analyze desk. Prefer this over legacy `/analyze` or bare `/`. */
 export function analyzeHref(q: AnalyzeQuery = {}): string {
   const params = new URLSearchParams();
   const symbol = q.symbol?.trim().toUpperCase();
@@ -13,7 +13,7 @@ export function analyzeHref(q: AnalyzeQuery = {}): string {
   if (symbol) params.set("symbol", symbol);
   if (model) params.set("model", model);
   const qs = params.toString();
-  return qs ? `/?${qs}` : "/";
+  return qs ? `/command?${qs}` : "/command";
 }
 
 // ---------------------------------------------------------------------------
@@ -127,9 +127,9 @@ export const LIVE_MODE_DESCRIPTIONS: Record<LiveMode, string> = {
   watch:
     "Multi-symbol operator board. Market scan ranks plays; poll keeps levels fresh. Click a name for a ticket.",
   ticket:
-    "Three layers: analysis setup · risk mode · paper-order unlock. Locked paper size does not erase the setup — use Options/Gamma for live feeds.",
+    "Build a paper plan with a verified price, clear stop, safe size, and maximum loss.",
   options:
-    "Live options chain feed: risk mode + defined-risk structure. Load feed for the symbol; only size on OPTIONS_ATTACK.",
+    "Compare a defined-risk options idea, its cost, time window, and payoff shape.",
   gamma:
     "Live gamma feed from option flow (OI fallback). Walls, squeeze, and listed expiries — not invented calendar dates.",
 };

@@ -3,9 +3,9 @@
 Each epoch:
   1. Mutate genome (learned secondary knobs) from current champion
   2. Materialize a temporary engine (base model + hunt/strategy overlays)
-  3. Backtest TRAIN window + pure OOS window
-  4. Score with utility on OOS (reward); penalize train/OOS gap
-  5. Accept only if OOS improves → like gradient step that generalizes
+  3. Backtest TRAIN window + rolling validation window
+  4. Score with validation utility (reward); penalize train/validation gap
+  5. Accept only if validation improves
   6. Persist BRAIN.json checkpoint + lessons
   7. Every K epochs: retrain meta MLP features (secondary)
 
@@ -210,10 +210,20 @@ def evaluate_model(
     track: str,
     cash: float,
     train_window: tuple[str, str],
-    oos_window: tuple[str, str],
     bag: list[str],
     reuse: bool,
+    validation_window: tuple[str, str] | None = None,
+    oos_window: tuple[str, str] | None = None,
 ) -> dict[str, Any]:
+    """Evaluate selection fitness on train + validation.
+
+    ``oos_window`` is retained as a deprecated compatibility alias.  Because
+    this window is repeatedly used to accept/reject mutations, it must not be
+    represented as an untouched OOS/lockbox result.
+    """
+    selected_window = validation_window or oos_window
+    if selected_window is None:
+        raise ValueError("validation_window is required")
     mode = "options" if track.startswith("options") else "daily"
     force_1d = mode == "options"
     train = run_one_cached(
@@ -227,33 +237,35 @@ def evaluate_model(
         reuse=reuse,
         force_1d=force_1d if force_1d else None,
     )
-    oos = run_one_cached(
+    validation = run_one_cached(
         model,
         mode=mode,
         codes=bag,
-        start=oos_window[0],
-        end=oos_window[1],
-        tag="oos",
+        start=selected_window[0],
+        end=selected_window[1],
+        tag="validation",
         cash=cash,
         reuse=reuse,
         force_1d=force_1d if force_1d else None,
     )
-    # Anti-overfit: OOS utility is the reward. Light gap penalty only.
-    # (Heavy gap penalty made every multi-year train look "worse" than short OOS.)
+    # Anti-overfit selection heuristic. This remains validation, not a final
+    # generalization claim; promotion requires separate lockbox evidence.
     u_tr = float(train.get("utility") or utility_score(train))
-    u_oos = float(oos.get("utility") or utility_score(oos))
-    gap = max(0.0, u_tr - u_oos)
-    # Prefer OOS; soft penalty; hard kill if OOS dead
-    objective = u_oos - 0.08 * min(gap, 5.0)
-    if oos.get("error") or int(oos.get("n") or 0) == 0:
+    u_validation = float(validation.get("utility") or utility_score(validation))
+    gap = max(0.0, u_tr - u_validation)
+    objective = u_validation - 0.08 * min(gap, 5.0)
+    if validation.get("error") or int(validation.get("n") or 0) == 0:
         objective = -99.0
-    elif float(oos.get("ret") or 0) <= 0 and int(oos.get("n") or 0) >= 5:
+    elif float(validation.get("ret") or 0) <= 0 and int(validation.get("n") or 0) >= 5:
         objective = min(objective, -1.0)
     return {
         "train": train,
-        "oos": oos,
+        "validation": validation,
+        "oos": validation,  # deprecated artifact compatibility alias
+        "evaluation_role": "selection_validation",
         "u_train": u_tr,
-        "u_oos": u_oos,
+        "u_validation": u_validation,
+        "u_oos": u_validation,  # legacy Brain schema alias
         "gap": gap,
         "objective": objective,
         "id": model["id"],
@@ -288,9 +300,9 @@ def run_train(
     brain.best_genome.track = track
 
     bag, _core = bags_for_track("options" if track.startswith("options") else "equity")
-    # longer train / pure oos
+    # Repeatedly selected-on validation window; never a final lockbox.
     train_w = WINDOWS["early_train"]
-    oos_w = WINDOWS["oos"]
+    validation_w = WINDOWS["oos"]  # historical window registry key
 
     found = discover([brain.genome.base_model])
     if not found:
@@ -306,7 +318,7 @@ def run_train(
     total = max_epochs_continuous if continuous else epochs
     print(
         f"[train] base={brain.genome.base_model} track={track} epochs={total} "
-        f"best_oos_u={brain.best_utility_oos:.3f} brain={brain_path}",
+        f"best_validation_u={brain.best_utility_oos:.3f} brain={brain_path}",
         flush=True,
     )
 
@@ -314,7 +326,8 @@ def run_train(
     if brain.best_utility_oos <= -900:
         print("[train] evaluating seed champion…", flush=True)
         base_eval = evaluate_model(
-            base, track=track, cash=cash, train_window=train_w, oos_window=oos_w, bag=bag, reuse=reuse
+            base, track=track, cash=cash, train_window=train_w,
+            validation_window=validation_w, bag=bag, reuse=reuse
         )
         brain.best_utility_oos = base_eval["objective"]
         brain.best_utility_train = base_eval["u_train"]
@@ -325,7 +338,8 @@ def run_train(
                 "event": "seed",
                 "id": base["id"],
                 "objective": base_eval["objective"],
-                "u_oos": base_eval["u_oos"],
+                "u_validation": base_eval["u_validation"],
+                "u_oos": base_eval["u_validation"],  # legacy schema
                 "u_train": base_eval["u_train"],
             }
         )
@@ -351,7 +365,7 @@ def run_train(
             track=track,
             cash=cash,
             train_window=train_w,
-            oos_window=oos_w,
+            validation_window=validation_w,
             bag=bag,
             reuse=False,
         )
@@ -374,7 +388,7 @@ def run_train(
             )
             brain.lessons.append(lesson)
         else:
-            lesson = learn_lesson(brain, ev["oos"], accepted)
+            lesson = learn_lesson(brain, ev["validation"], accepted)
 
         if accepted:
             brain.accepted += 1
@@ -408,12 +422,16 @@ def run_train(
             "epoch": brain.epoch,
             "accepted": accepted,
             "objective": obj,
-            "u_oos": ev["u_oos"],
+            "u_validation": ev["u_validation"],
+            "u_oos": ev["u_validation"],  # legacy schema
             "u_train": ev["u_train"],
             "gap": ev["gap"],
-            "oos_n": ev["oos"].get("n"),
-            "oos_ret": ev["oos"].get("ret"),
-            "oos_dd": ev["oos"].get("dd"),
+            "validation_n": ev["validation"].get("n"),
+            "validation_ret": ev["validation"].get("ret"),
+            "validation_dd": ev["validation"].get("dd"),
+            "oos_n": ev["validation"].get("n"),  # legacy schema
+            "oos_ret": ev["validation"].get("ret"),
+            "oos_dd": ev["validation"].get("dd"),
             "genome": cand_g.to_dict(),
             "lesson": lesson,
             "candidate_id": cand["id"],
@@ -434,7 +452,7 @@ def run_train(
                 recipe = train_meta_recipe(
                     bag[:5],
                     start=train_w[0],
-                    end=oos_w[1],
+                    end=validation_w[1],
                     out_dir=out / "meta",
                 )
                 if recipe.get("ok"):
@@ -468,12 +486,12 @@ def run_train(
                     {
                         "id": rec["candidate_id"],
                         "mode": "options" if track.startswith("options") else "daily",
-                        "ret": rec.get("oos_ret") or 0,
-                        "dd": rec.get("oos_dd") or 0,
+                        "ret": rec.get("validation_ret") or 0,
+                        "dd": rec.get("validation_dd") or 0,
                         "sharpe": 0,
-                        "n": rec.get("oos_n") or 0,
+                        "n": rec.get("validation_n") or 0,
                         "wr": 0,
-                        "utility": rec.get("u_oos"),
+                        "utility": rec.get("u_validation"),
                     }
                 ),
                 dd_hard=dd_hard_from_bar(),
@@ -491,6 +509,7 @@ def run_train(
         "brain_path": str(brain_path.relative_to(ROOT)),
         "best_genome": brain.best_genome.to_dict(),
         "best_utility_oos": brain.best_utility_oos,
+        "best_utility_validation": brain.best_utility_oos,
         "epoch": brain.epoch,
         "accepted": brain.accepted,
         "rejected": brain.rejected,
@@ -501,7 +520,10 @@ def run_train(
         "honesty": {
             "primary_side": "unchanged_rules",
             "trained": "secondary_genome_risk_meta",
-            "accept_rule": "OOS utility − 0.35×train_OOS_gap only",
+            "selection_window": "validation_reused_for_mutation_selection",
+            "accept_rule": "validation utility minus soft train/validation gap penalty",
+            "promotion_eligible": False,
+            "promotion_blocker": "separate untouched lockbox and multi-lock evidence required",
         },
     }
     write_state(out / "STATE.json", state)
@@ -509,7 +531,7 @@ def run_train(
     (out / "TRAIN_LOG.md").write_text(_train_log_md(brain, epoch_rows))
     save_brain(brain, brain_path)
     print(
-        f"[train] done epoch={brain.epoch} best_oos_obj={brain.best_utility_oos:.3f} "
+        f"[train] done epoch={brain.epoch} best_validation_obj={brain.best_utility_oos:.3f} "
         f"accepted={brain.accepted} rejected={brain.rejected} → {out}",
         flush=True,
     )
@@ -521,7 +543,7 @@ def _train_log_md(brain: Brain, rows: list[dict[str, Any]]) -> str:
         "# Train log (self-feedback)",
         "",
         f"Updated: `{datetime.now(timezone.utc).isoformat()}`",
-        f"Best OOS objective: **{brain.best_utility_oos:.4f}**",
+        f"Best validation objective: **{brain.best_utility_oos:.4f}**",
         f"Epochs: {brain.epoch} · accepted {brain.accepted} · rejected {brain.rejected}",
         "",
         "## Lessons (latest)",
@@ -529,11 +551,11 @@ def _train_log_md(brain: Brain, rows: list[dict[str, Any]]) -> str:
     ]
     for L in brain.lessons[-20:]:
         lines.append(f"- {L}")
-    lines += ["", "## Epochs", "", "| Ep | Acc | Obj | U_oos | U_train | n | Lesson |", "|----|-----|-----|-------|---------|---|--------|"]
+    lines += ["", "## Epochs", "", "| Ep | Acc | Obj | U_validation | U_train | n | Lesson |", "|----|-----|-----|--------------|---------|---|--------|"]
     for r in rows:
         lines.append(
             f"| {r['epoch']} | {'Y' if r['accepted'] else 'n'} | {r['objective']:.3f} | "
-            f"{r['u_oos']:.3f} | {r['u_train']:.3f} | {r.get('oos_n')} | {r.get('lesson','')[:48]} |"
+            f"{r['u_validation']:.3f} | {r['u_train']:.3f} | {r.get('validation_n')} | {r.get('lesson','')[:48]} |"
         )
     lines += [
         "",

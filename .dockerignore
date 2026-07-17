@@ -1,0 +1,43 @@
+# Source control and local developer state
+.git
+.github
+.venv
+venv
+**/__pycache__
+**/*.py[cod]
+.pytest_cache
+.mypy_cache
+.ruff_cache
+.coverage
+htmlcov
+
+# Secrets and credentials (the example contract is safe to retain)
+.env
+.env.*
+!.env.example
+**/*.pem
+**/*.key
+**/*credentials*
+**/*secret*
+
+# Mutable research/runtime state is mounted or supplied separately
+runs
+data_cache
+data/*.db
+data/*.db-*
+*.sqlite
+*.sqlite3
+*.log
+
+# Frontend/build artifacts are not part of the Python service image
+apps/**/node_modules
+apps/**/.next
+node_modules
+dist
+build
+
+# Local editor/OS files
+.DS_Store
+.idea
+.vscode
+

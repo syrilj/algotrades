@@ -1,0 +1,12 @@
+{
+  "source": "local",
+  "codes": ["TSLA.US", "MU.US", "SPY.US", "IONQ.US", "APLD.US", "XLP.US", "QQQ.US"],
+  "interval": "1H",
+  "commission": 0.001,
+  "engine": "daily",
+  "strategy": {
+    "name": "v84_macro_sleeve",
+    "model_version": "v84_macro_sleeve",
+    "note": "v72 dual-sleeve with a global SPY macro soft-size overlay. Pre-registered for forward paper trading."
+  }
+}

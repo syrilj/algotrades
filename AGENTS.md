@@ -75,6 +75,47 @@
 - Run: `dmr.run_one(dmr.discover_models(['v72_dual_sleeve'])[0], mode='daily', codes=EQUITY_WINNER_BAG, start='2024-08-01', end='2026-07-11', tag='verify', cash=1000, source='local', interval='1H')`
 - Artifacts: `runs/v72_dual_sleeve/LEADERBOARD.md`, `COMPARE.json`, `STATE.json`.
 
+## v81_high_confidence_boost (research-only challenger)
+- `models/poc_va_macdha/v81_high_confidence_boost/` keeps v72 as the primary
+  side/exit authority and raises an already-active position to a 40% target
+  only when the v70 hard-quality precision sleeve agrees. It cannot create an
+  orphan trade and retains the 50% per-symbol cap.
+- Train-only selection: 2024-08-01→2025-08-01; locked holdout:
+  2025-08-01→2026-07-11. Run:
+  `.venv/bin/python tools/train_v81_high_confidence_boost.py --cash 1000`.
+- Frozen result (`source=local`, `1H`, `$1,000`, `EQUITY_WINNER_BAG`):
+  full +510.8% / -18.0% DD / Sharpe 2.88 / 177 trades / 71.8% WR;
+  holdout +90.5% / -17.8% DD / Sharpe 2.13 / 84 trades / 65.5% WR.
+- The v70-qualified subset achieved 90.9% holdout WR but only `n=11`.
+  `last_confidence=0.90` on those episodes is explicitly a thin empirical
+  target, not a guaranteed or securely calibrated 90% probability. The 10/11
+  holdout result has an approximate 95% Wilson interval of 62.3%–98.4%.
+- Verdict: **not promoted**. It beats v72 holdout return (+90.5% vs +81.6%)
+  and drawdown (-17.8% vs -19.6%) but misses v72 on holdout Sharpe (2.13 vs
+  2.20) and full return (+510.8% vs +513.1%). Artifacts:
+  `runs/v81_high_confidence_boost/STATE.json`, `LEADERBOARD.md`.
+
+## v82_frequent_confidence (research-only swing candidate)
+- `models/poc_va_macdha/v82_frequent_confidence/` is a two-tier 1H swing
+  router: liquid core (`SPY/QQQ/XLP/MU/NVDA/TSLA`) uses v71 balanced signals;
+  the remaining equity satellites use the stricter v70 gate. `HYG/LQD` are
+  excluded. Per-symbol target weight is capped at 35%.
+- Reconcile: `.venv/bin/python tools/train_v82_frequent_confidence.py`.
+- Later historical check (2025-08-01→2026-07-11, local 1H, $1,000): **+39.1%**
+  return, **-13.0%** max DD, Sharpe **1.78**, 26 trades, **84.6% WR**, final
+  $1,391; median holding period 10 calendar days (~2.3 closed trades/month).
+- Full: +89.4% return, -28.9% max DD, Sharpe 1.47, 69 trades, 82.6% WR.
+- Tier evidence on the later history: liquid core 18/20 wins (90%);
+  strict satellites 4/6 (66.7%); combined 22/26 (84.6%, approximate 95%
+  Wilson interval 66.5%–93.8%). “Strict” describes the entry gate, not a
+  promised precision level.
+- `last_confidence` is explicitly
+  `uncalibrated_ordinal_rank_not_probability`; `last_tier` is 1=core,
+  2=strict-satellite and `last_strict_tier` is the boolean strict-gate flag.
+- Verdict: **not promoted**. The routing was designed after historical review,
+  so there is no untouched validation window remaining. Run forward on paper
+  without retuning, then calibrate confidence by tier before live routing.
+
 ## v60_microstructure (microstructure / institutional-flow research artifact)
 - `models/poc_va_macdha/v60_microstructure/` is a new standalone microstructure model implementing OHLCV-safe OFI, absorption, volume schedule-deviation, VPIN-style toxicity, VPA confirmation, and an XGB meta-classifier with triple-barrier labels.
 - Run with `mode="daily"`:
@@ -168,3 +209,25 @@
   - `v61_institutional_flow` (standard): +4.0% ret, -14.1% max DD, Sharpe 0.35, 40% WR, 162 trades
   - `v61_institutional_flow` + Almgren-Chriss impact: +4.0% ret, -14.1% max DD, Sharpe 0.35, final $1,040 (impact cost $0.04 at $1k scale)
 - Verdict: `v61` is a working refactor/proof-of-concept, but the heuristic is not yet competitive with `v60` or `v39d`. The AC impact overlay is correctly active but negligible at $1k scale.
+
+## v72 self-healing round 2 (2026-07-16)
+- `tools/evolve/v72_search.py` ran 7 cycles, 54 variants of v72 sleeve parameters against a frozen v72 control.
+- Best challenger (`v72c0007g0_04_1dc9ce33`, core_scale=0.7453, both_core_frac=0.274, max_weight=0.3649, sniper_min_conf=0.5866) beat the champion on rolling validation (score 0.6781 vs 0.6185, 82 trades, 4/4 folds positive).
+- On the untouched lockbox (2026-04-16 → 2026-07-11) the challenger failed: +9.3% ret, Sharpe 2.09, -6.2% DD, PF 2.15, 20 trades, 40% WR; frozen v72 on the same window: +33.0% ret, Sharpe 3.73, -9.5% DD, PF 3.43, 29 trades, 55% WR.
+- Verdict: `FAIL_NO_EDGE_OVER_FROZEN_CHAMPION`; nothing promoted.
+- Historical lockbox consumed. No further in-sample optimization. Next valid evidence is forward paper trading (≥40 closed trades without retuning).
+
+## v83_adaptive_regime
+- Skeleton exists at `models/poc_va_macdha/v83_adaptive_regime/` (hierarchical v71 sniper + v39d core with trend/vol/RSI regime scaling).
+- Mocked import/generate tests pass; full e2e backtest not run to avoid touching the consumed lockbox.
+- Forward paper harness: `tools/forward_paper_v83.py` pulls yfinance 1H bars, runs v83, reconciles target weights against `paper_ledger` open positions, and opens/closes paper trades. Dry-run by default; pass `--execute` to append events.
+- Dry-run on `SPY.US` succeeded (2026-07-17 00:20 UTC); no signal at the last bar, consistent with after-hours flat conditions.
+
+## v84_macro_sleeve / v84_macro_sleeve_up
+- Hypothesis: global SPY macro soft-size overlay on frozen `v72_dual_sleeve`.
+- Pre-lockbox diagnostic (2024-08-01 → 2026-04-15, `source=local`, `1H`, $1,000, `EQUITY_WINNER_BAG`):
+  - `v84_macro_sleeve`: +241.2% ret, -21.6% DD, Sharpe 2.77, 149 trades, 74.5% WR, final $3,411
+  - `v84_macro_sleeve_up` (1.35× size-up in low-vol uptrend): +276.3% ret, -23.8% DD, Sharpe 2.75, 149 trades, 74.5% WR, final $3,763
+  - `v72_dual_sleeve` same window: +336.9% ret, -19.4% DD, Sharpe 2.92, 149 trades, 73.8% WR, final $4,369
+- Verdict: macro overlay does not beat v72; it trades return for deeper drawdown. Both variants trail v72 on risk-adjusted and absolute return.
+- Forward-paper harness `tools/forward_paper_v83.py` (now generic `--model`) can run any poc_va_macdha model including `v84_macro_sleeve`.

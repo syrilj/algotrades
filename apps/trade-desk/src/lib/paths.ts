@@ -41,6 +41,10 @@ export function optionsUnusualFlowScript(): string {
   return path.join(repoRoot(), "tools", "options_unusual_flow.py");
 }
 
+export function optionsBookScanScript(): string {
+  return path.join(repoRoot(), "tools", "options_book_scan.py");
+}
+
 export function riskManagerScript(): string {
   return path.join(repoRoot(), "tools", "risk_manager.py");
 }

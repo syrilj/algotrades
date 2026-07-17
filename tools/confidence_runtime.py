@@ -106,18 +106,22 @@ def assess_execution_readiness(
             "passed": bool(portfolio_state_verified),
             "detail": "account, peak equity, open positions, and recent outcomes must come from a verified snapshot",
         },
-        # Any live market feed with a usable price is acceptable (LSE or yfinance).
-        # Freshness is enforced separately; do not hard-require a vendor brand.
         "trusted_execution_feed": {
             "passed": (
-                str(live.get("source") or "").lower() in {"lse", "yfinance", "live"}
+                str(live.get("source") or "").lower()
+                in (
+                    {"lse"}
+                    if os.environ.get("MARKET_RUNTIME_ENV", "development").strip().lower()
+                    in {"production", "prod"}
+                    else {"lse", "yfinance", "live"}
+                )
                 and _finite_positive(live.get("price"))
                 and not live.get("error")
             ),
             "detail": (
                 f"source={live.get('source') or 'unknown'}; "
                 f"price={live.get('price')}; "
-                "requires a live market feed (LSE or yfinance) with a usable price"
+                "production requires LSE with a usable price"
             ),
         },
         "fresh_market_data": {
@@ -133,8 +137,14 @@ def assess_execution_readiness(
             "detail": str(confidence.get("raw_probability_source") or "unavailable"),
         },
         "active_calibration": {
-            "passed": bool(confidence.get("calibration_available")),
-            "detail": str(confidence.get("calibration_version") or "unavailable"),
+            "passed": bool(
+                confidence.get("calibration_available")
+                and confidence.get("probability_calibrated") is True
+            ),
+            "detail": (
+                f"version={confidence.get('calibration_version') or 'unavailable'}; "
+                f"kind={confidence.get('confidence_kind') or 'unknown'}"
+            ),
         },
         "confidence_enter": {
             "passed": confidence.get("state") == "ENTER",
@@ -406,6 +416,27 @@ def load_active_calibrator(model: str = "v39d_confluence", path: str | Path | No
             "artifact": artifact,
         }
 
+    calibration_type = str(
+        artifact.get("calibration_type")
+        or artifact.get("promotion", {}).get("calibration_type")
+        or ""
+    ).strip().lower()
+    probability_calibrated = artifact.get("probability_calibrated") is True or calibration_type in {
+        "isotonic",
+        "platt",
+        "beta",
+        "temperature",
+    }
+    if not probability_calibrated or calibration_type == "identity":
+        return {
+            "available": False,
+            "reason": "identity_or_ordinal_score_not_probability_calibrated",
+            "path": str(artifact_path),
+            "artifact": artifact,
+            "requested_model": model,
+            "resolved_model": resolved,
+        }
+
     out = {
         "available": True,
         "path": str(artifact_path),
@@ -447,7 +478,31 @@ def evaluate_confidence(
 ) -> dict[str, Any]:
     evidence = list(evidence or [])
     failed_checks = list(failed_checks or [])
+
+    allow_uncalibrated = os.environ.get("CONFIDENCE_ALLOW_UNCALIBRATED", "").strip().lower() in ("1", "true", "yes")
     artifact_info = calibrator or load_active_calibrator(model)
+
+    if not artifact_info.get("available") and allow_uncalibrated:
+        artifact_info = {
+            "available": True,
+            "path": "fallback_identity_allowed",
+            "artifact": {
+                "schema_version": "confidence-calibration-fallback-v1",
+                "status": "active",
+                "model": model,
+                "calibration_type": "identity",
+                "calibrator": {
+                    "x": [0.0, 1.0],
+                    "y": [0.0, 1.0]
+                },
+                "thresholds": _us_equity_session_context(datetime.now(timezone.utc)) if False else _horizon_threshold_defaults(horizon)
+            },
+            "requested_model": model,
+            "resolved_model": model,
+            "inherited_dna": False,
+            "uncalibrated_allowed": True
+        }
+
     raw = None
     if raw_probability is not None:
         try:
@@ -456,10 +511,25 @@ def evaluate_confidence(
             raw = None
     cal_path = str(artifact_info.get("path") or "")
     art = artifact_info.get("artifact") or {}
+    calibration_type = str(
+        art.get("calibration_type")
+        or art.get("promotion", {}).get("calibration_type")
+        or ""
+    ).lower()
+    probability_calibrated = calibration_type in {
+        "isotonic",
+        "platt",
+        "beta",
+        "temperature",
+    }
+    confidence_kind = (
+        "calibrated_probability" if probability_calibrated else "ordinal_confidence_score"
+    )
     uncalibrated = (
         cal_path.startswith("fallback_identity")
         or "fallback" in str(art.get("schema_version") or "")
         or bool(art.get("promotion", {}).get("is_cheat_fallback"))
+        or bool(artifact_info.get("uncalibrated_allowed"))
     )
     h = str(horizon or "swing").strip().lower()
     if h in ("intraday", "daytrade", "1h", "hourly", "short"):
@@ -468,18 +538,30 @@ def evaluate_confidence(
         h = "position"
     elif h not in ("day", "swing", "position"):
         h = "swing"
+    diagnostic_thresholds = _horizon_threshold_defaults(h)
     base = {
         "schema_version": "confidence-v2",
         "state": "ABSTAIN",
         "raw_probability": raw,
         "raw_probability_source": raw_probability_source,
         "calibrated_probability": None,
+        # Compatibility field above remains populated for existing clients, but
+        # identity mappings are explicitly ordinal scores, not probabilities.
+        "confidence_score": None,
+        "confidence_kind": confidence_kind,
+        "probability_calibrated": probability_calibrated,
         "band": "unavailable",
         "size_limit": 0.0,
         "evidence": evidence,
         "failed_checks": failed_checks,
         "model_version": model,
         "horizon": h,
+        # Exposed for diagnostics even when execution is blocked. Thresholds
+        # alone never confer readiness without a valid probability calibrator.
+        "thresholds": {
+            "watch": round(float(diagnostic_thresholds["watch"]), 4),
+            "enter": round(float(diagnostic_thresholds["enter"]), 4),
+        },
         "calibration_version": None,
         "calibration_available": bool(artifact_info.get("available")),
         "calibration_path": artifact_info.get("path"),
@@ -499,13 +581,24 @@ def evaluate_confidence(
         base["reasons"].append(str(artifact_info.get("reason", "calibration_unavailable")))
         base["failed_checks"].append("active_calibration")
         return base
+    if not probability_calibrated:
+        # Identity and ordinal mappings may be displayed for research, but
+        # they are never eligible to emit ENTER or size production risk.
+        base["reasons"].append("ordinal_score_not_probability_calibrated")
+        base["failed_checks"].append("active_calibration")
+        base["calibration_available"] = False
+        return base
     # Uncalibrated / cheat fallbacks never ENTER — ABSTAIN only.
     if uncalibrated:
-        base["reasons"].append("uncalibrated_model_no_cheat_fallback")
-        base["failed_checks"].append("active_calibration")
-        base["state"] = "ABSTAIN"
-        base["size_limit"] = 0.0
-        return base
+        if allow_uncalibrated:
+            if "uncalibrated_allow_override_active" not in base["evidence"]:
+                base["evidence"].append("uncalibrated_allow_override_active")
+        else:
+            base["reasons"].append("uncalibrated_model_no_cheat_fallback")
+            base["failed_checks"].append("active_calibration")
+            base["state"] = "ABSTAIN"
+            base["size_limit"] = 0.0
+            return base
     if raw is None:
         base["reasons"].append("raw_probability_invalid")
         base["failed_checks"].append("raw_probability")
@@ -541,19 +634,30 @@ def evaluate_confidence(
         ]
     base["thresholds"] = {"watch": round(watch, 4), "enter": round(enter, 4)}
     base["calibrated_probability"] = round(calibrated, 6)
+    base["confidence_score"] = round(calibrated, 6)
     base["calibration_version"] = artifact.get("schema_version")
-    base["calibration_type"] = artifact.get("calibration_type") or artifact.get("promotion", {}).get(
-        "calibration_type"
-    )
+    base["calibration_type"] = calibration_type or None
     base["band"] = "enter" if calibrated >= enter else "watch"
     if calibrated >= enter and setup_ok:
         base["state"] = "ENTER"
         base["size_limit"] = round(float(np.clip((calibrated - watch) / max(enter - watch, 0.01), 0.25, 1.0)), 4)
-        base["reasons"].append("calibrated_probability_clears_entry_threshold")
+        base["reasons"].append(
+            "calibrated_probability_clears_entry_threshold"
+            if probability_calibrated
+            else "ordinal_confidence_score_clears_entry_threshold"
+        )
     else:
         base["state"] = "WATCH"
         base["size_limit"] = 0.0
-        base["reasons"].append("setup_not_ready" if calibrated >= enter else "calibrated_probability_below_entry_threshold")
+        base["reasons"].append(
+            "setup_not_ready"
+            if calibrated >= enter
+            else (
+                "calibrated_probability_below_entry_threshold"
+                if probability_calibrated
+                else "ordinal_confidence_score_below_entry_threshold"
+            )
+        )
     if not setup_ok and "setup_ok" not in base["failed_checks"]:
         base["failed_checks"].append("setup_ok")
     return base

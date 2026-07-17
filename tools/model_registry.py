@@ -1,6 +1,7 @@
 """Model registry + ranking for poc_va_macdha variants."""
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -9,12 +10,14 @@ ROOT = Path(__file__).resolve().parents[1]
 MODELS_ROOT = ROOT / "models" / "poc_va_macdha"
 RANKER_ROOT = ROOT / "runs" / "symbol_ranker"
 RANKER_MAX_AGE_DAYS = 7
-# Fallback if WINNER.json missing; live default prefers WINNER via equity_default_model().
-DEFAULT_MODEL = "v39b_live_adapt"
+# Last-resort safe model if the deployment manifest and every declared fallback
+# are unavailable.  WINNER.json is compatibility metadata, not live authority.
+DEFAULT_MODEL = "v39d_confluence"
 # Options stack default = OOS champion (see OPTIONS_WINNER.json / runs/poc_va_oos_rank/).
 OPTIONS_DEFAULT_MODEL = "v32_soft_react_opts"
 OPTIONS_WINNER_PATH = MODELS_ROOT / "OPTIONS_WINNER.json"
 EQUITY_WINNER_PATH = MODELS_ROOT / "WINNER.json"
+DEPLOYMENT_MANIFEST_PATH = MODELS_ROOT / "DEPLOYMENT_MANIFEST.json"
 DESK_ROUTING_PATH = MODELS_ROOT / "DESK_ROUTING.json"
 
 # Trade timeframes used by ranking, confidence, and desk auto-routing.
@@ -109,8 +112,84 @@ def horizon_confidence_thresholds(horizon: str | None = None) -> dict[str, float
     return {"watch": 0.50, "enter": 0.60}
 
 
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def load_deployment_manifest(*, verify_active: bool = True) -> dict[str, Any]:
+    """Load the sole live deployment authority.
+
+    When ``verify_active`` is true, the active engine must exist and match the
+    pinned SHA-256.  A malformed or tampered manifest fails closed to ``{}``.
+    """
+    try:
+        data = json.loads(DEPLOYMENT_MANIFEST_PATH.read_text())
+        if not isinstance(data, dict) or int(data.get("schema_version", 0)) != 1:
+            return {}
+        active = data.get("active") or {}
+        model = str(active.get("equity_model") or "")
+        if not model:
+            return {}
+        engine = MODELS_ROOT / model / "signal_engine.py"
+        if verify_active:
+            bundle = active.get("bundle") or {}
+            expected = str(bundle.get("signal_engine_sha256") or "")
+            if not expected or not engine.is_file() or _sha256(engine) != expected:
+                return {}
+            for key, name in (
+                ("config_sha256", "config.json"),
+                ("results_sha256", "results.json"),
+            ):
+                pinned = bundle.get(key)
+                artifact = MODELS_ROOT / model / name
+                if pinned and (not artifact.is_file() or _sha256(artifact) != pinned):
+                    return {}
+            external = [data.get("calibration"), *(data.get("promotion_evidence") or [])]
+            for record in external:
+                if not isinstance(record, dict) or not record.get("artifact"):
+                    continue
+                artifact = Path(str(record["artifact"]))
+                artifact = artifact if artifact.is_absolute() else ROOT / artifact
+                pinned = str(record.get("sha256") or "")
+                if not pinned or not artifact.is_file() or _sha256(artifact) != pinned:
+                    return {}
+        return data
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        return {}
+
+
+def _declared_deployment_fallbacks() -> list[str]:
+    """Return existing failover engines even if the active hash is invalid."""
+    try:
+        data = json.loads(DEPLOYMENT_MANIFEST_PATH.read_text())
+    except (OSError, json.JSONDecodeError):
+        return []
+    if not isinstance(data, dict):
+        return []
+    raw = [data.get("rollback_model"), *((data.get("fallbacks") or {}).get("equity") or [])]
+    return [str(m) for m in raw if m]
+
+
 def equity_default_model() -> str:
-    """Current equity WINNER for desk/auto; falls back to DEFAULT_MODEL."""
+    """Return the hash-verified active equity deployment, or a safe fallback."""
+    manifest = load_deployment_manifest()
+    active = str((manifest.get("active") or {}).get("equity_model") or "")
+    if active:
+        return active
+
+    # A broken active artifact must not silently become the stale WINNER.json.
+    # Use only failovers declared by the deployment control plane.
+    if DEPLOYMENT_MANIFEST_PATH.exists():
+        for model in _declared_deployment_fallbacks():
+            if (MODELS_ROOT / model / "signal_engine.py").is_file():
+                return model
+        return DEFAULT_MODEL
+
+    # Migration compatibility for installations not yet carrying a manifest.
     try:
         if EQUITY_WINNER_PATH.exists():
             d = json.loads(EQUITY_WINNER_PATH.read_text())
@@ -192,14 +271,10 @@ def desk_specialist_for_symbol(symbol: str) -> dict[str, Any] | None:
 def standard_equity_model() -> str:
     """Track B — normal bag models for symbols without a specialist.
 
-    Prefers DESK_ROUTING.fallback_equity (v39d_confluence) when that engine
-    exists, else WINNER.json / DEFAULT_MODEL.
+    The standard/no-symbol live route is the deployment manifest's active
+    model. Explicit per-symbol calls still use ``route_best_model`` and may
+    competitively select a specialist or another standard model.
     """
-    routing = load_desk_routing()
-    for key in ("fallback_equity", "fallback_equity_alt"):
-        cand = routing.get(key)
-        if cand and (MODELS_ROOT / str(cand) / "signal_engine.py").exists():
-            return str(cand)
     return equity_default_model()
 
 

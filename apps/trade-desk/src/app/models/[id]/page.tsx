@@ -52,6 +52,26 @@ function fmtNum(n: number | undefined, digits = 2): string {
   return n.toFixed(digits);
 }
 
+function cleanMarkdownText(text: string): string {
+  if (!text) return "";
+  return text
+    .split("\n")
+    .map((line) => {
+      // Remove header hashes but keep the text
+      const headerMatch = line.match(/^#+\s+(.*)$/);
+      if (headerMatch) return headerMatch[1].toUpperCase();
+      // Replace leading markdown bullet points with neat unicode bullets
+      const bulletMatch = line.match(/^[-*]\s+(.*)$/);
+      if (bulletMatch) return `  • ${bulletMatch[1]}`;
+      // Remove divider lines (e.g. --- or ===)
+      if (/^[=-]{3,}$/.test(line.trim())) return "";
+      return line;
+    })
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n") // remove excessive newlines
+    .trim();
+}
+
 function pickMetrics(
   detail: ModelDetail,
 ): NonNullable<ModelDetail["metrics"]> {
@@ -311,7 +331,7 @@ export default function ModelDetailPage() {
                     "var(--td-font-mono, ui-monospace, Menlo, monospace)",
                 }}
               >
-                {md}
+                {cleanMarkdownText(md)}
               </pre>
             ) : (
               <p
