@@ -39,10 +39,11 @@ def evaluate_freshness(
     require_utc(market_asof, "market_asof")
     require_utc(computed_at, "computed_at")
     age = computed_at - market_asof
+    future_timestamp = age < -timedelta(minutes=5)
     if age < timedelta(0):
         age = timedelta(0)
     threshold = thresholds.get(instrument.category, _DEFAULT_THRESHOLD) if thresholds else _DEFAULT_THRESHOLD
-    is_stale = age > threshold
+    is_stale = future_timestamp or age > threshold
     return DataFreshness(
         category=instrument.category,
         market_asof=market_asof,

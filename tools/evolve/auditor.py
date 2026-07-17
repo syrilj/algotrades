@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import ast
 import json
+import math
 import re
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
@@ -79,7 +80,8 @@ def _extract_metrics(obj: dict[str, Any] | None) -> dict[str, Any]:
             "dd": abs(_safe_float(p.get("max_drawdown"))),
             "n": int(_safe_float(p.get("trade_count"))),
             "wr": _safe_float(p.get("win_rate")),
-            "pf": _safe_float(p.get("profit_factor"), 1.0),
+            "pf": _safe_float(p.get("profit_factor")) if p.get("profit_factor") is not None else None,
+            "expectancy": p.get("expectancy_after_costs", p.get("expectancy")),
         }
     return {
         "ret": _safe_float(obj.get("ret", obj.get("total_return"))),
@@ -87,7 +89,12 @@ def _extract_metrics(obj: dict[str, Any] | None) -> dict[str, Any]:
         "dd": abs(_safe_float(obj.get("dd", obj.get("max_drawdown")))),
         "n": int(_safe_float(obj.get("n", obj.get("trade_count")))),
         "wr": _safe_float(obj.get("wr", obj.get("win_rate"))),
-        "pf": _safe_float(obj.get("pf", obj.get("profit_factor")), 1.0),
+        "pf": (
+            _safe_float(obj.get("pf", obj.get("profit_factor")))
+            if obj.get("pf", obj.get("profit_factor")) is not None
+            else None
+        ),
+        "expectancy": obj.get("expectancy_after_costs", obj.get("expectancy")),
         "u_train": obj.get("u_train"),
         "u_oos": obj.get("u_oos"),
         "gap": obj.get("gap"),
@@ -183,6 +190,7 @@ def audit_metrics(
     *,
     claim_level: str | None = None,
     data_track: str | None = None,
+    evaluation_label: str = "OOS",
 ) -> list[Finding]:
     findings: list[Finding] = []
     bar = _load_pass_bar()
@@ -235,7 +243,8 @@ def audit_metrics(
             {"dd": dd, "limit": max_dd},
         ))
 
-    # Train vs OOS collapse
+    # Train vs evaluation-window collapse. Train-loop callers label this as
+    # validation; final results.json holdouts use OOS/holdout terminology.
     if tm and om and tm.get("n") and om.get("n"):
         tr_ret = float(tm.get("ret") or 0)
         oos_ret = float(om.get("ret") or 0)
@@ -243,14 +252,14 @@ def audit_metrics(
         oos_wr = float(om.get("wr") or 0)
         if tr_ret > 0.1 and oos_ret <= 0:
             findings.append(Finding(
-                "oos_ret_flip", "fail", "OOS return flip",
-                f"Train ret={tr_ret:.1%} but OOS ret={oos_ret:.1%} — overfit / regime break",
+                "evaluation_ret_flip", "fail", f"{evaluation_label} return flip",
+                f"Train ret={tr_ret:.1%} but {evaluation_label} ret={oos_ret:.1%} — overfit / regime break",
                 {"train_ret": tr_ret, "oos_ret": oos_ret},
             ))
         if tr_wr - oos_wr > 0.15 and int(om.get("n") or 0) >= 5:
             findings.append(Finding(
-                "oos_wr_collapse", "fail", "OOS win-rate collapse",
-                f"Train WR={tr_wr:.0%} → OOS WR={oos_wr:.0%} (>{15}pp drop)",
+                "evaluation_wr_collapse", "fail", f"{evaluation_label} win-rate collapse",
+                f"Train WR={tr_wr:.0%} → {evaluation_label} WR={oos_wr:.0%} (>{15}pp drop)",
                 {"train_wr": tr_wr, "oos_wr": oos_wr},
             ))
         # Train/OOS utility gap — long train windows often score higher than short OOS.
@@ -263,7 +272,7 @@ def audit_metrics(
             if gap > 2.0 and oos_bad:
                 findings.append(Finding(
                     "utility_gap", "fail", "Train≫OOS and OOS weak",
-                    f"u_train={float(u_tr):.2f} u_oos={float(u_oos):.2f} gap={gap:.2f} OOS not viable",
+                    f"u_train={float(u_tr):.2f} u_eval={float(u_oos):.2f} gap={gap:.2f} {evaluation_label} not viable",
                     {"gap": gap, "u_oos": float(u_oos)},
                 ))
             elif gap > 2.0:
@@ -383,6 +392,7 @@ def audit_model(
     data_track: str | None = None,
     brain_history: list[dict[str, Any]] | None = None,
     results_json: Path | None = None,
+    evaluation_label: str = "OOS holdout",
 ) -> AuditReport:
     findings: list[Finding] = []
 
@@ -401,22 +411,87 @@ def audit_model(
         if engine and engine.exists():
             findings.extend(audit_source(engine))
 
-    metrics_from_file = None
-    if results_json and results_json.exists():
+    metrics_from_file: dict[str, Any] | None = None
+    results_source = results_json or ((mdir / "results.json") if mdir else None)
+    if results_source and results_source.exists():
         try:
-            metrics_from_file = json.loads(results_json.read_text())
-        except Exception:
-            findings.append(Finding("bad_results_json", "warn", "Unreadable results.json", str(results_json), {}))
-    elif mdir and (mdir / "results.json").exists():
-        try:
-            metrics_from_file = json.loads((mdir / "results.json").read_text())
-        except Exception:
-            pass
+            loaded = json.loads(results_source.read_text())
+            if not isinstance(loaded, dict):
+                findings.append(Finding(
+                    "malformed_results_json", "fail", "Malformed results.json",
+                    "Top-level JSON must be an object", {"path": str(results_source)},
+                ))
+            else:
+                metrics_from_file = loaded
+        except Exception as exc:
+            findings.append(Finding(
+                "bad_results_json", "fail", "Unreadable results.json", str(exc),
+                {"path": str(results_source)},
+            ))
+    elif results_json is not None:
+        findings.append(Finding(
+            "missing_results_json", "fail", "Missing results.json",
+            "Cannot verify a final holdout without the requested results artifact",
+            {"path": str(results_json)},
+        ))
 
-    if train_metrics is None and metrics_from_file:
-        train_metrics = metrics_from_file
-    if oos_metrics is None and train_metrics and "oos" in (train_metrics or {}):
-        oos_metrics = train_metrics.get("oos")  # type: ignore
+    if metrics_from_file is not None:
+        holdout = metrics_from_file.get("holdout", metrics_from_file.get("oos"))
+        if holdout is None:
+            findings.append(Finding(
+                "missing_holdout", "fail", "Missing holdout metrics",
+                "results.json must contain a holdout (or legacy oos) object for an OOS claim",
+                {"path": str(results_source)},
+            ))
+        elif not isinstance(holdout, dict):
+            findings.append(Finding(
+                "malformed_holdout", "fail", "Malformed holdout metrics",
+                "holdout must be a JSON object", {"type": type(holdout).__name__},
+            ))
+        else:
+            required_aliases = {
+                "return": ("total_return", "ret"),
+                "drawdown": ("max_drawdown", "dd"),
+                "sharpe": ("sharpe",),
+                "trade_count": ("trade_count", "n"),
+                "win_rate": ("win_rate", "wr"),
+            }
+            missing = [
+                name for name, aliases in required_aliases.items()
+                if not any(k in holdout and holdout[k] is not None for k in aliases)
+            ]
+            if missing:
+                findings.append(Finding(
+                    "incomplete_holdout", "fail", "Incomplete holdout metrics",
+                    f"holdout missing required metrics: {', '.join(missing)}",
+                    {"missing": missing},
+                ))
+            invalid: list[str] = []
+            for name, aliases in required_aliases.items():
+                values = [holdout[k] for k in aliases if k in holdout and holdout[k] is not None]
+                if not values:
+                    continue
+                try:
+                    if not math.isfinite(float(values[0])):
+                        invalid.append(name)
+                except (TypeError, ValueError):
+                    invalid.append(name)
+            if invalid:
+                findings.append(Finding(
+                    "malformed_holdout_metrics", "fail", "Malformed holdout metric values",
+                    f"holdout metrics must be finite numbers: {', '.join(invalid)}",
+                    {"invalid": invalid},
+                ))
+            if oos_metrics is None:
+                oos_metrics = holdout
+        if train_metrics is None:
+            portfolio = metrics_from_file.get("portfolio")
+            train_metrics = portfolio if isinstance(portfolio, dict) else metrics_from_file
+
+    if oos_metrics is None and train_metrics:
+        nested_eval = train_metrics.get("holdout", train_metrics.get("oos"))
+        if isinstance(nested_eval, dict):
+            oos_metrics = nested_eval
 
     findings.extend(
         audit_metrics(
@@ -424,6 +499,7 @@ def audit_model(
             oos_metrics or train_metrics,
             claim_level=claim_level,
             data_track=data_track,
+            evaluation_label=evaluation_label,
         )
     )
 
@@ -458,7 +534,7 @@ def audit_train_epoch(
 ) -> AuditReport:
     """Gate a train-loop accept: call before promoting genome."""
     train = eval_result.get("train") or {}
-    oos = eval_result.get("oos") or {}
+    validation = eval_result.get("validation") or eval_result.get("oos") or {}
     # attach train utility fields for gap checks
     train = {
         **train,
@@ -469,23 +545,24 @@ def audit_train_epoch(
         "dd": train.get("dd"),
         "sharpe": train.get("sharpe"),
     }
-    oos = {
-        **oos,
-        "u_oos": eval_result.get("u_oos"),
-        "utility": eval_result.get("u_oos"),
-        "n": oos.get("n"),
-        "ret": oos.get("ret"),
-        "wr": oos.get("wr"),
-        "dd": oos.get("dd"),
-        "sharpe": oos.get("sharpe"),
+    validation = {
+        **validation,
+        "u_oos": eval_result.get("u_validation", eval_result.get("u_oos")),
+        "utility": eval_result.get("u_validation", eval_result.get("u_oos")),
+        "n": validation.get("n"),
+        "ret": validation.get("ret"),
+        "wr": validation.get("wr"),
+        "dd": validation.get("dd"),
+        "sharpe": validation.get("sharpe"),
     }
     return audit_model(
         model_id=candidate_id,
         model_dir=candidate_dir,
         train_metrics=train,
-        oos_metrics=oos,
+        oos_metrics=validation,
         data_track=data_track,
-        claim_level=str(oos.get("claim_level") or train.get("claim_level") or ""),
+        claim_level=str(validation.get("claim_level") or train.get("claim_level") or ""),
+        evaluation_label="validation",
     )
 
 

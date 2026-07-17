@@ -1,0 +1,17 @@
+{
+  "portfolio": {
+    "total_return": 0.10889405568700328,
+    "max_drawdown": -0.06498330017872449,
+    "sharpe": 0.6712826094166288,
+    "profit_factor": 1.6943,
+    "trade_count": 35,
+    "win_rate": 0.5428571428571428,
+    "final_value": 1108894.0556870033
+  },
+  "generated_utc": "",
+  "codes": [
+    "PLTR.US"
+  ],
+  "start": "2024-08-01",
+  "end": "2026-07-11"
+}

@@ -1,0 +1,23 @@
+{
+  "source": "yfinance",
+  "codes": [
+    "TSLA.US",
+    "MU.US",
+    "SPY.US",
+    "IONQ.US",
+    "APLD.US",
+    "XLP.US",
+    "QQQ.US"
+  ],
+  "start_date": "2024-08-01",
+  "end_date": "2026-07-11",
+  "initial_cash": 1000000,
+  "commission": 0.001,
+  "engine": "daily",
+  "interval": "1H",
+  "strategy": {
+    "name": "v63b_conf_prune",
+    "model_version": "v63b_conf_prune",
+    "note": "v39d + drop SPY + hard skip adj_proba<0.55"
+  }
+}

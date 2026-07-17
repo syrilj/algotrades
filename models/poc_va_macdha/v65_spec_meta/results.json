@@ -1,0 +1,17 @@
+{
+  "portfolio": {
+    "total_return": -0.028269754379657286,
+    "max_drawdown": -0.06608721066948935,
+    "sharpe": -0.08937963313728467,
+    "profit_factor": 0.9261,
+    "trade_count": 38,
+    "win_rate": 0.4473684210526316,
+    "final_value": 971730.2456203427
+  },
+  "generated_utc": "",
+  "codes": [
+    "META.US"
+  ],
+  "start": "2024-08-01",
+  "end": "2026-07-11"
+}

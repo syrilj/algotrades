@@ -1,0 +1,12 @@
+{
+  "source": "local",
+  "codes": ["TSLA.US", "MU.US", "SPY.US", "IONQ.US", "APLD.US", "XLP.US", "QQQ.US"],
+  "interval": "1H",
+  "commission": 0.001,
+  "engine": "daily",
+  "strategy": {
+    "name": "v70_high_confidence_wr",
+    "model_version": "v70_high_confidence_wr",
+    "note": "High-confidence high-WR: v45 Ultimate RSI gated by SMA(250) entry trend + causal quality score (constructive/volume/ATR), scale 22.5%. Config frozen before OOS."
+  }
+}

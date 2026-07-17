@@ -1,0 +1,12 @@
+{
+  "source": "local",
+  "codes": ["TSLA.US", "MU.US", "SPY.US", "IONQ.US", "APLD.US", "XLP.US", "QQQ.US"],
+  "interval": "1H",
+  "commission": 0.001,
+  "engine": "daily",
+  "strategy": {
+    "name": "v88_xgb_filter",
+    "model_version": "v88_xgb_filter",
+    "note": "RESEARCH ONLY. v72_dual_sleeve weights re-ranked by a frozen XGB entry filter (tools/ml_filter/train_xgb.py; train-window fit, one-shot holdout eval in runs/v88_xgb_filter/TRAIN_REPORT.json). Not promoted; never route live."
+  }
+}

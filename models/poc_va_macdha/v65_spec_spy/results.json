@@ -1,0 +1,17 @@
+{
+  "portfolio": {
+    "total_return": 0.03076997428973982,
+    "max_drawdown": -0.03357495771580923,
+    "sharpe": 0.6514815184305109,
+    "profit_factor": 1.8522,
+    "trade_count": 26,
+    "win_rate": 0.38461538461538464,
+    "final_value": 1030769.9742897397
+  },
+  "generated_utc": "",
+  "codes": [
+    "SPY.US"
+  ],
+  "start": "2024-08-01",
+  "end": "2026-07-11"
+}

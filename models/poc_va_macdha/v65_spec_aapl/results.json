@@ -1,0 +1,17 @@
+{
+  "portfolio": {
+    "total_return": 0.08284805982592292,
+    "max_drawdown": -0.056868354917009464,
+    "sharpe": 0.26521342870988546,
+    "profit_factor": 2.2346,
+    "trade_count": 23,
+    "win_rate": 0.4782608695652174,
+    "final_value": 1082848.0598259228
+  },
+  "generated_utc": "",
+  "codes": [
+    "AAPL.US"
+  ],
+  "start": "2024-08-01",
+  "end": "2026-07-11"
+}

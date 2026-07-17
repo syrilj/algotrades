@@ -1,5 +1,6 @@
-import { PortfolioDesk } from "@/components/portfolio/PortfolioDesk";
+import { redirect } from "next/navigation";
 
-export default function PortfolioPage() {
-  return <PortfolioDesk />;
+/** Legacy `/portfolio` — portfolio builder lives under Positions hub. */
+export default function PortfolioCompatibilityPage() {
+  redirect("/positions?view=portfolio");
 }

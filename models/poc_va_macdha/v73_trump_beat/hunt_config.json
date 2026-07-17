@@ -1,0 +1,16 @@
+{
+  "mode": "high_beta_guard",
+  "boost": 1.1,
+  "calm_threshold": 0.99,
+  "elevated_threshold": 1.1,
+  "high_beta_base": 0.75,
+  "high_beta_elevated": 0.75,
+  "core_elevated": 1.0,
+  "position_cap": 2.0,
+  "high_beta_codes": [
+    "IONQ.US"
+  ],
+  "max_scale": 1.18,
+  "primary": "v39b_live_adapt",
+  "secondary": "v39d_confluence"
+}

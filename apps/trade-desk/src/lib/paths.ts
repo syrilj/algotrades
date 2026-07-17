@@ -1,7 +1,15 @@
+import fs from "fs";
 import path from "path";
 
 /** Monorepo root: TradingAlgoWork (apps/trade-desk → ../..) */
 export function repoRoot(): string {
+  let current = process.cwd();
+  while (current !== path.dirname(current)) {
+    if (fs.existsSync(path.join(current, "requirements.txt")) || fs.existsSync(path.join(current, ".venv"))) {
+      return current;
+    }
+    current = path.dirname(current);
+  }
   return path.resolve(process.cwd(), "../..");
 }
 
@@ -21,8 +29,20 @@ export function optionsPickerScript(): string {
   return path.join(repoRoot(), "tools", "options_picker.py");
 }
 
+export function volPackageScoreScript(): string {
+  return path.join(repoRoot(), "tools", "vol_package_score.py");
+}
+
 export function gammaExposureScript(): string {
   return path.join(repoRoot(), "tools", "gamma_exposure.py");
+}
+
+export function optionsUnusualFlowScript(): string {
+  return path.join(repoRoot(), "tools", "options_unusual_flow.py");
+}
+
+export function optionsBookScanScript(): string {
+  return path.join(repoRoot(), "tools", "options_book_scan.py");
 }
 
 export function riskManagerScript(): string {
@@ -39,6 +59,10 @@ export function vpaScanScript(): string {
 
 export function sectorWatchlistScript(): string {
   return path.join(repoRoot(), "tools", "sector_watchlist.py");
+}
+
+export function sectorMoneyFlowScript(): string {
+  return path.join(repoRoot(), "tools", "sector_money_flow.py");
 }
 
 export function modelsRoot(): string {
@@ -67,4 +91,8 @@ export function paperLedgerScript(): string {
 
 export function supplyChainScript(): string {
   return path.join(repoRoot(), "tools", "supply_chain.py");
+}
+
+export function analysisAgentScript(): string {
+  return path.join(repoRoot(), "tools", "analysis_agent.py");
 }

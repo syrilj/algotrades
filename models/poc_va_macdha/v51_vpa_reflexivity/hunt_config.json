@@ -1,0 +1,5 @@
+{
+  "threshold": 0.55,
+  "signal_scale": 1.0,
+  "max_hold": 5
+}

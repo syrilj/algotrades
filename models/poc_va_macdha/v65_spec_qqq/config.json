@@ -1,0 +1,33 @@
+{
+  "source": "local",
+  "codes": [
+    "QQQ.US"
+  ],
+  "start_date": "2024-08-01",
+  "end_date": "2026-07-11",
+  "initial_cash": 1000000,
+  "commission": 0.001,
+  "engine": "daily",
+  "interval": "1H",
+  "strategy": {
+    "name": "v65_spec_qqq",
+    "model_version": "v65_spec_qqq",
+    "desk_specialist": true,
+    "desk_symbol": "QQQ.US",
+    "dna_donor": "dna_spy",
+    "engine_base": "v39d_confluence",
+    "bakeoff": {
+      "id": "v39d_confluence",
+      "ret": 0.0,
+      "dd": 0.0,
+      "sharpe": 0.0,
+      "n": 0,
+      "wr": 0.0,
+      "final": 1000.0,
+      "ok": true,
+      "source_data": "local",
+      "symbol": "QQQ.US"
+    },
+    "note": "Proper specialist rebuilt from v39d + winning DNA bakeoff"
+  }
+}

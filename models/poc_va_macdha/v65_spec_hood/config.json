@@ -1,0 +1,35 @@
+{
+  "source": "yfinance",
+  "codes": [
+    "HOOD.US"
+  ],
+  "start_date": "2024-08-01",
+  "end_date": "2026-07-11",
+  "initial_cash": 1000000,
+  "commission": 0.001,
+  "engine": "daily",
+  "interval": "1H",
+  "strategy": {
+    "name": "v65_spec_hood",
+    "model_version": "v65_spec_hood",
+    "desk_specialist": true,
+    "desk_symbol": "HOOD.US",
+    "dna_donor": "dna_arm",
+    "engine_base": "v39d_confluence",
+    "bakeoff": {
+      "id": "_bake_hood_dna_arm",
+      "dna": "dna_arm",
+      "kind": "donor",
+      "ret": 0.4895265999051317,
+      "dd": -0.09908476160467806,
+      "sharpe": 1.291715975781703,
+      "n": 32,
+      "wr": 0.6875,
+      "final": 1489.5265999051317,
+      "ok": true,
+      "source_data": "yfinance",
+      "symbol": "HOOD.US"
+    },
+    "note": "Proper specialist rebuilt from v39d + winning DNA bakeoff"
+  }
+}

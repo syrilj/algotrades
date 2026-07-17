@@ -1,0 +1,45 @@
+{
+  "schema_version": 1,
+  "files": [
+    {
+      "source": "../../../tools/evolve/adaptive_router.py",
+      "target": "adaptive_router.py",
+      "sha256": "97c44c6e15e6515e20e105b6ea3aab85853123477068450ca34c81e5826bcf89"
+    },
+    {
+      "source": "../v39d_confluence/signal_engine.py",
+      "target": "experts/v39d_confluence/signal_engine.py",
+      "sha256": "82c1516a2bbc68d8d699858633dd392489b80fe1fbcbb9a6763a03f36de800a5"
+    },
+    {
+      "source": "../v39d_confluence/meta_config.json",
+      "target": "experts/v39d_confluence/meta_config.json",
+      "sha256": "fabf8c8d4ed33ac8656921bb9c2f60c36b916a2b19f65bcde38bab072b8957c1"
+    },
+    {
+      "source": "../v39d_confluence/meta_xgb_final.json",
+      "target": "experts/v39d_confluence/meta_xgb_final.json",
+      "sha256": "4f94d512bc58e4c9c1a9c2ed76dbf139ff1ca568d089fe3c32399648566dc3b3"
+    },
+    {
+      "source": "../v39d_confluence/candidate_ledger.py",
+      "target": "experts/v39d_confluence/candidate_ledger.py",
+      "sha256": "e0b0fa56df8fd268908d9334e044803f37d64426ff0d056423888c444d647e38"
+    },
+    {
+      "source": "../v45_ultimate_rsi/signal_engine.py",
+      "target": "experts/v45_ultimate_rsi/signal_engine.py",
+      "sha256": "52fca244456739c441b9851c2aceabc74abbc3fb215cce839875e64e07f0e2e1"
+    },
+    {
+      "source": "../v45_ultimate_rsi/config.json",
+      "target": "experts/v45_ultimate_rsi/config.json",
+      "sha256": "63d692ec2dc76a3e30eb1a980003f12105bc88fd3a798552b5a0a67b94306353"
+    },
+    {
+      "source": "../v71_live_confidence/gates.py",
+      "target": "experts/v71_live_confidence/gates.py",
+      "sha256": "5f4877f8723cab5fb16d804502b5bcc773a9aab3b85d6f133c99a50fbdb51a54"
+    }
+  ]
+}

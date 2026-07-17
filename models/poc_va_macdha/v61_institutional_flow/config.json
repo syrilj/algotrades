@@ -1,0 +1,15 @@
+{
+  "source": "local",
+  "codes": ["TSLA.US", "SPY.US", "QQQ.US"],
+  "start_date": "2025-08-01",
+  "end_date": "2026-07-11",
+  "initial_cash": 1000,
+  "commission": 0.001,
+  "engine": "daily",
+  "interval": "1H",
+  "strategy": {
+    "name": "v61_institutional_flow",
+    "model_version": "v61_institutional_flow",
+    "note": "Pilot model using the reusable tools/institutional_flow feature module."
+  }
+}

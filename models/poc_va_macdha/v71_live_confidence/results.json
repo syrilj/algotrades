@@ -1,0 +1,43 @@
+{
+  "portfolio": {
+    "total_return": 1.1401298636307748,
+    "max_drawdown": -0.19507369828838642,
+    "sharpe": 1.7162764994903077,
+    "trade_count": 50,
+    "win_rate": 0.86,
+    "final_value": 2140.1298636307747
+  },
+  "holdout": {
+    "total_return": 0.30896121676944865,
+    "max_drawdown": -0.19622391609759035,
+    "sharpe": 1.17000516120431,
+    "trade_count": 26,
+    "win_rate": 0.7692307692307693,
+    "final_value": 1308.9612167694486
+  },
+  "train": {
+    "wr": 0.9,
+    "ret": 0.49935367507875994,
+    "dd": -0.08965984681418562,
+    "sharpe": 2.0493014671487613,
+    "n": 20,
+    "final": 1499.35367507876,
+    "error": null
+  },
+  "selected_variant": "sizeup_q1",
+  "promoted": true,
+  "codes": [
+    "TSLA.US",
+    "MU.US",
+    "SPY.US",
+    "IONQ.US",
+    "APLD.US",
+    "XLP.US",
+    "QQQ.US"
+  ],
+  "start": "2024-08-01",
+  "end": "2026-07-11",
+  "holdout_start": "2025-08-01",
+  "holdout_end": "2026-07-11",
+  "notes": "Live confidence model: soft quality floor + size-up on conf. OOS matches v50 high-WR baseline; v39d remains return champion."
+}

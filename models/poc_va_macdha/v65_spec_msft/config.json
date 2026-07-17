@@ -1,0 +1,35 @@
+{
+  "source": "yfinance",
+  "codes": [
+    "MSFT.US"
+  ],
+  "start_date": "2024-08-01",
+  "end_date": "2026-07-11",
+  "initial_cash": 1000000,
+  "commission": 0.001,
+  "engine": "daily",
+  "interval": "1H",
+  "strategy": {
+    "name": "v65_spec_msft",
+    "model_version": "v65_spec_msft",
+    "desk_specialist": true,
+    "desk_symbol": "MSFT.US",
+    "dna_donor": "dna_tsla",
+    "engine_base": "v39d_confluence",
+    "bakeoff": {
+      "id": "_bake_msft_dna_tsla",
+      "dna": "dna_tsla",
+      "kind": "donor",
+      "ret": 0.09439955112823695,
+      "dd": -0.03088835645378052,
+      "sharpe": 1.1462370337468566,
+      "n": 49,
+      "wr": 0.5714285714285714,
+      "final": 1094.399551128237,
+      "ok": true,
+      "source_data": "yfinance",
+      "symbol": "MSFT.US"
+    },
+    "note": "Proper specialist rebuilt from v39d + winning DNA bakeoff"
+  }
+}

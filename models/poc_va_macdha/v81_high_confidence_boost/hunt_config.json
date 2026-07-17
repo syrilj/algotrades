@@ -1,0 +1,12 @@
+{
+  "base_model": "v72_dual_sleeve",
+  "precision_model": "v70_high_confidence_wr",
+  "precision_target_weight": 0.4,
+  "max_weight": 0.5,
+  "high_confidence_target": 0.9,
+  "allow_precision_orphans": false,
+  "selection_rule": "train_only_then_locked_holdout",
+  "train_window_end": "2025-08-01",
+  "variant_id": "target_40",
+  "hypothesis": "Raise an already-active v72 target only when the v70 hard-quality sleeve agrees; retain v72 exits and breadth."
+}

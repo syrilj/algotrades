@@ -22,9 +22,17 @@ from evolve.farm import (  # noqa: E402
     run_batch,
     run_one_cached,
 )
-from evolve.gates import multi_lock_verdict  # noqa: E402
+from evolve.gates import claim_min_trades, multi_lock_verdict  # noqa: E402
 from evolve.meta_train import train_meta_recipe  # noqa: E402
-from evolve.mutations import spawn_mutations  # noqa: E402
+from evolve.model_feedback import (  # noqa: E402
+    DEFAULT_MEMORY_PATH,
+    load_memory,
+    prioritize_mutation_menu,
+    rank_model_runs,
+    save_memory,
+    update_memory,
+)
+from evolve.mutations import MUTATION_MENU, spawn_mutations  # noqa: E402
 from evolve.finalize import write_finalize_report, write_phases_doc  # noqa: E402
 from evolve.report import write_leaderboard, write_state  # noqa: E402
 
@@ -163,44 +171,6 @@ def run_rank(
                 deep_by_id[m["id"]].append(r)
                 deep_rows.append(r)
 
-    # Aggregate deep utility
-    ranking = list(screen)
-    if deep_by_id:
-        agg = []
-        for mid, tests in deep_by_id.items():
-            ok = [t for t in tests if not t.get("error") and int(t.get("n") or 0) > 0]
-            if not ok:
-                continue
-            mean_u = sum(float(t.get("utility") or 0) for t in ok) / len(ok)
-            mean_ret = sum(float(t["ret"]) for t in ok) / len(ok)
-            mean_sh = sum(float(t["sharpe"]) for t in ok) / len(ok)
-            mean_dd = sum(float(t["dd"]) for t in ok) / len(ok)
-            mean_n = sum(int(t["n"]) for t in ok) / len(ok)
-            base = next((s for s in screen if s["id"] == mid), ok[0])
-            row = dict(base)
-            row.update(
-                {
-                    "utility": mean_u,
-                    "ret": mean_ret,
-                    "sharpe": mean_sh,
-                    "dd": mean_dd,
-                    "n": int(mean_n),
-                    "deep_tests": len(ok),
-                    "tag": "deep_agg",
-                }
-            )
-            from evolve.gates import apply_gates
-            from evolve.scoring import enrich_scores
-            from evolve.gates import claim_min_trades, dd_hard_from_bar
-
-            row = apply_gates(row)
-            row = enrich_scores(row, dd_hard=dd_hard_from_bar(), claim_min=claim_min_trades())
-            # keep deep mean utility primary
-            row["utility"] = mean_u * float(row.get("reliability") or 1.0)
-            agg.append(row)
-        if agg:
-            ranking = rank_rows(agg)
-
     ml_out: dict[str, Any] = {}
     if multi_lock and deep_models and not quick:
         print("[evolve] multi-lock holdouts", flush=True)
@@ -228,6 +198,29 @@ def run_rank(
             train["is_holdout"] = False
             hold["is_holdout"] = True
             ml_out[m["id"]] = multi_lock_verdict([train, hold])
+
+    # Robust aggregation uses all comparable deep runs, penalizes dispersion
+    # and OOS reversal, and exposes structured failure reasons.  Quick mode
+    # has one comparable screen run per model.
+    from evolve.gates import apply_gates
+
+    rank_inputs = (
+        {mid: tests for mid, tests in deep_by_id.items() if tests}
+        if any(deep_by_id.values())
+        else {row["id"]: [row] for row in screen}
+    )
+    ranking = rank_model_runs(
+        rank_inputs,
+        multi_lock=ml_out,
+        min_trades=claim_min_trades(),
+        expected_runs=4 if any(deep_by_id.values()) else 1,
+    )
+    for row in ranking:
+        gated = apply_gates(row)
+        row.update(gated)
+        lock = ml_out.get(row["id"])
+        if multi_lock and not quick and (not lock or not lock.get("ok")):
+            row["may_auto_promote"] = False
 
     state = {
         "phase": "rank",
@@ -273,6 +266,7 @@ def run_loop(
     max_backtests_per_gen: int = 40,
     epsilon: float = 0.02,
     out_dir: Path | None = None,
+    memory_path: Path | None = None,
 ) -> dict[str, Any]:
     """Phase 2 (+3 if options track): multi-gen feedback + constrained mutations."""
     out = out_dir or (ROOT / "runs" / f"evolve_loop_{_now_tag()}")
@@ -280,7 +274,7 @@ def run_loop(
     _setup_dmr_out(out)
     dmr.CASH = cash
 
-    bag, core = bags_for_track(track)
+    bag, _core = bags_for_track(track)
     pool_ids = models or DEFAULT_POOL
     found = {m["id"]: m for m in discover(pool_ids, family=family)}
     survivors = [found[i] for i in pool_ids if i in found]
@@ -289,6 +283,8 @@ def run_loop(
         survivors = filter_track(survivors, track)[:12]
 
     generations: list[dict[str, Any]] = []
+    feedback_path = memory_path or DEFAULT_MEMORY_PATH
+    memory = load_memory(feedback_path)
     best_u = -999.0
     no_improve = 0
     ranking: list[dict[str, Any]] = []
@@ -296,8 +292,7 @@ def run_loop(
     for gen in range(1, gens + 1):
         print(f"\n[evolve] ===== GEN {gen}/{gens} survivors={len(survivors)} =====", flush=True)
         budget = max_backtests_per_gen
-        screen = rank_rows(
-            run_batch(
+        screen_rows = run_batch(
                 survivors,
                 codes=bag,
                 start=WINDOWS["full"][0],
@@ -309,6 +304,10 @@ def run_loop(
                 workers=workers,
                 budget=budget,
             )
+        screen = rank_model_runs(
+            {row["id"]: [row] for row in screen_rows},
+            min_trades=claim_min_trades(),
+            expected_runs=1,
         )
         budget -= len(survivors)
 
@@ -318,35 +317,77 @@ def run_loop(
 
         # Mutations from elite parents
         mut_dir = out / "mutations" / f"gen{gen}"
-        muts = spawn_mutations(elite[:3], mut_dir, max_mutations=min(max_mutations, max(0, budget)))
+        guided_menu = prioritize_mutation_menu(
+            MUTATION_MENU,
+            [row.get("failure_profile") or {} for row in screen],
+            memory,
+        )
+        muts = spawn_mutations(
+            elite[:3],
+            mut_dir,
+            max_mutations=min(max_mutations, max(0, budget)),
+            menu=guided_menu,
+        )
         mut_rows: list[dict[str, Any]] = []
         if muts:
             print(f"[evolve] gen{gen} mutations={len(muts)}", flush=True)
-            mut_rows = rank_rows(
-                run_batch(
+            raw_mut_rows = run_batch(
                     muts,
-                    codes=core,
-                    start=WINDOWS["late"][0],
-                    end=WINDOWS["late"][1],
+                    # Mutations and parents must use the identical evaluation
+                    # contract or their scores are not rank-comparable.
+                    codes=bag,
+                    start=WINDOWS["full"][0],
+                    end=WINDOWS["full"][1],
                     tag=f"G{gen}_mut",
                     cash=cash,
                     track=track,
                     reuse=reuse,
                     workers=workers,
                 )
+            mut_by_id = {m["id"]: m for m in muts}
+            for row in raw_mut_rows:
+                meta = mut_by_id.get(row["id"], {})
+                row.update(
+                    {
+                        "is_mutation": True,
+                        "parent": meta.get("parent"),
+                        "mutation_name": meta.get("mutation_name"),
+                        "mutation_targets": meta.get("mutation_targets", []),
+                        "feedback_priority": meta.get("feedback_priority"),
+                    }
+                )
+            mut_rows = rank_model_runs(
+                {row["id"]: [row] for row in raw_mut_rows},
+                min_trades=claim_min_trades(),
+                expected_runs=1,
             )
             # merge mut models into pool for next gen if RESEARCH+
-            for mr, mm in zip(mut_rows, muts):
+            for mr in mut_rows:
+                mm = mut_by_id.get(mr["id"])
+                if mm is None:
+                    continue
                 if mr.get("error"):
                     continue
                 if str(mr.get("claim_level")) in ("RESEARCH", "CLAIM") and float(mr.get("utility") or -99) > -1:
                     survivors.append(mm)
                     by_id[mm["id"]] = mm
 
-        combined = rank_rows(screen + mut_rows)
+        combined = sorted(
+            screen + mut_rows,
+            key=lambda row: float(row.get("rank_score") or -99),
+            reverse=True,
+        )
+        for index, row in enumerate(combined, 1):
+            row["rank"] = index
         ranking = combined
         gen_best = next((r for r in combined if not r.get("error")), None)
-        gu = float(gen_best.get("utility") or -99) if gen_best else -99
+        gu = float(gen_best.get("rank_score") or -99) if gen_best else -99
+        parent_scores = {
+            row["id"]: float(row.get("rank_score") or -99)
+            for row in screen
+        }
+        memory = update_memory(memory, combined, generation=gen, parent_scores=parent_scores)
+        save_memory(memory, feedback_path)
         generations.append(
             {
                 "gen": gen,
@@ -354,6 +395,17 @@ def run_loop(
                 "best_utility": gu,
                 "n_mutations": len(muts),
                 "top": [r["id"] for r in combined[:8]],
+                "top_failures": (gen_best.get("failure_profile") or {}).get("failure_tags", [])
+                if gen_best
+                else [],
+                "mutation_priorities": [
+                    {
+                        "name": spec.get("name"),
+                        "priority": spec.get("feedback_priority"),
+                        "targets": spec.get("feedback_targets"),
+                    }
+                    for spec in guided_menu[:8]
+                ],
             }
         )
         print(f"[evolve] gen{gen} best={gen_best and gen_best.get('id')} util={gu:.3f}", flush=True)
@@ -392,6 +444,9 @@ def run_loop(
         "best_utility": best_u,
         "state_path": str((out / "STATE.json").relative_to(ROOT)),
         "run_dir": str(out.relative_to(ROOT)),
+        "feedback_memory": str(feedback_path.relative_to(ROOT))
+        if feedback_path.is_relative_to(ROOT)
+        else str(feedback_path),
         "honesty": {
             "options_auto_promote": False,
             "mutations_are_config_patches": True,

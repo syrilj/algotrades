@@ -52,7 +52,10 @@ def bs_greeks(S: float, K: float, T: float, r: float, sigma: float, call: bool =
 def strike_for_delta(S: float, T: float, r: float, sigma: float, target_delta: float, call: bool = True) -> float:
     """Binary search strike for target |delta| on calls (0<delta<1)."""
     target = abs(float(target_delta))
-    lo, hi = S * 0.5, S * 1.5
+    # Volatility and time scaled search bounds to prevent clipping on high-beta names
+    vol_expansion = max(3.0, 5.0 * sigma * math.sqrt(T))
+    lo = max(1e-4, S * math.exp(-vol_expansion))
+    hi = S * math.exp(vol_expansion)
     for _ in range(50):
         mid = 0.5 * (lo + hi)
         d = abs(bs_delta(S, mid, T, r, sigma, call))

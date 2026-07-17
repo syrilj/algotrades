@@ -1,0 +1,35 @@
+{
+  "source": "yfinance",
+  "codes": [
+    "CRWV.US"
+  ],
+  "start_date": "2024-08-01",
+  "end_date": "2026-07-11",
+  "initial_cash": 1000000,
+  "commission": 0.001,
+  "engine": "daily",
+  "interval": "1H",
+  "strategy": {
+    "name": "v65_spec_crwv",
+    "model_version": "v65_spec_crwv",
+    "desk_specialist": true,
+    "desk_symbol": "CRWV.US",
+    "dna_donor": "dna_tsla",
+    "engine_base": "v39d_confluence",
+    "bakeoff": {
+      "id": "_bake_crwv_dna_tsla",
+      "dna": "dna_tsla",
+      "kind": "donor",
+      "ret": 0.22224245401943388,
+      "dd": -0.09594146653038839,
+      "sharpe": 0.9378198759686548,
+      "n": 24,
+      "wr": 0.5,
+      "final": 1222.2424540194338,
+      "ok": true,
+      "source_data": "yfinance",
+      "symbol": "CRWV.US"
+    },
+    "note": "Proper specialist rebuilt from v39d + winning DNA bakeoff"
+  }
+}

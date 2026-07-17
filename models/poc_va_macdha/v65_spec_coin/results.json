@@ -1,0 +1,17 @@
+{
+  "portfolio": {
+    "total_return": -0.1931006068427984,
+    "max_drawdown": -0.22920952447037524,
+    "sharpe": -0.5220108067453891,
+    "profit_factor": 0.5589,
+    "trade_count": 25,
+    "win_rate": 0.28,
+    "final_value": 806899.3931572016
+  },
+  "generated_utc": "",
+  "codes": [
+    "COIN.US"
+  ],
+  "start": "2024-08-01",
+  "end": "2026-07-11"
+}

@@ -1,0 +1,17 @@
+{
+  "portfolio": {
+    "total_return": 0.0006538570224077223,
+    "max_drawdown": -0.06410058825557188,
+    "sharpe": 0.011180781911075856,
+    "profit_factor": 1.1933,
+    "trade_count": 53,
+    "win_rate": 0.49056603773584906,
+    "final_value": 1000653.8570224078
+  },
+  "generated_utc": "",
+  "codes": [
+    "MSFT.US"
+  ],
+  "start": "2024-08-01",
+  "end": "2026-07-11"
+}

@@ -1,0 +1,35 @@
+{
+  "source": "local",
+  "codes": [
+    "COIN.US"
+  ],
+  "start_date": "2024-08-01",
+  "end_date": "2026-07-11",
+  "initial_cash": 1000000,
+  "commission": 0.001,
+  "engine": "daily",
+  "interval": "1H",
+  "strategy": {
+    "name": "v65_spec_coin",
+    "model_version": "v65_spec_coin",
+    "desk_specialist": true,
+    "desk_symbol": "COIN.US",
+    "dna_donor": "dna_spy",
+    "engine_base": "v39d_confluence",
+    "bakeoff": {
+      "id": "v39d_confluence",
+      "dna": "v39d_default",
+      "kind": "baseline",
+      "ret": -0.1934671493611131,
+      "dd": -0.22905542380869687,
+      "sharpe": -0.5236183607907859,
+      "n": 25,
+      "wr": 0.28,
+      "final": 806.5328506388869,
+      "ok": true,
+      "source_data": "local",
+      "symbol": "COIN.US"
+    },
+    "note": "Proper specialist rebuilt from v39d + winning DNA bakeoff"
+  }
+}

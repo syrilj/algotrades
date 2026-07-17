@@ -2,7 +2,7 @@
 
 Canonical CSS/token layer for implementation. **Brand intent and hex values live in [`BRAND.md`](./BRAND.md)** — this file extends them with type scale, spacing, icon rules, and gate/action maps for engineers.
 
-Default theme: **dark** (desk). The 2026 refresh uses a quiet graphite canvas, acid-lime product accent, and reserves semantic green/coral for trade outcomes. The legacy token block below remains for component compatibility; the refresh block is canonical for new UI work.
+Default theme: **dark** (desk). **Live source of truth is `apps/trade-desk/src/app/globals.css`** (BMW M near-black canvas, M tricolor brand, zero-radius hairlines). Historical “2026 acid-lime / rounded” sketches below are **not** the shipped primary hub system — do not reintroduce dual palettes on Command / Execution / Portfolio / Lab.
 
 ## 2026 refresh — canonical shell tokens
 

@@ -11,7 +11,7 @@ import type {
 } from "@/lib/types";
 import { formatUsd, formatPct, formatNum } from "@/lib/format";
 import { PageHeader } from "@/components/shell/PageHeader";
-import { analyzeHref, optionsHref } from "@/lib/routes";
+import { analyzeHref, optionsHref, watchHref } from "@/lib/routes";
 import { Chip } from "@/components/ui/Chip";
 import { colorVarFor } from "@/lib/actionColors";
 import { Stat } from "@/components/ui/Stat";
@@ -88,7 +88,8 @@ function LiveDeskInner({ showHeader = true }: { showHeader?: boolean }) {
           scan: true,
           account,
           peak,
-          noModel: true,
+          // Default: model-aware ranked plays. "Fast (skip model)" forces light scan.
+          noModel,
         }),
       });
       const json = (await res.json()) as ApiEnvelope<LiveScanResponse>;
@@ -101,7 +102,7 @@ function LiveDeskInner({ showHeader = true }: { showHeader?: boolean }) {
     } finally {
       setScanning(false);
     }
-  }, [account, peak]);
+  }, [account, peak, noModel]);
 
   const ticket = plan?.ticket;
   const live = plan?.live;
@@ -202,6 +203,12 @@ function LiveDeskInner({ showHeader = true }: { showHeader?: boolean }) {
           >
             {scanning ? "Scanning…" : "Scan book"}
           </button>
+          <Link
+            href={watchHref()}
+            className="td-btn td-btn-ghost no-underline"
+          >
+            Full watch board
+          </Link>
         </div>
       </section>
 
@@ -242,8 +249,17 @@ function LiveDeskInner({ showHeader = true }: { showHeader?: boolean }) {
               <Stat label="Risk" value={formatPct(ticket.risk_pct ?? 0)} />
               <Stat label="Max loss" value={formatUsd(ticket.max_loss_dollars, 0)} />
               <Stat label="Vol z" value={formatNum(live?.vol_z, 2)} />
-              <Stat label="Blended conf" value={formatPct(plan.blended_confidence ?? 0)} />
-              <Stat label="Confidence gate" value={plan.confidence?.state ?? "ABSTAIN"} />
+              <Stat label="Live conf" value={formatPct(live?.confidence ?? 0)} />
+              <Stat label="Blended" value={formatPct(plan.blended_confidence ?? 0)} />
+              <Stat label="Gate" value={plan.confidence?.state ?? "ABSTAIN"} />
+              <Stat
+                label="Calibrated"
+                value={
+                  plan.confidence?.calibrated_probability != null
+                    ? formatPct(plan.confidence.calibrated_probability)
+                    : "—"
+                }
+              />
               <Stat label="QQQ" value={plan.macro?.qqq_trend ?? "—"} />
               <Stat label="Macro" value={plan.macro?.xlp_spy_ratio_state ?? "—"} />
             </div>
@@ -252,10 +268,27 @@ function LiveDeskInner({ showHeader = true }: { showHeader?: boolean }) {
               className="mt-3 border-l-2 pl-3 text-[13px] leading-snug"
               style={{ borderColor: "var(--td-ink-500)", color: "var(--td-ink-300)" }}
             >
-              Calibrated probability: {plan.confidence?.calibrated_probability != null
-                ? formatPct(plan.confidence.calibrated_probability)
-                : "unavailable"}
-              {plan.confidence?.reasons?.length ? ` · ${plan.confidence.reasons[0]}` : ""}
+              <div>
+                Execution gate: <strong style={{ color: "var(--td-ink-100)" }}>{plan.confidence?.state ?? "ABSTAIN"}</strong>
+                {plan.confidence?.uncalibrated ? " · uncalibrated (identity)" : ""}
+                {plan.decision?.analysis_action
+                  ? ` · setup ${plan.decision.analysis_action}`
+                  : ""}
+              </div>
+              <div className="mt-1">
+                Calibrated:{" "}
+                {plan.confidence?.calibrated_probability != null
+                  ? formatPct(plan.confidence.calibrated_probability)
+                  : "unavailable"}
+                {plan.confidence?.reasons?.length
+                  ? ` · ${plan.confidence.reasons.filter((r) => r !== "using_identity_calibration_fallback").join(" · ") || plan.confidence.reasons[0]}`
+                  : ""}
+              </div>
+              {plan.execution_readiness?.blockers?.length ? (
+                <div className="mt-1" style={{ color: "var(--td-action-avoid)" }}>
+                  Blocked: {plan.execution_readiness.blockers.slice(0, 4).join(", ")}
+                </div>
+              ) : null}
             </div>
 
             <div>
@@ -381,9 +414,10 @@ function LiveDeskInner({ showHeader = true }: { showHeader?: boolean }) {
 
       {scan?.rows?.length ? (
         <section className="td-panel overflow-x-auto">
-          <div className="flex items-center justify-between px-4 py-3">
+          <div className="flex items-center justify-between gap-2 px-4 py-3">
             <span className="text-[14px] font-medium" style={{ color: "var(--td-ink-100)" }}>
               Scan · {scan.count} names
+              {scan.use_model === false ? " · light" : " · ranked plays"}
             </span>
             <span className="text-[12px]" style={{ color: "var(--td-ink-400)" }}>
               macro {scan.macro?.xlp_spy_ratio_state ?? "—"} · QQQ{" "}
@@ -394,17 +428,19 @@ function LiveDeskInner({ showHeader = true }: { showHeader?: boolean }) {
             <thead>
               <tr style={{ color: "var(--td-ink-400)", borderTop: "1px solid var(--td-ink-700)" }}>
                 <th className="px-4 py-2 font-normal">Symbol</th>
+                <th className="px-2 py-2 font-normal">Setup</th>
+                <th className="px-2 py-2 font-normal">Gate</th>
+                <th className="px-2 py-2 font-normal">Cal%</th>
                 <th className="px-2 py-2 font-normal">Mode</th>
-                <th className="px-2 py-2 font-normal">Vehicle</th>
-                <th className="px-2 py-2 font-normal">Conv</th>
                 <th className="px-2 py-2 font-normal">Vol z</th>
                 <th className="px-2 py-2 font-normal">Price</th>
-                <th className="px-2 py-2 font-normal">Max loss</th>
                 <th className="px-2 py-2 font-normal">Analyze</th>
               </tr>
             </thead>
             <tbody>
-              {scan.rows.map((r: LiveScanRow) => (
+              {scan.rows.map((r: LiveScanRow) => {
+                const setup = r.analysis_action || r.mode;
+                return (
                 <tr
                   key={r.symbol}
                   className="td-row-link"
@@ -431,22 +467,25 @@ function LiveDeskInner({ showHeader = true }: { showHeader?: boolean }) {
                     {r.symbol}
                   </td>
                   <td className="px-2 py-2">
-                    <span style={{ color: colorVarFor("mode", r.mode) }}>{r.mode}</span>
-                  </td>
-                  <td className="px-2 py-2" style={{ color: "var(--td-ink-300)" }}>
-                    {r.vehicle}
+                    <span style={{ color: colorVarFor("action", setup) }}>{setup}</span>
                   </td>
                   <td className="px-2 py-2" style={{ color: "var(--td-ink-200)" }}>
-                    {formatNum(r.conviction, 2)}
+                    {r.confidence_state ?? "—"}
+                  </td>
+                  <td className="px-2 py-2" style={{ color: "var(--td-ink-200)" }}>
+                    {r.calibrated_probability != null
+                      ? formatPct(r.calibrated_probability)
+                      : formatPct(r.blended_confidence ?? 0)}
+                    {r.uncalibrated ? "*" : ""}
+                  </td>
+                  <td className="px-2 py-2">
+                    <span style={{ color: colorVarFor("mode", r.mode) }}>{r.mode}</span>
                   </td>
                   <td className="px-2 py-2" style={{ color: "var(--td-ink-200)" }}>
                     {formatNum(r.vol_z, 2)}
                   </td>
                   <td className="px-2 py-2" style={{ color: "var(--td-ink-200)" }}>
                     {formatUsd(r.price)}
-                  </td>
-                  <td className="px-2 py-2" style={{ color: "var(--td-ink-200)" }}>
-                    {formatUsd(r.max_loss_dollars, 0)}
                   </td>
                   <td className="px-2 py-2">
                     <Link
@@ -459,7 +498,8 @@ function LiveDeskInner({ showHeader = true }: { showHeader?: boolean }) {
                     </Link>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </section>

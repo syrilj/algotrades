@@ -1,0 +1,56 @@
+{
+  "status": "research_only",
+  "research_only": true,
+  "portfolio": {
+    "total_return": 5.10758278696714,
+    "max_drawdown": -0.17975767371121326,
+    "sharpe": 2.875510652663155,
+    "trade_count": 177,
+    "win_rate": 0.7175141242937854,
+    "final_value": 6107.58278696714
+  },
+  "holdout": {
+    "id": "v81_high_confidence_boost",
+    "tag": "v81_locked_holdout",
+    "start": "2025-08-01",
+    "end": "2026-07-11",
+    "cash": 1000.0,
+    "ret": 0.9045179747168621,
+    "dd": -0.17764705667192165,
+    "sharpe": 2.1320919703787427,
+    "n": 84,
+    "wr": 0.6547619047619048,
+    "final": 1904.5179747168622,
+    "path": "runs/poc_va_dynamic_rank/runs/v81_high_confidence_boost/v81_locked_holdout__daily__c1000"
+  },
+  "precision_subset_holdout": {
+    "id": "v70_high_confidence_wr",
+    "tag": "v81_precision_holdout",
+    "start": "2025-08-01",
+    "end": "2026-07-11",
+    "cash": 1000.0,
+    "ret": 0.13862588837684653,
+    "dd": -0.11932526559722441,
+    "sharpe": 1.185813564483503,
+    "n": 11,
+    "wr": 0.9090909090909091,
+    "final": 1138.6258883768464,
+    "path": "runs/poc_va_dynamic_rank/runs/v70_high_confidence_wr/v81_precision_holdout__daily__c1000"
+  },
+  "selected_variant": {
+    "variant_id": "target_40",
+    "precision_target_weight": 0.4,
+    "train_score": 0.08087798385117369
+  },
+  "promoted": false,
+  "promotion_failed": [
+    "holdout_sharpe_beats_v72",
+    "full_return_beats_v72"
+  ],
+  "confidence_kind": "empirical_precision_subset_target_thin",
+  "confidence_warning": "0.90 marks v70-qualified episodes. Holdout evidence is 10 wins in 11 trades and is too thin to guarantee a calibrated 90% probability.",
+  "precision_holdout_wilson_95": [
+    0.6226,
+    0.9838
+  ]
+}

@@ -1,36 +1,24 @@
 {
   "TSLA.US": {
     "specialist": "tsla_F_lb30_block",
-    "win_rate": 0.5853658536585366,
-    "sharpe": 0.7532800536345038,
-    "total_return": 0.2778956278959004,
-    "max_drawdown": -0.2465814155228906,
-    "trade_count": 41,
-    "interval": "1H",
-    "score": 0.5204895188994348,
-    "why": "feedback-tuned from FEATURE_INSIGHTS lifts"
+    "family": "megacap_beta",
+    "model": "v65_spec_tsla",
+    "track": "specialist",
+    "status": "routed"
   },
   "ARM.US": {
     "specialist": "arm_A_4h_v8",
-    "win_rate": 0.6,
-    "sharpe": 0.3632509281409648,
-    "total_return": 0.13053810820844491,
-    "max_drawdown": -0.19398556434583658,
-    "trade_count": 30,
-    "interval": "4H",
-    "score": 0.4666413660176206,
-    "why": "feedback-tuned from FEATURE_INSIGHTS lifts"
+    "family": "semi_spec_4h",
+    "model": "v65_spec_arm",
+    "track": "specialist",
+    "status": "routed"
   },
   "MU.US": {
     "specialist": "mu_A_block",
-    "win_rate": 0.5888888888888889,
-    "sharpe": 1.0618418137487506,
-    "total_return": 0.7146072677191542,
-    "max_drawdown": -0.36660450367635106,
-    "trade_count": 90,
-    "interval": "1H",
-    "score": 0.5651685600519272,
-    "why": "feedback-tuned from FEATURE_INSIGHTS lifts"
+    "family": "semi_memory",
+    "model": "v65_spec_mu",
+    "track": "specialist",
+    "status": "routed"
   },
   "SPY.US": {
     "specialist": "spy_A_vwap_trend",
@@ -45,24 +33,127 @@
   },
   "IONQ.US": {
     "specialist": "ionq_A_4h_v8",
-    "win_rate": 0.7419354838709677,
-    "sharpe": 1.5483843625829317,
-    "total_return": 1.7957211973098768,
-    "max_drawdown": -0.16757200174799314,
-    "trade_count": 31,
-    "interval": "4H",
-    "score": 0.7887093356454471,
-    "why": "feedback-tuned from FEATURE_INSIGHTS lifts"
+    "family": "quantum_spec",
+    "model": "v65_spec_ionq",
+    "track": "specialist",
+    "status": "routed"
   },
   "APLD.US": {
     "specialist": "apld_B_full_stack",
-    "win_rate": 0.8125,
-    "sharpe": 1.3515994357278018,
-    "total_return": 0.9406183782951163,
-    "max_drawdown": -0.26701530534230045,
-    "trade_count": 16,
-    "interval": "1H",
-    "score": 0.8064499294659753,
-    "why": "feedback-tuned from FEATURE_INSIGHTS lifts"
+    "family": "ai_infra_beta",
+    "model": "v65_spec_apld",
+    "track": "specialist",
+    "status": "routed"
+  },
+  "MSTR.US": {
+    "specialist": "mstr_crypto_beta",
+    "family": "crypto_beta",
+    "model": "v65_spec_mstr",
+    "track": "specialist",
+    "status": "routed"
+  },
+  "SNDK.US": {
+    "specialist": "sndk_semi_block",
+    "family": "semi_memory",
+    "model": "v65_spec_sndk",
+    "track": "specialist",
+    "status": "routed"
+  },
+  "ASTS.US": {
+    "specialist": "asts_spec_4h",
+    "family": "spec_high_vol",
+    "model": "v65_spec_asts",
+    "track": "specialist",
+    "status": "routed"
+  },
+  "META.US": {
+    "specialist": "meta_vwap_trend",
+    "family": "megacap_quality",
+    "model": "v65_spec_meta",
+    "track": "specialist",
+    "status": "routed"
+  },
+  "GOOG.US": {
+    "specialist": "goog_vwap_trend",
+    "family": "megacap_quality",
+    "model": "v65_spec_goog",
+    "track": "specialist",
+    "status": "routed"
+  },
+  "COIN.US": {
+    "specialist": "coin_crypto_beta",
+    "family": "crypto_beta",
+    "model": "v65_spec_coin",
+    "track": "specialist",
+    "status": "routed"
+  },
+  "CRWV.US": {
+    "specialist": "crwv_demand_bounce",
+    "family": "demand_bounce",
+    "model": "v64_crwv_bounce",
+    "track": "specialist",
+    "status": "routed"
+  },
+  "NVDA.US": {
+    "specialist": "nvda_semi_leader",
+    "family": "semi_leader",
+    "model": "v65_spec_nvda",
+    "track": "specialist",
+    "status": "routed"
+  },
+  "AMD.US": {
+    "specialist": "amd_semi_block",
+    "family": "semi_memory",
+    "model": "v65_spec_amd",
+    "track": "specialist",
+    "status": "routed"
+  },
+  "SMCI.US": {
+    "specialist": "smci_ai_infra",
+    "family": "ai_infra_beta",
+    "model": "v65_spec_smci",
+    "track": "specialist",
+    "status": "routed"
+  },
+  "PLTR.US": {
+    "specialist": "pltr_soft_trend",
+    "family": "software_beta",
+    "model": "v65_spec_pltr",
+    "track": "specialist",
+    "status": "routed"
+  },
+  "HOOD.US": {
+    "specialist": "hood_fintech_beta",
+    "family": "fintech_beta",
+    "model": "v65_spec_hood",
+    "track": "specialist",
+    "status": "routed"
+  },
+  "AMZN.US": {
+    "specialist": "amzn_vwap_trend",
+    "family": "megacap_quality",
+    "model": "v65_spec_amzn",
+    "track": "specialist",
+    "status": "routed"
+  },
+  "MSFT.US": {
+    "specialist": "msft_vwap_trend",
+    "family": "megacap_quality",
+    "model": "v65_spec_msft",
+    "track": "specialist",
+    "status": "routed"
+  },
+  "AAPL.US": {
+    "specialist": "aapl_vwap_trend",
+    "family": "megacap_quality",
+    "model": "v65_spec_aapl",
+    "track": "specialist",
+    "status": "routed"
+  },
+  "_standard_fallback": {
+    "track": "standard",
+    "model": "v39d_confluence",
+    "alt": "v39b_live_adapt",
+    "note": "Used for any symbol not in by_symbol"
   }
 }

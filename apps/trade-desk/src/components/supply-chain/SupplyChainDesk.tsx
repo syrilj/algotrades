@@ -30,7 +30,7 @@ function capLabel(cap: number | null | undefined): string {
   return `${cap}`;
 }
 
-function SupplyChainDeskInner() {
+function SupplyChainDeskInner({ showHeader = true }: { showHeader?: boolean }) {
   const searchParams = useSearchParams();
   const qSymbol = searchParams.get("symbol")?.toUpperCase() ?? "";
 
@@ -103,22 +103,24 @@ function SupplyChainDeskInner() {
   const top = suppliers.slice(0, 3);
   const anchorAction = anchor?.play?.action ?? "";
 
-  return (
-    <div className="td-page">
-      <PageHeader
-        title="Supply Chain"
-        description="Enter a big-cap ticker. Discover its suppliers, read their growth sheets, measure correlation, and find the small-cap plays the big-cap move can pull."
-        meta={
-          result ? (
-            <span className="tabular" style={{ fontFamily: "var(--td-font-mono)" }}>
-              {result.symbol}
-              {anchorAction ? <span style={{ color: "var(--td-ink-400)" }}> · {anchorAction}</span> : null}
-            </span>
-          ) : (
-            <span>Seed a hardware mega-cap or any ticker with a web search</span>
-          )
-        }
-      />
+  const body = (
+    <>
+      {showHeader ? (
+        <PageHeader
+          title="Supply Chain"
+          description="Enter a big-cap ticker. Discover its suppliers, read their growth sheets, measure correlation, and find the small-cap plays the big-cap move can pull."
+          meta={
+            result ? (
+              <span className="tabular" style={{ fontFamily: "var(--td-font-mono)" }}>
+                {result.symbol}
+                {anchorAction ? <span style={{ color: "var(--td-ink-400)" }}> · {anchorAction}</span> : null}
+              </span>
+            ) : (
+              <span>Seed a hardware mega-cap or any ticker with a web search</span>
+            )
+          }
+        />
+      ) : null}
 
       <form onSubmit={handleSubmit} className="td-toolbar" aria-label="Supply chain controls">
         <div className="td-toolbar__row">
@@ -340,20 +342,26 @@ function SupplyChainDeskInner() {
           <p className="td-muted">No suppliers discovered. Try a seed ticker or add OPENAI_API_KEY for web search.</p>
         </div>
       ) : null}
-    </div>
+    </>
   );
+
+  return showHeader ? <div className="td-page">{body}</div> : body;
 }
 
-export default function SupplyChainDesk() {
+export default function SupplyChainDesk({
+  showHeader = true,
+}: {
+  showHeader?: boolean;
+}) {
   return (
     <Suspense
       fallback={
-        <div className="td-page">
+        <div className={showHeader ? "td-page" : undefined}>
           <p className="td-muted">Loading desk…</p>
         </div>
       }
     >
-      <SupplyChainDeskInner />
+      <SupplyChainDeskInner showHeader={showHeader} />
     </Suspense>
   );
 }

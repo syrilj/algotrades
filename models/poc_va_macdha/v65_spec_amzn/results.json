@@ -1,0 +1,17 @@
+{
+  "portfolio": {
+    "total_return": 0.04745155247775945,
+    "max_drawdown": -0.08583702415997865,
+    "sharpe": 0.16946091010303796,
+    "profit_factor": 1.4666,
+    "trade_count": 75,
+    "win_rate": 0.5333333333333333,
+    "final_value": 1047451.5524777595
+  },
+  "generated_utc": "",
+  "codes": [
+    "AMZN.US"
+  ],
+  "start": "2024-08-01",
+  "end": "2026-07-11"
+}

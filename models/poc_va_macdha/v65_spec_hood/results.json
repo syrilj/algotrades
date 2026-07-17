@@ -1,0 +1,17 @@
+{
+  "portfolio": {
+    "total_return": 0.08317551054690142,
+    "max_drawdown": -0.08459198820214327,
+    "sharpe": 0.18429444129545483,
+    "profit_factor": 1.717,
+    "trade_count": 27,
+    "win_rate": 0.6666666666666666,
+    "final_value": 1083175.5105469015
+  },
+  "generated_utc": "",
+  "codes": [
+    "HOOD.US"
+  ],
+  "start": "2024-08-01",
+  "end": "2026-07-11"
+}

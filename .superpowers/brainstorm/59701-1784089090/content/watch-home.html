@@ -1,0 +1,49 @@
+<h2>Where should Watch live?</h2>
+<p class="subtitle">You chose Hub-first. Watch and Execution overlap most — pick the home for the live multi-symbol board.</p>
+
+<div class="section">
+  <div class="split">
+    <div class="mockup">
+      <div class="mockup-header">Option A — under Execution</div>
+      <div class="mockup-body">
+        <div class="mock-nav">Command · Radar · <strong>Execution</strong> · Portfolio · Lab</div>
+        <p style="margin-top:10px"><strong>Execution tabs:</strong></p>
+        <p>Ticket · Watch board · Options · Gamma</p>
+        <p style="margin-top:10px;color:var(--text-muted)">Radar = discovery only (bias, open scan seed, picks, supply chain). When you act on a name, jump into Execution.</p>
+      </div>
+    </div>
+    <div class="mockup">
+      <div class="mockup-header">Option B — under Radar</div>
+      <div class="mockup-body">
+        <div class="mock-nav">Command · <strong>Radar</strong> · Execution · Portfolio · Lab</div>
+        <p style="margin-top:10px"><strong>Radar tabs:</strong></p>
+        <p>Bias · Watch · Picks · Supply chain</p>
+        <p style="margin-top:10px;color:var(--text-muted)">Execution = single-symbol ticket + options only. Scan rows deep-link into Execution ticket.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="exec-watch" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>Watch under Execution (recommended)</h3>
+      <p>Matches your note that Execution ≈ Watch. One place for “what’s hot” + “size the trade.” Radar stays discovery/research bias.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="radar-watch" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>Watch under Radar</h3>
+      <p>Keeps monitoring with scanning. Execution stays pure ticket/risk. Slightly more clicks from board → ticket.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="split-roles" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>Split by role, shared UI</h3>
+      <p>Same shared board component in both places: Radar shows discovery scan; Execution shows account-sized watch + ticket side panel. No dead stubs, one component system.</p>
+    </div>
+  </div>
+</div>

@@ -8,6 +8,8 @@ QUEUE_PATH is monkeypatched to tmp_path so no test ever touches the real
 models/_shared/promotion_queue.json.
 """
 import sys
+import json
+import shutil
 from pathlib import Path
 
 import pytest
@@ -35,7 +37,32 @@ def _candidate(cid: str = CID):
         "model_dir": "/tmp/nonexistent/mut_model",
         "metrics": {"utility": 1.23, "sharpe": 2.1, "ret": 0.9, "dd": -0.11, "n": 55},
         "gates": {"claim_level": "CLAIM", "passed": True},
+        "data_contract": {"source": "local", "interval": "1H"},
     }
+
+
+def _valid_candidate(tmp_path: Path, cid: str = CID):
+    model_dir = tmp_path / "candidate_bundle"
+    model_dir.mkdir()
+    (model_dir / "signal_engine.py").write_text("class SignalEngine:\n    pass\n")
+    (model_dir / "config.json").write_text('{"mode": "daily"}\n')
+    evidence = model_dir / "results.json"
+    evidence.write_text('{"sharpe": 2.1, "n": 55}\n')
+    calibration = model_dir / "calibration.json"
+    calibration.write_text(
+        '{"method": "platt", "status": "passed", '
+        '"probability_calibrated": true, "cross_fitted": true}\n'
+    )
+    candidate = _candidate(cid)
+    candidate.update(
+        {
+            "model_dir": str(model_dir),
+            "evidence": [str(evidence)],
+            "calibration_artifact": str(calibration),
+            "data_contract": {"source": "local", "interval": "1H"},
+        }
+    )
+    return candidate
 
 
 # --- nominate --------------------------------------------------------------
@@ -100,7 +127,8 @@ def test_reject_unknown_id_raises(monkeypatch, tmp_path):
 
 def test_approve_promotes_via_stub_and_marks_approved(monkeypatch, tmp_path):
     _seed_queue_path(monkeypatch, tmp_path)
-    pq.nominate(_candidate())
+    candidate = _valid_candidate(tmp_path)
+    pq.nominate(candidate)
 
     calls = {"promote": 0, "winner": 0}
     from evolve import mutations
@@ -108,16 +136,18 @@ def test_approve_promotes_via_stub_and_marks_approved(monkeypatch, tmp_path):
     def fake_promote(mut, *, family="poc_va_macdha", version_name=None):
         calls["promote"] += 1
         assert mut["id"] == CID
-        assert mut["model_dir"] == "/tmp/nonexistent/mut_model"
-        return Path("/tmp/models/poc_va_macdha/v_evolve_stub")
+        assert mut["model_dir"] == candidate["model_dir"]
+        dest = tmp_path / "models" / "poc_va_macdha" / "v_evolve_stub"
+        shutil.copytree(mut["model_dir"], dest)
+        return dest
 
-    def fake_update_winner(family, version, entry):
+    def fake_update_control_plane(family, version, dest, entry):
         calls["winner"] += 1
         assert version == "v_evolve_stub"
-        return Path("/tmp/WINNER.json")
+        return Path("/tmp/DEPLOYMENT_MANIFEST.json"), Path("/tmp/WINNER.json")
 
     monkeypatch.setattr(mutations, "promote_mutation_to_models", fake_promote)
-    monkeypatch.setattr(pq, "_update_winner", fake_update_winner)
+    monkeypatch.setattr(pq, "_update_deployment_control_plane", fake_update_control_plane)
     monkeypatch.setattr(pq, "_record_promotion_finding", lambda *a, **k: None)
 
     out = pq.approve(CID)
@@ -128,6 +158,84 @@ def test_approve_promotes_via_stub_and_marks_approved(monkeypatch, tmp_path):
     assert out["promoted_version"] == "v_evolve_stub"
     q = pq._load_queue()
     assert q[0]["status"] == "approved"
+
+
+def test_approve_requires_pending_passed_and_integrity(monkeypatch, tmp_path):
+    _seed_queue_path(monkeypatch, tmp_path)
+    pq.nominate(_candidate())
+    with pytest.raises(ValueError, match="integrity snapshot"):
+        pq.approve(CID)
+
+    q = pq._load_queue()
+    q[0]["status"] = "rejected"
+    pq._write_queue(q)
+    with pytest.raises(ValueError, match="only pending"):
+        pq.approve(CID)
+
+
+def test_approve_rejects_bundle_changed_after_nomination(monkeypatch, tmp_path):
+    _seed_queue_path(monkeypatch, tmp_path)
+    candidate = _valid_candidate(tmp_path)
+    pq.nominate(candidate)
+    (Path(candidate["model_dir"]) / "signal_engine.py").write_text("tampered = True\n")
+    with pytest.raises(ValueError, match="bytes changed"):
+        pq.approve(CID)
+
+
+def test_approve_rejects_candidate_that_did_not_pass_gates(monkeypatch, tmp_path):
+    _seed_queue_path(monkeypatch, tmp_path)
+    candidate = _valid_candidate(tmp_path)
+    candidate["gates"]["passed"] = False
+    pq.nominate(candidate)
+    with pytest.raises(ValueError, match="gates did not pass"):
+        pq.approve(CID)
+
+
+def test_approve_rejects_identity_or_uncrossfitted_calibration(monkeypatch, tmp_path):
+    _seed_queue_path(monkeypatch, tmp_path)
+    candidate = _valid_candidate(tmp_path)
+    calibration = Path(candidate["calibration_artifact"])
+    calibration.write_text(
+        '{"status": "active", "probability_calibrated": false, '
+        '"cross_fitted": false, "calibration_type": "identity"}\n'
+    )
+    pq.nominate(candidate)
+    with pytest.raises(ValueError, match="cross-fitted probability calibrator"):
+        pq.approve(CID)
+
+
+def test_approve_atomically_updates_manifest_and_winner(monkeypatch, tmp_path):
+    monkeypatch.setattr(pq, "ROOT", tmp_path)
+    _seed_queue_path(monkeypatch, tmp_path)
+    family_dir = tmp_path / "models" / "poc_va_macdha"
+    family_dir.mkdir(parents=True)
+    (family_dir / "DEPLOYMENT_MANIFEST.json").write_text(
+        json.dumps({"schema_version": 1, "active": {"equity_model": "v72_dual_sleeve"}})
+    )
+    (family_dir / "WINNER.json").write_text(json.dumps({"winner": "v72_dual_sleeve"}))
+    candidate = _valid_candidate(tmp_path, cid="candidate_atomic")
+    pq.nominate(candidate)
+
+    from evolve import mutations
+
+    def fake_promote(mut, *, family="poc_va_macdha", version_name=None):
+        dest = family_dir / "v_evolve_atomic"
+        shutil.copytree(mut["model_dir"], dest)
+        return dest
+
+    monkeypatch.setattr(mutations, "promote_mutation_to_models", fake_promote)
+    monkeypatch.setattr(pq, "_record_promotion_finding", lambda *a, **k: None)
+    out = pq.approve("candidate_atomic")
+
+    manifest = json.loads((family_dir / "DEPLOYMENT_MANIFEST.json").read_text())
+    winner = json.loads((family_dir / "WINNER.json").read_text())
+    assert manifest["active"]["equity_model"] == "v_evolve_atomic"
+    assert manifest["rollback_model"] == "v72_dual_sleeve"
+    assert manifest["promotion_evidence"][0]["sha256"]
+    assert manifest["calibration"]["sha256"]
+    assert winner["winner"] == "v_evolve_atomic"
+    assert winner["previous_winner"] == "v72_dual_sleeve"
+    assert out["status"] == "approved"
 
 
 # --- winner_health (read-only decay check) ---------------------------------

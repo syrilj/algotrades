@@ -10,12 +10,13 @@ import type {
   EvolveRow,
   EvolveRunSummary,
 } from "@/lib/evolve";
-import type { ApiEnvelope } from "@/lib/types";
+import type { ApiEnvelope, PromotionPayload } from "@/lib/types";
 import { modelHref } from "@/lib/routes";
 import { PageHeader } from "@/components/shell/PageHeader";
 import { formatNum, formatPct } from "@/lib/format";
 import { Chip } from "@/components/ui/Chip";
 import { EmptyState } from "@/components/ui/EmptyState";
+import { Stat } from "@/components/ui/Stat";
 import { colorVarFor } from "@/lib/actionColors";
 
 type BoardPayload = {
@@ -94,6 +95,8 @@ export function EvolveDesk() {
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<EvolveRow | null>(null);
   const [audits, setAudits] = useState<AuditReport[]>([]);
+  const [promotion, setPromotion] = useState<PromotionPayload | null>(null);
+  const [actionPendingId, setActionPendingId] = useState<string | null>(null);
 
   const load = useCallback(async (id?: string) => {
     setLoading(true);
@@ -108,6 +111,13 @@ export function EvolveDesk() {
         if (data.run.track?.includes("options")) setTrack("options");
         else setTrack("equity");
       }
+
+      // Load promotion queue
+      const promoRes = await fetch("/api/promotion", { cache: "no-store" });
+      const promoBody = (await promoRes.json()) as ApiEnvelope<PromotionPayload>;
+      if (promoBody.ok) {
+        setPromotion(promoBody.data ?? null);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Load failed");
       setBoard(null);
@@ -115,6 +125,35 @@ export function EvolveDesk() {
       setLoading(false);
     }
   }, []);
+
+  const handlePromotionAction = useCallback(async (id: string, action: "approve" | "reject", reason?: string) => {
+    setActionPendingId(id);
+    setError(null);
+    try {
+      const res = await fetch("/api/promotion", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, id, reason }),
+      });
+      const body = (await res.json()) as ApiEnvelope<unknown>;
+      if (!body.ok) throw new Error(body.error || "Promotion action failed");
+
+      // Refetch promotion queue
+      const promoRes = await fetch("/api/promotion", { cache: "no-store" });
+      const promoBody = (await promoRes.json()) as ApiEnvelope<PromotionPayload>;
+      if (promoBody.ok) {
+        setPromotion(promoBody.data ?? null);
+      }
+
+      // Reload board to capture winner updates if any
+      const boardData = await fetchBoard(runId || undefined);
+      setBoard(boardData);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Promotion action failed");
+    } finally {
+      setActionPendingId(null);
+    }
+  }, [runId]);
 
   useEffect(() => {
     void load();
@@ -298,6 +337,20 @@ export function EvolveDesk() {
         }
       />
 
+      {promotion?.winner_health?.degraded && (
+        <div
+          className="mb-4 px-4 py-3 rounded-lg border text-sm font-semibold flex items-center gap-2"
+          style={{
+            color: "var(--td-action-avoid)",
+            borderColor: "var(--td-action-avoid)",
+            background: "color-mix(in srgb, var(--td-action-avoid) 10%, transparent)",
+          }}
+        >
+          <span className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: "var(--td-action-avoid)" }} />
+          WINNER degraded — live WR {formatPct(promotion.winner_health.live_wr)} over last {promotion.winner_health.live_n} trades (floor {formatPct(promotion.winner_health.threshold)})
+        </div>
+      )}
+
       {error ? (
         <p className="td-alert td-alert--error" role="alert">
           {error}
@@ -369,7 +422,7 @@ export function EvolveDesk() {
             {winners?.equity || "—"}
           </p>
           <Link
-            href={winners?.equity ? modelHref(winners.equity) : "/leaderboard"}
+            href={winners?.equity ? modelHref(winners.equity) : "/research?view=leaderboard"}
             className="mt-2 inline-block text-[12px] no-underline"
             style={{ color: "var(--td-ink-300)" }}
           >
@@ -455,6 +508,107 @@ export function EvolveDesk() {
           </div>
         </div>
       ) : null}
+
+      {/* Promotion queue */}
+      <div className="mb-6">
+        <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--td-ink-100)" }}>
+          Promotion Queue
+        </h3>
+        {!promotion?.queue || promotion.queue.filter(q => q.status === "pending").length === 0 ? (
+          <EmptyState
+            icon={Check}
+            title="Promotion Queue Empty"
+            hint="No pending model promotions. Run evolve loop or nominate candidates via CLI."
+          />
+        ) : (
+          <div className="td-panel p-4 flex flex-col gap-4">
+            {promotion.queue
+              .filter((entry) => entry.status === "pending")
+              .map((entry) => {
+                const passed = entry.gates?.passed;
+                return (
+                  <div
+                    key={entry.id}
+                    className="flex flex-col md:flex-row md:items-center justify-between p-4 border rounded-lg gap-4"
+                    style={{ borderColor: "var(--td-border)", background: "var(--td-ink-950)" }}
+                  >
+                    <div className="flex-1 flex flex-col gap-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-sm font-semibold" style={{ color: "var(--td-ink-100)" }}>
+                          {entry.id}
+                        </span>
+                        {entry.campaign && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded border" style={{ borderColor: "var(--td-border)", color: "var(--td-ink-400)" }}>
+                            {entry.campaign}
+                          </span>
+                        )}
+                        <span className="text-[10px] text-muted-foreground" style={{ color: "var(--td-ink-500)" }}>
+                          {new Date(entry.ts).toLocaleString()}
+                        </span>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+                        <Stat label="Utility" value={formatNum(entry.metrics?.utility, 3)} />
+                        <Stat label="Return" value={formatPct(entry.metrics?.ret)} />
+                        <Stat label="Sharpe" value={formatNum(entry.metrics?.sharpe)} />
+                        <Stat label="Max DD" value={formatPct(entry.metrics?.dd)} />
+                        <Stat label="Trades" value={String(entry.metrics?.n ?? "—")} />
+                      </div>
+
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-[10px] uppercase font-bold" style={{ color: "var(--td-ink-500)" }}>
+                          Gates:
+                        </span>
+                        <Chip
+                          label={entry.gates?.claim_level || "UNKNOWN"}
+                          colorVar={colorVarFor("claim", entry.gates?.claim_level)}
+                        />
+                        <Chip
+                          label={passed ? "PASS" : "FAIL"}
+                          colorVar={passed ? "var(--td-gate-pass)" : "var(--td-gate-fail)"}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        className="td-btn text-xs font-semibold px-3 py-1.5 rounded"
+                        style={{
+                          backgroundColor: "color-mix(in srgb, var(--td-action-buy-now) 15%, transparent)",
+                          color: "var(--td-action-buy-now)",
+                          border: "1px solid var(--td-action-buy-now)",
+                        }}
+                        disabled={actionPendingId !== null}
+                        onClick={() => handlePromotionAction(entry.id, "approve")}
+                      >
+                        {actionPendingId === entry.id ? "Approving..." : "Approve"}
+                      </button>
+                      <button
+                        type="button"
+                        className="td-btn text-xs font-semibold px-3 py-1.5 rounded"
+                        style={{
+                          backgroundColor: "color-mix(in srgb, var(--td-action-avoid) 15%, transparent)",
+                          color: "var(--td-action-avoid)",
+                          border: "1px solid var(--td-action-avoid)",
+                        }}
+                        disabled={actionPendingId !== null}
+                        onClick={() => {
+                          const reason = prompt("Enter rejection reason:");
+                          if (reason !== null) {
+                            handlePromotionAction(entry.id, "reject", reason);
+                          }
+                        }}
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+          </div>
+        )}
+      </div>
 
       {/* Meta strip */}
       <div
@@ -724,7 +878,7 @@ export function EvolveDesk() {
                   Analyze with model
                 </Link>
                 <Link
-                  href="/leaderboard"
+                  href="/research?view=leaderboard"
                   className="td-btn td-btn-ghost no-underline text-center"
                 >
                   Registry leaderboard

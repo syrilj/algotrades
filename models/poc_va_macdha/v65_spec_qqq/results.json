@@ -1,0 +1,17 @@
+{
+  "portfolio": {
+    "total_return": 0.07275585336802948,
+    "max_drawdown": -0.048088991588980785,
+    "sharpe": 0.7474859971879542,
+    "profit_factor": 1.9915,
+    "trade_count": 19,
+    "win_rate": 0.47368421052631576,
+    "final_value": 1072755.8533680295
+  },
+  "generated_utc": "",
+  "codes": [
+    "QQQ.US"
+  ],
+  "start": "2024-08-01",
+  "end": "2026-07-11"
+}

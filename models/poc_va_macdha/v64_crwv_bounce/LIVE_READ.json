@@ -1,0 +1,94 @@
+{
+  "symbol": "CRWV",
+  "price": 79.94999694824219,
+  "prev_close": 83.31,
+  "day_change_pct": -4.033132939332395,
+  "specialist_signal": 0.8779576740788849,
+  "specialist_confidence_pct": 83.3,
+  "verdict": "BUY ZONE / bounce long bias",
+  "why_global_models_low_conf": "CRWV is multi-week downtrend (below SMA20/50/EMA21). v39d/global meta require HTF green + VA/POC confluence designed for trend continuation. Oversold bounce at put-wall is a different edge \u2014 global 22% conf is expected, not a price call that \"levels are wrong\".",
+  "structure": {
+    "RSI14": 27.1,
+    "ATR14_pct": 8.9,
+    "day_range": "78.40 \u2013 85.91",
+    "today_vwap_approx": 80.91,
+    "20d_VAL": 79.1746012878418,
+    "20d_POC": 83.30580001831055,
+    "20d_low": 78.4,
+    "swing_low_20": 78.4000015258789,
+    "SMA10": 86.88,
+    "SMA20": 96.72,
+    "levels": {
+      "day_low_zone": 78.4,
+      "put_wall_75": 75.0,
+      "put_wall_80": 80.0,
+      "val_20d": 79.1746012878418,
+      "poc_20d": 83.30580001831055,
+      "vwap_today": 95.9281146890974,
+      "call_85": 85.0,
+      "call_90": 90.0
+    }
+  },
+  "options_into_day": {
+    "call_vol_gt_put_vol": true,
+    "near_exp": "2026-07-17",
+    "call_volume_leaders": [
+      90,
+      95,
+      100,
+      85,
+      80
+    ],
+    "put_oi_walls": [
+      75,
+      70,
+      80,
+      62.5,
+      65
+    ],
+    "put_vol_focus": [
+      80,
+      75,
+      72.5,
+      70
+    ],
+    "read": "Calls are active up into 85/90/95 (bounce-to-magnet trades), while heavy put OI sits at 75/70/80. Spot ~80 is wedged between put wall 80 and day low 78.40. That supports a bounce attempt IF 78.40-75 holds; failure through 75 opens air to 70."
+  },
+  "playbook": {
+    "invalidation": "Hourly close under 78.40 then 75 put wall",
+    "trigger_long": "Reclaim today VWAP (~80.9) with HA green + volume, or stop-volume wick hold at 78.4-80",
+    "targets": [
+      "82.5-83 (prior open/VAL band)",
+      "85 call magnet",
+      "90 major call OI"
+    ],
+    "size": "Half-size until VWAP reclaim; full only if demand_score high and no dump"
+  },
+  "engine_read": {
+    "code": "CRWV.US",
+    "price": 79.94999694824219,
+    "atr": 1.7403355522639152,
+    "val": 79.1746012878418,
+    "poc": 83.30580001831055,
+    "vah": 90.01899795532226,
+    "swing_low_20": 78.4000015258789,
+    "vwap": 95.9281146890974,
+    "demand_score": 0.961690873009889,
+    "htf_green": true,
+    "local_ha_green": true,
+    "vol_confirm": false,
+    "stop_vol": false,
+    "dump": false,
+    "put_walls": [
+      75.0,
+      80.0,
+      70.0
+    ],
+    "call_magnets": [
+      85.0,
+      90.0,
+      95.0
+    ],
+    "signal": 0.8779576740788849
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "portfolio": {
+    "total_return": 0.11480517879416197,
+    "max_drawdown": -0.13971915992527165,
+    "sharpe": 0.4466717836263475,
+    "profit_factor": 1.3005,
+    "trade_count": 43,
+    "win_rate": 0.4186046511627907,
+    "final_value": 1114805.1787941619
+  },
+  "generated_utc": "",
+  "codes": [
+    "MSTR.US"
+  ],
+  "start": "2024-08-01",
+  "end": "2026-07-11"
+}

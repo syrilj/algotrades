@@ -571,7 +571,7 @@ function FactorTiltPanel({
   );
 }
 
-export function PortfolioDesk() {
+export function PortfolioDesk({ showHeader = true }: { showHeader?: boolean }) {
   const [tab, setTab] = useState<PortfolioMethod>("portfolio");
   const { result, loading, error, run } = usePortfolio();
 
@@ -579,17 +579,22 @@ export function PortfolioDesk() {
     run(payload.method as PortfolioMethod, payload);
   };
 
-  return (
-    <div className="td-page">
-      <PageHeader
-        title="Portfolio"
-        description="Modern portfolio construction: mean-variance, efficient frontier, risk parity, and factor tilt."
-      />
+  const body = (
+    <>
+      {showHeader ? (
+        <PageHeader
+          title="Portfolio"
+          description="Construction metrics on inputs you set — mean-variance, efficient frontier, risk parity, and factor tilt."
+        />
+      ) : null}
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2" role="tablist" aria-label="Portfolio methods">
         {TABS.map((t) => (
           <button
             key={t.key}
+            type="button"
+            role="tab"
+            aria-selected={tab === t.key}
             className={`td-btn ${tab === t.key ? "td-btn-primary" : "td-btn-ghost"}`}
             onClick={() => setTab(t.key)}
           >
@@ -598,15 +603,19 @@ export function PortfolioDesk() {
         ))}
       </div>
 
-      {tab === "portfolio" ? (
-        <PortfolioBuilder />
-      ) : tab === "mpt" ? (
-        <MptPanel result={result} loading={loading} error={error} onRun={runTab} />
-      ) : tab === "risk_parity" ? (
-        <RiskParityPanel result={result} loading={loading} error={error} onRun={runTab} />
-      ) : (
-        <FactorTiltPanel result={result} loading={loading} error={error} onRun={runTab} />
-      )}
-    </div>
+      <div role="tabpanel" aria-label={TABS.find((t) => t.key === tab)?.label}>
+        {tab === "portfolio" ? (
+          <PortfolioBuilder />
+        ) : tab === "mpt" ? (
+          <MptPanel result={result} loading={loading} error={error} onRun={runTab} />
+        ) : tab === "risk_parity" ? (
+          <RiskParityPanel result={result} loading={loading} error={error} onRun={runTab} />
+        ) : (
+          <FactorTiltPanel result={result} loading={loading} error={error} onRun={runTab} />
+        )}
+      </div>
+    </>
   );
+
+  return showHeader ? <div className="td-page">{body}</div> : <div className="flex flex-col gap-3">{body}</div>;
 }

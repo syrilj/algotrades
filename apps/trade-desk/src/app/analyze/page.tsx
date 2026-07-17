@@ -1,8 +1,10 @@
 import { redirect } from "next/navigation";
 
+export const dynamic = "force-dynamic";
+
 /**
  * Legacy `/analyze` path — deep-links from older UI and bookmarks.
- * Analyze lives at `/`; preserve query (symbol, model).
+ * Analyze lives at `/command`; preserve query (symbol, model).
  */
 export default async function AnalyzeRedirectPage({
   searchParams,
@@ -20,5 +22,5 @@ export default async function AnalyzeRedirectPage({
     }
   }
   const qs = params.toString();
-  redirect(qs ? `/?${qs}` : "/");
+  redirect(qs ? `/command?${qs}` : "/command");
 }

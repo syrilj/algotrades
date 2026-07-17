@@ -71,6 +71,9 @@ export interface AnalyzeState {
   vol_surge?: boolean;
   vol_dry?: boolean;
   flags?: AnalyzeFlags;
+  confidence_source?: string;
+  engine_confidence?: number | null;
+  confidence_kind?: string;
   [key: string]: unknown;
 }
 
@@ -90,6 +93,7 @@ export interface PlainPlan {
   why: string;
   do_next: string;
   confidence_note?: string;
+  checklist?: { ok: boolean; label: string; key: string }[];
 }
 
 export interface ModelRankRow {
@@ -135,6 +139,8 @@ export interface EngineModelInfo {
   /** equity = desk-native; options = wrapper (desk unwraps to equity child) */
   kind?: "equity" | "options" | "other";
   desk_compatible?: boolean;
+  /** Recent research engines prioritised in pickers */
+  featured?: boolean;
   metrics?: Partial<ModelRankRow>;
 }
 
@@ -144,6 +150,7 @@ export interface ModelsCatalog {
   previous_winner?: string | null;
   engines: string[];
   desk_engines?: string[];
+  featured_desk_engines?: string[];
   all_versions: string[];
   models: EngineModelInfo[];
   updated_at?: string | null;
@@ -241,6 +248,22 @@ export interface LiveTicket {
   steps?: string[];
   confidence_state?: "ENTER" | "WATCH" | "ABSTAIN" | string;
   confidence_size_limit?: number;
+  proposed_risk_pct?: number;
+  proposed_max_loss_dollars?: number;
+  risk_pct_adapted?: number;
+  max_loss_adapted?: number;
+  execution_readiness?: string;
+  execution_blocked?: boolean;
+}
+
+export interface ExecutionReadiness {
+  schema_version?: string;
+  ready?: boolean;
+  status?: "READY_FOR_MANUAL_REVIEW" | "BLOCKED" | string;
+  checks?: Record<string, { passed?: boolean; detail?: string }>;
+  blockers?: string[];
+  human_approval_required?: boolean;
+  automatic_transmission_enabled?: boolean;
 }
 
 export interface LiveConfidence {
@@ -256,12 +279,18 @@ export interface LiveConfidence {
   model_version?: string;
   calibration_version?: string | null;
   calibration_available?: boolean;
+  /** True when using identity fallback (no model-matched artifact). */
+  uncalibrated?: boolean;
   data_freshness?: {
     available?: boolean;
     stale?: boolean;
     asof_utc?: string | null;
     age_minutes?: number | null;
     max_age_minutes?: number;
+    market_session?: string;
+    freshness_basis?: string;
+    next_open_utc?: string;
+    previous_close_utc?: string;
     error?: string;
   };
   reasons?: string[];
@@ -270,12 +299,16 @@ export interface LiveConfidence {
 export interface LivePlanResponse {
   ok: boolean;
   symbol: string;
+  /** Engine id the plan was generated with (tools/live_plan.py). */
+  model_used?: string;
   account?: number;
   peak?: number;
   drawdown?: number;
   live?: {
     go_long?: boolean;
+    go_short?: boolean;
     soft_long?: boolean;
+    soft_short?: boolean;
     confidence?: number;
     vol_z?: number;
     price?: number;
@@ -285,6 +318,10 @@ export interface LivePlanResponse {
     macd_positive?: boolean;
     signal_strength?: number;
     timestamp?: string;
+    source?: "lse" | "yfinance" | string;
+    interval?: string;
+    market_session?: string;
+    freshness?: LiveConfidence["data_freshness"];
     error?: string;
   };
   macro?: {
@@ -306,12 +343,28 @@ export interface LivePlanResponse {
   };
   blended_confidence?: number;
   confidence?: LiveConfidence;
+  gex?: GammaResponse | null;
   decision_support_ready?: boolean;
+  execution_readiness?: ExecutionReadiness;
+  execution_risk?: {
+    proposal_risk_pct?: number;
+    adapt_mult?: number;
+    confidence_size_limit?: number;
+    uncapped_risk_pct?: number;
+    hard_cap_risk_pct?: number;
+    effective_risk_pct?: number;
+    effective_max_loss_dollars?: number;
+    capped?: boolean;
+  };
+  portfolio_state_verified?: boolean;
   shadow_event_id?: string | null;
   decision?: {
     mode?: RiskMode;
     vehicle?: string;
     action?: string;
+    analysis_action?: string;
+    confidence_state?: "ENTER" | "WATCH" | "ABSTAIN" | string;
+    execution_blocked?: boolean;
     size_mult?: number;
     risk_pct?: number;
     max_loss_dollars?: number;
@@ -348,15 +401,20 @@ export interface LiveScanRow {
   mode: RiskMode;
   vehicle: string;
   action: string;
+  /** Operator setup label (BUY NOW / BREAKOUT WATCH / WAIT / AVOID / …). */
+  analysis_action?: string;
   conviction?: number;
   risk_pct?: number;
   max_loss_dollars?: number;
   vol_z?: number;
   price?: number;
   go_long?: boolean;
+  soft_long?: boolean;
   blended_confidence?: number;
   confidence_state?: "ENTER" | "WATCH" | "ABSTAIN" | string;
   calibrated_probability?: number | null;
+  uncalibrated?: boolean;
+  do_next?: string | null;
 }
 
 /** Options desk: live mode + structure pick + playbook */
@@ -446,6 +504,109 @@ export interface RiskAssessmentResponse {
   asof_utc: string;
 }
 
+/** Research-only vol package score from tools/vol_package_score.py */
+export interface VolPackageTemplate {
+  template: string;
+  score: number;
+  edge_after_cost_proxy?: number | null;
+  action: "consider" | "stand_aside" | "avoid" | string;
+  reasons?: string[];
+}
+
+export interface VolPackageWarning {
+  severity: "info" | "watch" | "danger" | string;
+  code: string;
+  message: string;
+}
+
+export interface VolPackageScore {
+  ok: boolean;
+  symbol?: string;
+  features?: {
+    symbol?: string;
+    spot?: number;
+    rv_har_ann?: number;
+    rv_5d_ann?: number;
+    rv_21d_ann?: number;
+    atm_iv?: number;
+    iv_rv_spread?: number;
+    term_slope?: number;
+    skew_25d?: number;
+    near_dte?: number | null;
+    next_dte?: number | null;
+    call_volume?: number;
+    put_volume?: number;
+    call_oi?: number;
+    put_oi?: number;
+    put_call_vol_ratio?: number;
+    put_call_oi_ratio?: number;
+    spot_ret_1d?: number;
+    spot_ret_5d?: number;
+    data_quality?: string;
+    reasons?: string[];
+  };
+  packages?: VolPackageTemplate[];
+  recommended?: {
+    template: string;
+    action: string;
+    score?: number;
+    edge_after_cost_proxy?: number | null;
+    reasons?: string[];
+  };
+  warnings?: VolPackageWarning[];
+  guardrails?: {
+    max_risk_pct?: number;
+    cost_proxy_vol?: number;
+    research_only?: boolean;
+    auto_trade?: boolean;
+    does_not_set_options_attack?: boolean;
+  };
+  asof_utc?: string;
+  error?: string;
+}
+
+/** Single unusual options print/flag (LSE tape preferred; chain proxy fallback). */
+export interface UnusualOptionsFlag {
+  symbol: string;
+  expiry: string;
+  dte: number;
+  right: "C" | "P" | string;
+  strike: number;
+  spot?: number;
+  volume: number;
+  open_interest?: number;
+  vol_oi?: number | null;
+  mid?: number | null;
+  premium?: number | null;
+  iv?: number | null;
+  moneyness_pct?: number | null;
+  score: number;
+  severity?: "high" | "watch" | "info" | string;
+  reasons: string[];
+  reason?: string;
+  unusual?: boolean;
+  methodology?: string;
+}
+
+export interface UnusualOptionsFlow {
+  ok: boolean;
+  symbol: string;
+  spot?: number;
+  n_scanned?: number;
+  n_flagged?: number;
+  flags: UnusualOptionsFlag[];
+  unusual?: UnusualOptionsFlag[];
+  methodology?: string;
+  methodology_note?: string;
+  asof_utc?: string;
+  session_label?: string;
+  error?: string;
+  expiries_used?: string[];
+  bias?: "call" | "put" | "balanced" | string;
+  upstream_error?: string;
+  fallback_source?: string;
+}
+
 export interface OptionsPlanResponse {
   ok: boolean;
   symbol: string;
@@ -456,16 +617,73 @@ export interface OptionsPlanResponse {
   ticket?: LiveTicket | null;
   live?: LivePlanResponse["live"] | null;
   macro?: LivePlanResponse["macro"] | null;
+  /** Model path / calibrated confidence when live plan succeeds. */
+  model?: LivePlanResponse["model"] | null;
+  confidence?: LivePlanResponse["confidence"] | null;
   options_from_ticket?: LivePlanResponse["options"];
   structure?: OptionsStructure | null;
   structure_error?: string | null;
   live_error?: string | null;
+  /** IV–RV package scores; null if scorer failed (directional plan still valid). */
+  vol_package?: VolPackageScore | null;
+  vol_package_error?: string | null;
+  /** Same-day unusual options activity (LSE prints preferred); partial failure OK. */
+  unusual_flow?: UnusualOptionsFlow | null;
+  unusual_flow_error?: string | null;
   playbook: OptionsPlaybook;
   research: {
     v22_variant: string;
     robust_path: string;
     note: string;
+    options_winner?: string;
+    vol_program?: string;
   };
+  asof_utc?: string;
+}
+
+export interface OptionsBookConfidenceRead {
+  score: number;
+  label: "HIGH" | "MEDIUM" | "LOW" | "AVOID" | string;
+  stance: string;
+  reasons: string[];
+}
+
+export interface OptionsBookRow {
+  symbol: string;
+  input_symbol?: string;
+  structure?: OptionsStructure | null;
+  vol_package?: {
+    ok?: boolean;
+    recommended?: VolPackageScore["recommended"];
+    warnings?: VolPackageWarning[];
+    features?: Record<string, number | string | null | undefined>;
+    error?: string;
+  } | null;
+  unusual_flow?: {
+    ok?: boolean;
+    n_flagged?: number;
+    calls?: number;
+    puts?: number;
+    premium?: number;
+    bias?: string;
+    error?: string;
+  } | null;
+  confidence_read?: OptionsBookConfidenceRead;
+  preferred?: boolean;
+  error?: string;
+  asof_utc?: string;
+}
+
+export interface OptionsBookScanResponse {
+  ok: boolean;
+  account?: number;
+  risk_pct?: number;
+  book: string[];
+  rows: OptionsBookRow[];
+  best?: string | null;
+  n?: number;
+  errors?: string[];
+  note?: string;
   asof_utc?: string;
 }
 
@@ -474,6 +692,7 @@ export interface LiveScanResponse {
   account?: number;
   macro?: LivePlanResponse["macro"];
   count?: number;
+  use_model?: boolean;
   rows?: LiveScanRow[];
   asof_utc?: string;
 }
@@ -667,8 +886,26 @@ export interface RankerRow {
   live?: RankerLiveStats | null;
   live_blend_applied?: boolean;
   pricing?: string;
+  /** Evidence-gated 0-1 confidence (Wilson-bound edge × sample × consistency × DD guard). */
+  confidence?: number;
+  confidence_parts?: Record<string, number>;
+  confidence_reasons?: string[];
   status: "ok" | "error" | "pending";
   error?: string | null;
+}
+/** Symbol-level highest-confidence engine read; abstains instead of forcing a pick. */
+export interface RankerRead {
+  schema: number;
+  symbol: string;
+  horizon: "day" | "swing" | "position" | string;
+  asof?: string | null;
+  verdict: "TRUST" | "WATCH" | "STAND_ASIDE";
+  model: string | null;
+  confidence: number;
+  thresholds: { watch: number; enter: number };
+  runner_up?: { model: string; confidence: number } | null;
+  gap?: number | null;
+  reasons: string[];
 }
 export interface RankerResponse {
   schema: number;
@@ -686,6 +923,7 @@ export interface RankerResponse {
   exists: boolean;
   stale: boolean;
   age_days?: number;
+  read?: RankerRead;
 }
 
 /** --- Paper ledger (tools/paper_ledger.py --json) --- */
@@ -768,6 +1006,8 @@ export interface GammaResponse {
   lse_error: string | null;
   options_asof?: string | null;
   asof_utc: string;
+  /** Full listed option expiries from the provider (for desk date pickers). */
+  available_expiries?: string[];
   expiries_used: string[];
   net_dealer_gex: number;
   near_spot_dealer_gex: number;
@@ -794,9 +1034,200 @@ export interface GammaResponse {
   n_contracts: number;
   weight: string;
   sign_convention: string;
+  exposure_kind?: "dealer_positioning_estimate" | "intraday_gamma_flow_proxy" | string;
+  formula?: string;
+  unit?: string;
+  sign_assumption?: string;
+  price_consistent?: boolean;
+  price_divergence_pct?: number;
+  warnings?: string[];
   squeeze_score?: number;
   squeeze_label?: "bullish_squeeze" | "bearish_squeeze" | "neutral";
   squeeze_components?: Record<string, number>;
   by_strike: GammaStrike[];
   error?: string;
+}
+
+export interface AnalysisDriver {
+  name: string;
+  value: string;
+  impact: "positive" | "negative" | "neutral";
+}
+
+export interface AnalysisTicket {
+  mode?: string;
+  vehicle?: string;
+  action?: string;
+  symbol?: string;
+  max_loss_dollars?: number | null;
+  risk_pct?: number | null;
+  conviction?: number | null;
+  steps?: string[];
+  exit_rules?: Record<string, string>;
+}
+
+export interface AnalysisSuggestion {
+  ticket: AnalysisTicket;
+  options?: {
+    action?: string;
+    structure?: string;
+    expiry?: string;
+    dte?: number;
+    long_strike?: number | null;
+    short_strike?: number | null;
+    debit_per_share?: number | null;
+    max_loss_1_contract?: number | null;
+    budget?: number | null;
+    long_delta?: number | null;
+    reason?: string;
+  } | null;
+  rationale: string;
+  drivers: AnalysisDriver[];
+  alternatives: string[];
+}
+
+export interface AnalysisDecisionConfidence {
+  state?: string;
+  band?: string;
+  raw_probability?: number | null;
+  calibrated_probability?: number | null;
+  size_limit?: number | null;
+  evidence?: string[];
+  failed_checks?: string[];
+  reasons?: string[];
+}
+
+export interface AnalysisDecisionSizing {
+  price?: number | null;
+  entry?: number | null;
+  stop?: number | null;
+  risk_per_share?: number | null;
+  shares?: number;
+  notional?: number | null;
+  target?: number | null;
+  side?: string;
+}
+
+export interface AnalysisDecision {
+  confidence_state?: string;
+  blended_confidence?: number | null;
+  mode?: string;
+  vehicle?: string;
+  /** Operator setup label (BUY NOW / BREAKOUT WATCH / AVOID / …). */
+  action?: string;
+  analysis_action?: string;
+  risk_manager_action?: string;
+  execution_action?: string;
+  execution_blocked?: boolean;
+  risk_pct?: number | null;
+  max_loss_dollars?: number | null;
+  conviction?: number | null;
+  reasons?: string[];
+  exit_rules?: Record<string, string>;
+  confidence?: AnalysisDecisionConfidence;
+  sizing?: AnalysisDecisionSizing;
+}
+
+export interface AnalysisFacts {
+  symbol?: string;
+  price?: number | null;
+  asof_utc?: string;
+  live: {
+    price?: number | null;
+    vol_z?: number | null;
+    atr_pct?: number | null;
+    go_long?: boolean;
+    go_short?: boolean;
+    above_vwap?: boolean;
+    swing_uptrend?: boolean;
+    macd_positive?: boolean;
+    signal_strength?: number | null;
+    timestamp?: string;
+  };
+  macro: {
+    qqq_ok?: boolean;
+    macro_ok?: boolean;
+    defensive?: boolean;
+    qqq_trend?: string | null;
+    xlp_spy_ratio_state?: string | null;
+  };
+  gex: {
+    regime?: string;
+    gex_sign?: number | null;
+    spot?: number | null;
+    call_wall?: number | null;
+    put_wall?: number | null;
+    approx_flip_strike?: number | null;
+    squeeze_score?: number | null;
+    squeeze_label?: string;
+    expected_move_pct?: number | null;
+    max_pain?: number | null;
+  };
+  model: {
+    model?: string;
+    ok?: boolean;
+    confidence?: number | null;
+    setup_ok?: boolean | null;
+    entry?: number | null;
+    stop?: number | null;
+    action_hint?: string | null;
+    raw_probability_source?: string | null;
+  };
+  top_models: ModelRankRow[];
+}
+
+export interface AnalysisReport {
+  facts: AnalysisFacts;
+  decision: AnalysisDecision;
+  suggestion: AnalysisSuggestion;
+}
+
+export interface AnalysisAgentResponse {
+  ok: boolean;
+  symbol?: string;
+  error?: string;
+  asof_utc?: string;
+  report?: AnalysisReport;
+}
+
+export interface PromotionEntry {
+  id: string;
+  ts: string;
+  campaign?: string;
+  family: string;
+  model_dir?: string;
+  metrics: {
+    utility?: number;
+    sharpe?: number;
+    ret?: number;
+    dd?: number;
+    n?: number;
+    [key: string]: number | undefined;
+  };
+  gates: {
+    passed: boolean;
+    claim_level?: string;
+    [key: string]: unknown;
+  };
+  status: "pending" | "approved" | "rejected";
+  approved_at?: string;
+  rejected_at?: string;
+  reject_reason?: string;
+  promoted_version?: string;
+  promoted_path?: string;
+}
+
+export interface WinnerHealth {
+  winner: string | null;
+  live_n: number;
+  live_wr: number;
+  threshold: number;
+  trailing_n: number;
+  degraded: boolean;
+  asof?: string;
+}
+
+export interface PromotionPayload {
+  queue: PromotionEntry[];
+  winner_health: WinnerHealth;
 }

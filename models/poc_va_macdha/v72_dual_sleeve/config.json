@@ -1,0 +1,12 @@
+{
+  "source": "local",
+  "codes": ["TSLA.US", "MU.US", "SPY.US", "IONQ.US", "APLD.US", "XLP.US", "QQQ.US"],
+  "interval": "1H",
+  "commission": 0.001,
+  "engine": "daily",
+  "strategy": {
+    "name": "v72_dual_sleeve",
+    "model_version": "v72_dual_sleeve",
+    "note": "Hierarchical live book: v71 high-WR sniper first, else scaled v39d core, both-stack under max_weight cap. Confidence via last_confidence."
+  }
+}

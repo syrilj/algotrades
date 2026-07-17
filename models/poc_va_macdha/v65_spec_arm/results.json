@@ -1,0 +1,17 @@
+{
+  "portfolio": {
+    "total_return": 0.3554900565518686,
+    "max_drawdown": -0.16952912774565368,
+    "sharpe": 0.9349284075828634,
+    "profit_factor": 2.1083,
+    "trade_count": 28,
+    "win_rate": 0.35714285714285715,
+    "final_value": 1355490.0565518686
+  },
+  "generated_utc": "",
+  "codes": [
+    "ARM.US"
+  ],
+  "start": "2024-08-01",
+  "end": "2026-07-11"
+}

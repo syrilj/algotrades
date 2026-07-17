@@ -1,0 +1,17 @@
+{
+  "portfolio": {
+    "total_return": 0.0659458447532899,
+    "max_drawdown": -0.019579267528239987,
+    "sharpe": 1.3008068799511374,
+    "profit_factor": 5.0972,
+    "trade_count": 12,
+    "win_rate": 0.75,
+    "final_value": 1065945.8447532898
+  },
+  "generated_utc": "",
+  "codes": [
+    "NVDA.US"
+  ],
+  "start": "2024-08-01",
+  "end": "2026-07-11"
+}

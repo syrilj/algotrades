@@ -5,7 +5,8 @@ Honest automation:
   - equity OHLCV can CLAIM / promote
   - options synthetic is RESEARCH only (synthetic BS pricing)
   - GEX excluded from auto-promote
-  - utility = return + Sharpe − DD, × reliability(n)
+  - robust rank = mean utility − instability/OOS/lock/confidence penalties
+  - persistent failure tags guide later mutation selection
   - content-addressed cache under runs/evolve_cache/
   - constrained mutations only (hunt/config patches)
 
@@ -15,6 +16,7 @@ Usage:
   .venv/bin/python tools/evolve_pipeline.py train --continuous --max-epochs 100
   .venv/bin/python tools/evolve_pipeline.py brain
   .venv/bin/python tools/evolve_pipeline.py loop --gens 3 --track equity
+  .venv/bin/python tools/evolve_pipeline.py feedback
   .venv/bin/python tools/evolve_pipeline.py meta
 """
 from __future__ import annotations
@@ -38,6 +40,7 @@ from evolve.pipeline import (  # noqa: E402
 )
 from evolve.train_loop import run_train  # noqa: E402
 from evolve.genome import DEFAULT_BRAIN, load_brain  # noqa: E402
+from evolve.model_feedback import DEFAULT_MEMORY_PATH, load_memory  # noqa: E402
 from evolve.auditor import audit_many, audit_model, write_audit  # noqa: E402
 
 
@@ -87,6 +90,12 @@ def main(argv: list[str] | None = None) -> int:
     p_loop.add_argument("--top", type=int, default=5)
     p_loop.add_argument("--max-mutations", type=int, default=8)
     p_loop.add_argument("--max-bt-per-gen", type=int, default=40)
+    p_loop.add_argument("--memory", type=str, default="", help="failure-memory JSON path")
+
+    p_feedback = sub.add_parser("feedback", help="Show learned failures and mutation outcomes")
+    p_feedback.add_argument("--memory", type=str, default="")
+    p_feedback.add_argument("--model", type=str, default="", help="show one model record")
+    p_feedback.add_argument("--json", action="store_true")
 
     p_meta = sub.add_parser("meta", help="Phase 4: meta MLP recipe (secondary only)")
     p_meta.add_argument("--codes", type=str, default="")
@@ -175,6 +184,9 @@ def main(argv: list[str] | None = None) -> int:
         if tr == DataTrack.GEX_LIVE_ONLY.value:
             print("GEX excluded from loop.", file=sys.stderr)
             return 2
+        memory_path = Path(args.memory) if args.memory else None
+        if memory_path and not memory_path.is_absolute():
+            memory_path = ROOT / memory_path
         state = run_loop(
             family=args.family,
             track=tr,
@@ -187,8 +199,45 @@ def main(argv: list[str] | None = None) -> int:
             max_mutations=args.max_mutations,
             max_backtests_per_gen=args.max_bt_per_gen,
             out_dir=out,
+            memory_path=memory_path,
         )
         print("best_utility:", state.get("best_utility"), "promote:", state.get("promote"))
+        return 0
+
+    if args.cmd == "feedback":
+        memory_path = Path(args.memory) if args.memory else DEFAULT_MEMORY_PATH
+        if not memory_path.is_absolute():
+            memory_path = ROOT / memory_path
+        memory = load_memory(memory_path)
+        if args.model:
+            payload = (memory.get("models") or {}).get(args.model)
+            if payload is None:
+                print(f"No feedback recorded for {args.model}", file=sys.stderr)
+                return 1
+            print(json.dumps({"model": args.model, **payload}, indent=2))
+            return 0
+        if args.json:
+            print(json.dumps(memory, indent=2))
+            return 0
+        failure_totals: dict[str, int] = {}
+        for model in (memory.get("models") or {}).values():
+            for tag, count in (model.get("failures") or {}).items():
+                failure_totals[tag] = failure_totals.get(tag, 0) + int(count)
+        print(f"memory: {memory_path}")
+        print("recurring failures:")
+        for tag, count in sorted(failure_totals.items(), key=lambda item: (-item[1], item[0])):
+            print(f"  {tag:24} {count}")
+        print("mutation outcomes:")
+        mutations = memory.get("mutations") or {}
+        for name, stat in sorted(
+            mutations.items(),
+            key=lambda item: float(item[1].get("mean_delta", 0)),
+            reverse=True,
+        ):
+            print(
+                f"  {name:24} attempts={stat.get('attempts', 0):3} "
+                f"wins={stat.get('wins', 0):3} mean_delta={float(stat.get('mean_delta', 0)):+.3f}"
+            )
         return 0
 
     if args.cmd == "meta":

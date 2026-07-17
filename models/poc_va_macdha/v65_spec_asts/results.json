@@ -1,0 +1,17 @@
+{
+  "portfolio": {
+    "total_return": 0.1612196215305295,
+    "max_drawdown": -0.05015614353000991,
+    "sharpe": 0.3984009567809799,
+    "profit_factor": 5.4539,
+    "trade_count": 15,
+    "win_rate": 0.6,
+    "final_value": 1161219.6215305296
+  },
+  "generated_utc": "",
+  "codes": [
+    "ASTS.US"
+  ],
+  "start": "2024-08-01",
+  "end": "2026-07-11"
+}

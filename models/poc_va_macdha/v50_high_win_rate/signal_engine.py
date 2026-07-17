@@ -54,6 +54,8 @@ class SignalEngine:
         self._trend_filter: Optional[Dict[str, Any]] = self._hunt.get("trend_filter")
         self._stop_loss_pct: float = float(self._hunt.get("stop_loss_pct", 0.0))
         self._signal_scale: float = float(self._hunt.get("signal_scale", 1.0))
+        # Live confidence channel (honest — not a constant 1.0).
+        self.last_confidence: Dict[str, pd.Series] = {}
 
         self._engines: Dict[str, Any] = {}
         for name in self._base_models:
@@ -110,10 +112,58 @@ class SignalEngine:
 
         return signal
 
+    def _entry_confidence(self, df: pd.DataFrame) -> pd.Series:
+        """Causal entry confidence in [0,1] from quality + RSI depth.
+
+        Same ingredients as v71 soft-size (quality bits + oversold depth), so
+        live calibrators have a real signal — not a constant 1.0.
+        """
+        import numpy as np
+
+        close = df["close"].astype(float)
+        opening = df["open"].astype(float)
+        volume = df["volume"].astype(float)
+        constructive = (close >= opening).fillna(False)
+        vol_ma = volume.rolling(20, min_periods=8).mean()
+        volume_ok = (volume >= 0.85 * vol_ma).fillna(False)
+        high = df["high"].astype(float)
+        low = df["low"].astype(float)
+        prev_c = close.shift(1)
+        tr = pd.concat(
+            [(high - low).abs(), (high - prev_c).abs(), (low - prev_c).abs()],
+            axis=1,
+        ).max(axis=1)
+        atr14 = tr.ewm(alpha=1.0 / 14.0, adjust=False).mean()
+        atr_pct = atr14 / close.replace(0.0, np.nan)
+        atr_med = atr_pct.shift(1).expanding(min_periods=20).median()
+        atr_ok = (atr_pct <= 1.35 * atr_med).fillna(False)
+        q_score = (
+            constructive.astype(int) + volume_ok.astype(int) + atr_ok.astype(int)
+        ).astype(float)
+        q_conf = (q_score / 3.0).clip(0.0, 1.0)
+
+        delta = close.diff()
+        up = delta.clip(lower=0.0)
+        down = (-delta).clip(lower=0.0)
+        roll_up = up.ewm(alpha=1.0 / 14.0, adjust=False).mean()
+        roll_down = down.ewm(alpha=1.0 / 14.0, adjust=False).mean()
+        rs = roll_up / roll_down.replace(0.0, np.nan)
+        rsi = 100.0 - (100.0 / (1.0 + rs))
+        depth = ((20.0 - rsi) / 20.0).clip(0.0, 1.0)
+        rsi_conf = (0.4 + 0.6 * depth).clip(0.4, 1.0).fillna(0.5)
+        return (0.65 * q_conf + 0.35 * rsi_conf).clip(0.0, 1.0).rename("entry_confidence")
+
     def _generate_one(
-        self, primary: pd.Series, trend: Optional[pd.Series], close: pd.Series
-    ) -> pd.Series:
-        """State machine that applies trend filter and stop loss."""
+        self,
+        primary: pd.Series,
+        trend: Optional[pd.Series],
+        close: pd.Series,
+        confidence: Optional[pd.Series] = None,
+    ) -> tuple[pd.Series, pd.Series]:
+        """State machine that applies trend filter and stop loss.
+
+        Returns (signal_weight, entry_confidence held for the trade).
+        """
         idx = primary.index
         primary = primary.reindex(idx).fillna(0.0).astype(float)
         close = close.reindex(idx).astype(float)
@@ -121,6 +171,10 @@ class SignalEngine:
             trend = pd.Series(True, index=idx)
         else:
             trend = trend.reindex(idx).fillna(False)
+        if confidence is None:
+            confidence = pd.Series(0.55, index=idx)
+        else:
+            confidence = confidence.reindex(idx).fillna(0.5).astype(float)
 
         apply = "continuous"
         if self._trend_filter:
@@ -131,19 +185,23 @@ class SignalEngine:
 
         in_pos = False
         entry_price = 0.0
+        entry_conf = 0.0
         prev_primary = 0.0
         out = pd.Series(0.0, index=idx)
+        conf_out = pd.Series(0.0, index=idx)
 
         for i in range(len(idx)):
             p = primary.iloc[i]
             c = close.iloc[i]
-            t = trend.iloc[i]
+            t = bool(trend.iloc[i])
+            conf = float(confidence.iloc[i])
             new_entry = (p > 0.5) and (prev_primary <= 0.5) and t
 
             if not in_pos:
                 if new_entry:
                     in_pos = True
                     entry_price = c
+                    entry_conf = conf
             else:
                 exit_now = False
                 if p <= 0.5:
@@ -155,14 +213,17 @@ class SignalEngine:
 
                 if exit_now:
                     in_pos = False
+                    entry_conf = 0.0
 
             out.iloc[i] = 1.0 if in_pos else 0.0
+            conf_out.iloc[i] = entry_conf if in_pos else 0.0
             prev_primary = p
 
-        return out
+        return out, conf_out
 
     def generate(self, data_map: Dict[str, pd.DataFrame]) -> Dict[str, pd.Series]:
         if not self._engines:
+            self.last_confidence = {}
             return {code: pd.Series(0.0, index=df.index) for code, df in data_map.items()}
 
         base_signals: Dict[str, Dict[str, pd.Series]] = {}
@@ -174,6 +235,7 @@ class SignalEngine:
                 base_signals[name] = {}
 
         out: Dict[str, pd.Series] = {}
+        self.last_confidence = {}
         for code, df in data_map.items():
             if df is None or df.empty:
                 out[code] = pd.Series(0.0, index=pd.DatetimeIndex([]))
@@ -190,6 +252,9 @@ class SignalEngine:
             primary = self._combine_signals(sigs, idx)
             trend = self._trend_series(data_map, code)
             close = df["close"].astype(float)
-            out[code] = self._generate_one(primary, trend, close) * self._signal_scale
+            conf = self._entry_confidence(df)
+            sized, entry_conf = self._generate_one(primary, trend, close, conf)
+            out[code] = sized * self._signal_scale
+            self.last_confidence[code] = entry_conf
 
         return out

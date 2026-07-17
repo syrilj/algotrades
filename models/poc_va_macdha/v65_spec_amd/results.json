@@ -1,0 +1,17 @@
+{
+  "portfolio": {
+    "total_return": 0.05836741363465592,
+    "max_drawdown": -0.09920214996872263,
+    "sharpe": 0.15066088618657453,
+    "profit_factor": 1.4696,
+    "trade_count": 43,
+    "win_rate": 0.4883720930232558,
+    "final_value": 1058367.413634656
+  },
+  "generated_utc": "",
+  "codes": [
+    "AMD.US"
+  ],
+  "start": "2024-08-01",
+  "end": "2026-07-11"
+}

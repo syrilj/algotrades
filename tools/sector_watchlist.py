@@ -4,20 +4,31 @@
 Computes RS of sector ETFs vs SPY and ranks names for next-week focus.
 No overfit claims — descriptive rotation scan only.
 
+By default delegates to ``tools/sector_money_flow.py`` for richer day-flow,
+money-in / money-out, definitiveness, and trading notes. Use ``--legacy`` for
+the original RS-only path.
+
 Usage:
   .venv/bin/python tools/sector_watchlist.py
   .venv/bin/python tools/sector_watchlist.py --json
+  .venv/bin/python tools/sector_watchlist.py --legacy --json
 """
 from __future__ import annotations
 
 import argparse
 import json
+import sys
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 import numpy as np
 import pandas as pd
 import yfinance as yf
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 # Sector ETFs + example names that trade like those books
 SECTORS: dict[str, dict[str, Any]] = {
@@ -191,32 +202,105 @@ def build_watchlist(
     }
 
 
+def _money_flow_as_watchlist(source: str = "auto", period: str = "6mo") -> dict[str, Any]:
+    """Adapter: sector_money_flow report → sector_watchlist / desk SectorBlock shape."""
+    from tools.sector_money_flow import print_human, run_scan
+
+    report = run_scan(source=source, period=period)
+    if not report.get("ok"):
+        return report
+
+    # Normalize field names expected by ScanDesk SectorPanel
+    sectors_ranked = []
+    for s in report.get("sectors_ranked") or []:
+        sectors_ranked.append(
+            {
+                **s,
+                "sector": s.get("name") or s.get("sector") or s.get("etf"),
+                "score": s.get("flow_score"),
+                "names": s.get("focus_names") or s.get("names") or [],
+            }
+        )
+    leaders = []
+    for s in report.get("leaders") or []:
+        leaders.append(
+            {
+                **s,
+                "sector": s.get("name") or s.get("sector") or s.get("etf"),
+                "score": s.get("flow_score"),
+                "names": s.get("focus_names") or s.get("names") or [],
+            }
+        )
+    laggards = []
+    for s in report.get("laggards") or []:
+        laggards.append(
+            {
+                **s,
+                "sector": s.get("name") or s.get("sector") or s.get("etf"),
+                "score": s.get("flow_score"),
+                "names": s.get("focus_names") or s.get("names") or [],
+            }
+        )
+
+    return {
+        **report,
+        "sectors_ranked": sectors_ranked,
+        "leaders": leaders,
+        "laggards": laggards,
+        "watch_names": report.get("watch_names") or [],
+        "narrative": (report.get("narrative") or [])
+        + [f"NOTE: {n}" for n in (report.get("trading_notes") or [])[:4]],
+    }
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--json", action="store_true")
     ap.add_argument("--period", default="6mo")
+    ap.add_argument(
+        "--legacy",
+        action="store_true",
+        help="Use original RS-only watchlist (no money-flow / definitive scoring)",
+    )
+    ap.add_argument(
+        "--source",
+        choices=("auto", "local", "yfinance"),
+        default="auto",
+        help="Data source for money-flow scanner (ignored with --legacy)",
+    )
     args = ap.parse_args()
-    out = build_watchlist(period=args.period)
+
+    if args.legacy:
+        out = build_watchlist(period=args.period)
+        if args.json:
+            print(json.dumps(out, indent=2, default=str))
+        else:
+            if not out.get("ok"):
+                print("ERROR", out.get("error"))
+                return 1
+            print("=== SECTOR RS vs SPY (legacy) ===")
+            for s in out["sectors_ranked"][:8]:
+                print(
+                    f"  {s['etf']:5} {s['sector']:14} score={s['score']*100:+5.1f}% "
+                    f"rs5={s.get('rs_5d',0)*100:+5.1f}% rs21={s.get('rs_21d',0)*100:+5.1f}%"
+                )
+            print("\n=== WATCH NAMES ===")
+            for n in out["watch_names"][:12]:
+                print(
+                    f"  {n['symbol']:6} {n['sector_hint']:12} score={n['score']*100:+5.1f}% "
+                    f"rs5={n.get('rs_5d',0)*100:+5.1f}% rs21={n.get('rs_21d',0)*100:+5.1f}%"
+                )
+            print("\n".join(out["narrative"]))
+        return 0 if out.get("ok") else 1
+
+    out = _money_flow_as_watchlist(source=args.source, period=args.period)
     if args.json:
         print(json.dumps(out, indent=2, default=str))
     else:
-        if not out.get("ok"):
-            print("ERROR", out.get("error"))
-            return 1
-        print("=== SECTOR RS vs SPY ===")
-        for s in out["sectors_ranked"][:8]:
-            print(
-                f"  {s['etf']:5} {s['sector']:14} score={s['score']*100:+5.1f}% "
-                f"rs5={s.get('rs_5d',0)*100:+5.1f}% rs21={s.get('rs_21d',0)*100:+5.1f}%"
-            )
-        print("\n=== WATCH NAMES ===")
-        for n in out["watch_names"][:12]:
-            print(
-                f"  {n['symbol']:6} {n['sector_hint']:12} score={n['score']*100:+5.1f}% "
-                f"rs5={n.get('rs_5d',0)*100:+5.1f}% rs21={n.get('rs_21d',0)*100:+5.1f}%"
-            )
-        print("\n".join(out["narrative"]))
-    return 0
+        from tools.sector_money_flow import print_human
+
+        print_human(out)
+    return 0 if out.get("ok") else 1
 
 
 if __name__ == "__main__":

@@ -1,0 +1,17 @@
+{
+  "schema_version": "patchtst-filter-meta-v1",
+  "trained_at_utc": "2026-07-17T18:35:46.030428+00:00",
+  "seq_len": 96,
+  "threshold": 0.4,
+  "train_rows": 92,
+  "params": {
+    "d_model": 32,
+    "n_heads": 4,
+    "num_layers": 2,
+    "dropout": 0.1,
+    "lr": 0.001,
+    "weight_decay": 0.0001,
+    "epochs": 100,
+    "batch_size": 16
+  }
+}

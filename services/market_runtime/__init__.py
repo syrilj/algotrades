@@ -1,4 +1,5 @@
 from .catalog import classify_category, instrument_from_catalog, normalize_category
+from .adaptive_replay import AdaptiveReplayStore, replay_latest_decisions
 from .contracts import (
     Bar,
     CoverageHealth,
@@ -20,3 +21,4 @@ from .lse_adapter import LSEAdapter
 from .persistence import TickPersistence
 from .state import LatestTickState, TickBarAggregator
 from .supervisor import StreamSupervisor
+from .vault_client import LSEVaultClient, LSEVaultError, VaultResult

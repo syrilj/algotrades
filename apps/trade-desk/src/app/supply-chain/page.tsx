@@ -1,7 +1,14 @@
-import SupplyChainDesk from "@/components/supply-chain/SupplyChainDesk";
+import { redirect } from "next/navigation";
+import { liveHref } from "@/lib/routes";
 
-export const dynamic = "force-dynamic";
-
-export default function SupplyChainPage() {
-  return <SupplyChainDesk />;
+/** Legacy `/supply-chain` — supply chain lives under Ops (Execution) Discover. */
+export default async function SupplyChainCompatibilityPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  const sp = await searchParams;
+  const symbol =
+    typeof sp.symbol === "string" ? sp.symbol.trim().toUpperCase() : "";
+  redirect(liveHref(symbol || undefined, "supply-chain"));
 }

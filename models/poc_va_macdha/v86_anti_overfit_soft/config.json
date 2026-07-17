@@ -1,0 +1,15 @@
+{
+  "source": "yfinance",
+  "codes": ["TSLA.US", "MU.US", "SPY.US", "IONQ.US", "APLD.US", "XLP.US", "QQQ.US"],
+  "start_date": "2024-08-01",
+  "end_date": "2026-07-11",
+  "initial_cash": 1000000,
+  "commission": 0.001,
+  "engine": "daily",
+  "interval": "1H",
+  "strategy": {
+    "name": "v86_anti_overfit_soft",
+    "model_version": "v86_anti_overfit_soft",
+    "note": "v72_dual_sleeve base + anti-overfit soft-size overlay: drop SPY, scale by vol_expand / !red_flag_up confidence"
+  }
+}

@@ -1,0 +1,6 @@
+-r requirements-runtime.txt
+
+# Tests exercise parquet-backed causal folds in addition to the live runtime.
+pyarrow==19.0.1
+pytest==9.1.1
+

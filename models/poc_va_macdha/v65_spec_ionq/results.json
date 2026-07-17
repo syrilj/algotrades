@@ -1,0 +1,17 @@
+{
+  "portfolio": {
+    "total_return": 1.2002899944439402,
+    "max_drawdown": -0.20030532782747545,
+    "sharpe": 1.5754008019568257,
+    "profit_factor": 3.0716,
+    "trade_count": 31,
+    "win_rate": 0.6451612903225806,
+    "final_value": 2200289.9944439405
+  },
+  "generated_utc": "",
+  "codes": [
+    "IONQ.US"
+  ],
+  "start": "2024-08-01",
+  "end": "2026-07-11"
+}

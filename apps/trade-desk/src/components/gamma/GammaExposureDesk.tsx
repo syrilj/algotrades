@@ -18,6 +18,11 @@ import { analyzeHref, liveHref, optionsHref } from "@/lib/routes";
 import { Chip } from "@/components/ui/Chip";
 import { colorVarFor } from "@/lib/actionColors";
 import { Stat } from "@/components/ui/Stat";
+import {
+  gammaDeskPresentation,
+  gammaFreshness,
+  gammaMethodology,
+} from "@/lib/executionState";
 
 function RegimeChip({ regime }: { regime: string }) {
   const isPin = regime === "positive_gex_pin";
@@ -170,6 +175,8 @@ function useVerdict(gamma: GammaResponse | null, live: LivePlanResponse | null) 
     const hasModel = live?.model?.ok === true;
 
     const gexSign = gamma?.gex_sign ?? 0;
+    const isFlowProxy = gamma?.exposure_kind === "intraday_gamma_flow_proxy";
+    const gammaSubject = isFlowProxy ? "Near-spot gamma flow" : "Near-spot dealer gamma";
     const regime = gamma?.regime ?? "flat";
     const squeezeLabel = gamma?.squeeze_label ?? "neutral";
     const squeezeScore = gamma?.squeeze_score ?? 0;
@@ -227,10 +234,10 @@ function useVerdict(gamma: GammaResponse | null, live: LivePlanResponse | null) 
       } else {
         consensus = gexSign < 0 ? "BREAKOUT WATCH" : "WAIT";
         note = gexSign < 0
-          ? "Near-spot dealer gamma is negative. A level break can expand volatility."
+          ? `${gammaSubject} is negative. A level break can expand volatility.`
           : gexSign > 0
-            ? "Near-spot dealer gamma is positive. Expect more pinning around the strongest strikes."
-            : "Dealer gamma is balanced. Wait for a price-level break.";
+            ? `${gammaSubject} is positive. Expect more pinning around the strongest strikes.`
+            : `${isFlowProxy ? "Gamma flow" : "Dealer gamma"} is balanced. Wait for a price-level break.`;
       }
     }
 
@@ -297,28 +304,20 @@ function buildNotes(gamma: GammaResponse): string[] {
   return notes;
 }
 
-function gammaFreshness(gamma: GammaResponse) {
-  const dataAsof = gamma.options_asof ?? null;
-  const dataDate = new Date(dataAsof ?? 0);
-  const hasTimestamp = dataAsof != null && Number.isFinite(dataDate.getTime());
-  const ageMs = hasTimestamp ? Date.now() - dataDate.getTime() : Number.POSITIVE_INFINITY;
-  const isStale = ageMs > 90 * 60 * 60 * 1000;
-  const staleHours = Math.max(0, Math.round(ageMs / (60 * 60 * 1000)));
-  return { dataAsof, dataDate, hasTimestamp, isStale, staleHours, isCurrent: hasTimestamp && !isStale };
-}
 
-function isoDateDaysAhead(days: number): string {
-  const date = new Date();
-  date.setDate(date.getDate() + days);
-  return date.toISOString().slice(0, 10);
-}
-
-export function GammaExposureDesk() {
+export function GammaExposureDesk({
+  showHeader = true,
+}: {
+  showHeader?: boolean;
+}) {
   const searchParams = useSearchParams();
   const qSymbol = searchParams.get("symbol")?.toUpperCase() ?? "";
+  const qAccount = Number(searchParams.get("account") || "1000");
+  const account = Number.isFinite(qAccount) && qAccount > 0 ? qAccount : 1000;
   const [symbol, setSymbol] = useState(qSymbol || "APLD");
-  const [expiryFrom, setExpiryFrom] = useState(() => isoDateDaysAhead(0));
-  const [expiryTo, setExpiryTo] = useState(() => isoDateDaysAhead(45));
+  // Empty until first options chain returns real listed expiries — never invent calendar dates.
+  const [selectedExpiry, setSelectedExpiry] = useState("all");
+  const [listedExpiries, setListedExpiries] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [gamma, setGamma] = useState<GammaResponse | null>(null);
@@ -330,13 +329,26 @@ export function GammaExposureDesk() {
   }, [qSymbol]);
 
   const run = useCallback(
-    async (symOverride?: string) => {
+    async (symOverride?: string, opts?: { resetExpiry?: boolean; targetExpiry?: string }) => {
       const sym = (symOverride ?? symbol).trim().toUpperCase();
       if (!sym) return;
+      const resetExpiry = opts?.resetExpiry === true || sym !== symbol;
       setSymbol(sym);
       setLoading(true);
       setError(null);
       setLiveError(null);
+      setGamma(null);
+      setLive(null);
+
+      let currentExp = selectedExpiry;
+      if (opts?.targetExpiry !== undefined) {
+        currentExp = opts.targetExpiry;
+      }
+      if (resetExpiry) {
+        currentExp = "all";
+        setSelectedExpiry("all");
+        setListedExpiries([]);
+      }
 
       const gammaController = new AbortController();
       const liveController = new AbortController();
@@ -344,17 +356,23 @@ export function GammaExposureDesk() {
       const liveTimer = setTimeout(() => liveController.abort(), 120_000);
 
       try {
+        const body: Record<string, unknown> = { symbol: sym, source: "auto" };
+        if (currentExp && currentExp !== "all") {
+          body.expiryFrom = currentExp;
+          body.expiryTo = currentExp;
+        }
+
         const [gammaRes, liveRes] = await Promise.allSettled([
           fetch("/api/gamma", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ symbol: sym, source: "auto", expiryFrom: expiryFrom || undefined, expiryTo: expiryTo || undefined }),
+            body: JSON.stringify(body),
             signal: gammaController.signal,
           }),
           fetch("/api/live-plan", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ symbol: sym, account: 1000 }),
+            body: JSON.stringify({ symbol: sym, account }),
             signal: liveController.signal,
           }),
         ]);
@@ -369,7 +387,16 @@ export function GammaExposureDesk() {
         if (!gammaRes.value.ok || gammaJson.ok === false || !gammaJson.data) {
           throw new Error(gammaJson.error ?? `gamma failed (${gammaRes.value.status})`);
         }
-        setGamma(gammaJson.data);
+        const data = gammaJson.data;
+        setGamma(data);
+
+        const listed = (data.available_expiries?.length
+          ? data.available_expiries
+          : data.expiries_used
+        ).filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d));
+        if (listed.length > 0) {
+          setListedExpiries(listed);
+        }
 
         if (liveRes.status === "fulfilled") {
           const liveJson = (await liveRes.value.json()) as ApiEnvelope<LivePlanResponse>;
@@ -387,56 +414,103 @@ export function GammaExposureDesk() {
         setLoading(false);
       }
     },
-    [symbol, expiryFrom, expiryTo],
+    [symbol, selectedExpiry, account],
   );
 
   useEffect(() => {
-    if (!qSymbol) return;
-    void run(qSymbol);
+    void run(qSymbol || symbol, { resetExpiry: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [qSymbol]);
 
+  useEffect(() => {
+    if (symbol) {
+      void run(symbol, { resetExpiry: false });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedExpiry]);
+
   const verdict = useVerdict(gamma, live);
   const notes = useMemo(() => (gamma ? buildNotes(gamma) : []), [gamma]);
-  const freshness = useMemo(() => (gamma ? gammaFreshness(gamma) : null), [gamma]);
-  const showLevels = Boolean(gamma && freshness?.isCurrent);
+  const freshness = useMemo(
+    () =>
+      gamma
+        ? gammaFreshness({
+            options_asof: gamma.options_asof,
+            asof_utc: gamma.asof_utc,
+            exposure_kind: gamma.exposure_kind,
+          })
+        : null,
+    [gamma],
+  );
+  const methodology = useMemo(() => gammaMethodology(gamma), [gamma]);
+  // Analysis levels always render when a snapshot exists. Freshness only labels age.
+  const deskView = useMemo(
+    () =>
+      gammaDeskPresentation(
+        gamma
+          ? {
+              options_asof: gamma.options_asof,
+              asof_utc: gamma.asof_utc,
+              exposure_kind: gamma.exposure_kind,
+            }
+          : null,
+      ),
+    [gamma],
+  );
+  const showLevels = deskView.showLevels;
 
-  return (
-    <div className="td-page">
-      <PageHeader
-        title="Gamma"
-        description="Dealer gamma exposure by strike. Use as a confirmation overlay for the model verdict."
-        meta={
-          gamma ? (
-            <span
-              className="tabular"
-              style={{
-                fontFamily: "var(--td-font-mono)",
-                color: freshness?.isStale ? "var(--td-action-avoid)" : "var(--td-ink-500)",
-                fontSize: "var(--td-text-caption)",
-              }}
-            >
-              {symbol} · options {freshness?.hasTimestamp ? freshness.dataDate.toLocaleString() : "timestamp unavailable"}
-              {!freshness?.isCurrent ? " · not live" : ""}
-            </span>
-          ) : null
-        }
-        actions={
-          symbol ? (
-            <div className="flex flex-wrap gap-2">
-              <Link href={analyzeHref({ symbol })} className="td-btn td-btn-ghost no-underline">
-                Analyze
-              </Link>
-              <Link href={liveHref(symbol)} className="td-btn td-btn-ghost no-underline">
-                Live
-              </Link>
-              <Link href={optionsHref(symbol)} className="td-btn td-btn-ghost no-underline">
-                Options
-              </Link>
-            </div>
-          ) : null
-        }
-      />
+  const body = (
+    <>
+      {showHeader ? (
+        <PageHeader
+          title="Gamma"
+          description="Gamma-derived levels from current option flow, with open-interest fallback when available."
+          meta={
+            gamma ? (
+              <span
+                className="tabular"
+                style={{
+                  fontFamily: "var(--td-font-mono)",
+                  color: freshness?.isStale
+                    ? "var(--td-action-avoid)"
+                    : "var(--td-ink-500)",
+                  fontSize: "var(--td-text-caption)",
+                }}
+              >
+                {symbol} · options{" "}
+                {freshness?.hasTimestamp
+                  ? freshness.dataDate.toLocaleString()
+                  : "timestamp unavailable"}
+                {!freshness?.isCurrent ? " · not live" : ""}
+              </span>
+            ) : null
+          }
+          actions={
+            symbol ? (
+              <div className="flex flex-wrap gap-2">
+                <Link
+                  href={analyzeHref({ symbol })}
+                  className="td-btn td-btn-ghost no-underline"
+                >
+                  Analyze
+                </Link>
+                <Link
+                  href={liveHref(symbol, "ticket", account)}
+                  className="td-btn td-btn-ghost no-underline"
+                >
+                  Ticket
+                </Link>
+                <Link
+                  href={optionsHref(symbol, account)}
+                  className="td-btn td-btn-ghost no-underline"
+                >
+                  Options
+                </Link>
+              </div>
+            ) : null
+          }
+        />
+      ) : null}
 
       <section className="td-toolbar">
         <div className="td-toolbar__row">
@@ -450,12 +524,20 @@ export function GammaExposureDesk() {
             />
           </label>
           <label className="td-field">
-            <span className="td-label">Expiry from</span>
-            <input type="date" value={expiryFrom} max={expiryTo || undefined} onChange={(e) => setExpiryFrom(e.target.value)} className="td-input" />
-          </label>
-          <label className="td-field">
-            <span className="td-label">Expiry to</span>
-            <input type="date" value={expiryTo} min={expiryFrom || undefined} onChange={(e) => setExpiryTo(e.target.value)} className="td-input" />
+            <span className="td-label">Expiry Date</span>
+            <select
+              value={selectedExpiry}
+              onChange={(e) => setSelectedExpiry(e.target.value)}
+              className="td-input"
+              style={{ fontFamily: "var(--td-font-mono)" }}
+            >
+              <option value="all">All Expirations</option>
+              {listedExpiries.map((d) => (
+                <option key={`expiry-${d}`} value={d}>
+                  {d}
+                </option>
+              ))}
+            </select>
           </label>
           <button
             type="button"
@@ -463,11 +545,12 @@ export function GammaExposureDesk() {
             disabled={loading || !symbol.trim()}
             className="td-btn td-btn-primary"
           >
-            {loading ? "Refreshing…" : "Refresh levels"}
+            {loading ? "Loading live feed…" : gamma ? "Refresh live gamma" : "Load live gamma feed"}
           </button>
         </div>
         <p className="text-[11px]" style={{ color: "var(--td-ink-500)" }}>
-          Live LSE options are preferred automatically. The selected dates filter the option expiries used for levels and the squeeze read. Levels are shown only when the chain carries a timestamp from the last 90 minutes.
+          Expiry bounds come from listed option dates for this symbol — not calendar guesses.
+          Flow is preferred when price-consistent; otherwise open-interest walls. Aged snapshots stay visible with a banner; execution still requires a live feed.
         </p>
       </section>
 
@@ -481,19 +564,17 @@ export function GammaExposureDesk() {
           Model signal unavailable: {liveError}
         </div>
       ) : null}
-      {gamma && !freshness?.isCurrent ? (
+      {deskView.banner ? (
         <div
           className="td-alert"
-          role="alert"
+          role="status"
           style={{
-            border: "1px solid var(--td-action-avoid)",
-            color: "var(--td-action-avoid)",
-            background: "color-mix(in oklch, var(--td-action-avoid) 10%, transparent)",
+            border: "1px solid var(--td-action-breakout-watch)",
+            color: "var(--td-action-breakout-watch)",
+            background: "color-mix(in oklch, var(--td-action-breakout-watch) 10%, transparent)",
           }}
         >
-          {freshness?.hasTimestamp
-            ? `The latest options update is ${freshness.staleHours} hours old, so levels are hidden rather than presented as live.`
-            : "The options provider did not return a usable update time, so levels are hidden rather than presented as live."}
+          {deskView.banner}
         </div>
       ) : null}
 
@@ -503,12 +584,12 @@ export function GammaExposureDesk() {
             className="text-[15px] font-medium"
             style={{ color: "var(--td-ink-100)", fontFamily: "var(--td-font-display)" }}
           >
-            No gamma snapshot yet
+            No live gamma feed yet
           </p>
           <ol className="mt-2 flex flex-col gap-1 text-[13px]" style={{ color: "var(--td-ink-300)" }}>
-            <li>1. Enter a symbol</li>
-            <li>2. Refresh live levels</li>
-            <li>3. Filter the strike board by range and exposure side</li>
+            <li>1. Enter a symbol (or keep the default)</li>
+            <li>2. Press <strong>Load live gamma feed</strong></li>
+            <li>3. Read walls, squeeze, and the strike board — expiry dates come from the chain</li>
           </ol>
         </section>
       ) : null}
@@ -556,13 +637,7 @@ export function GammaExposureDesk() {
                     Model: {live?.model?.model ?? "—"} · {live?.model?.confidence != null ? formatPct(live.model.confidence, 0) : "—"}
                   </span>
                   <span>
-                    Source:{" "}
-                    {gamma.weight === "volume_today"
-                      ? "LSE volume"
-                      : gamma.weight === "premium_today"
-                        ? "LSE premium"
-                        : "yfinance OI"}{" "}
-                    · {gamma.n_contracts} contracts
+                    {methodology.label} · {gamma.n_contracts} contracts
                   </span>
                 </div>
               </div>
@@ -570,9 +645,9 @@ export function GammaExposureDesk() {
               <div className="grid gap-3 border-t p-4 lg:border-l lg:border-t-0" style={{ borderColor: "var(--td-hairline)" }}>
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                   <ReadoutTile
-                    label="Net dealer GEX"
+                    label={gamma.exposure_kind === "intraday_gamma_flow_proxy" ? "Net gamma-flow proxy" : "Net dealer GEX estimate"}
                     value={formatNum(gamma.net_dealer_gex, 0)}
-                    detail={gamma.gex_sign < 0 ? "Short gamma: range can expand." : gamma.gex_sign > 0 ? "Long gamma: pinning risk." : "Flat dealer book."}
+                    detail={gamma.gex_sign < 0 ? "Negative gamma: range can expand." : gamma.gex_sign > 0 ? "Positive gamma: pinning risk." : gamma.exposure_kind === "intraday_gamma_flow_proxy" ? "Balanced option flow." : "Flat dealer book."}
                     color={gamma.gex_sign < 0 ? "var(--td-action-avoid)" : gamma.gex_sign > 0 ? "var(--td-brand)" : "var(--td-ink-300)"}
                   />
                   <ReadoutTile
@@ -650,7 +725,7 @@ export function GammaExposureDesk() {
               <SqueezeSummary gamma={gamma} />
 
               <div className="td-panel p-4">
-                <span className="td-eyebrow">Book inventory</span>
+                <span className="td-eyebrow">{gamma.exposure_kind === "intraday_gamma_flow_proxy" ? "Flow snapshot" : "Positioning estimate"}</span>
                 <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-3">
                   <Stat label="Spot" value={`${formatNum(gamma.spot)} (${gamma.spot_source})`} emphasize />
                   <Stat label="Regime" value={<RegimeChip regime={gamma.regime} />} emphasize />
@@ -658,8 +733,34 @@ export function GammaExposureDesk() {
                   <Stat label="OTM call OI" value={formatNum(gamma.otm_call_oi, 0)} />
                   <Stat label="OTM put vol" value={formatNum(gamma.otm_put_volume, 0)} />
                   <Stat label="OTM put OI" value={formatNum(gamma.otm_put_oi, 0)} />
-                  <Stat label="Options updated" value={freshness?.hasTimestamp ? freshness.dataDate.toLocaleString() : "—"} />
+                  <Stat
+                    label={
+                      gamma.exposure_kind === "intraday_gamma_flow_proxy"
+                        ? "Flow as-of"
+                        : "Chain last trade"
+                    }
+                    value={
+                      freshness?.hasChainTimestamp || freshness?.hasTimestamp
+                        ? freshness.dataDate.toLocaleString()
+                        : "—"
+                    }
+                  />
+                  <Stat
+                    label="Expiries in book"
+                    value={
+                      (gamma.expiries_used ?? [])
+                        .filter((d) => /^\d{4}-\d{2}-\d{2}$/.test(d))
+                        .slice(0, 4)
+                        .join(" · ") || "—"
+                    }
+                  />
                 </div>
+                <p className="mt-3 text-[11px] leading-snug" style={{ color: "var(--td-ink-500)" }}>
+                  {methodology.detail}
+                  {gamma.exposure_kind !== "intraday_gamma_flow_proxy"
+                    ? " Open-interest last-trade stamps are delayed by design; squeeze and walls still use this snapshot."
+                    : ""}
+                </p>
               </div>
 
               <div className="td-panel p-4">
@@ -678,6 +779,8 @@ export function GammaExposureDesk() {
           </motion.div>
         ) : null}
       </AnimatePresence>
-    </div>
+    </>
   );
+
+  return showHeader ? <div className="td-page">{body}</div> : body;
 }

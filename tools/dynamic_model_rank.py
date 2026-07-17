@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import shutil
 from datetime import datetime, timezone
@@ -33,6 +34,7 @@ from backtest.runner import main as bt_main
 import backtest.runner as _runner
 from backtest.engines.global_equity import GlobalEquityEngine
 from evolve.v48_execution import CausalGlobalEquityEngine
+from evolve.ac_execution import AlmgrenChrissGlobalEquityEngine
 
 # backtest.runner routes unknown sources to CryptoEngine. source="local" uses
 # LocalLoader (data_cache) but should still get the US/HK equity engine for
@@ -59,14 +61,22 @@ _patch_metrics_for_local()
 
 
 def _create_market_engine_for_local(source: str, config: dict, codes: list[str]):
-    if source == "local" and codes:
+    if codes:
         markets = {_runner._detect_market(c) for c in codes}
         if len(markets) == 1 and markets & {"us_equity", "hk_equity"}:
             market = _runner._detect_submarket(codes)
-            version = str((config.get("strategy") or {}).get("model_version", ""))
-            if config.get("causal_execution") or version in {"v39d_causal", "v47_causal", "v48_regime_barbell", "v49_precision_trend"}:
+            if config.get("impact_model") == "almgren_chriss":
+                return AlmgrenChrissGlobalEquityEngine(config, market=market)
+            # An explicit causal-execution request is a model-independent
+            # execution contract.  Honor it for every equity data source while
+            # retaining the AC engine's precedence when market impact is set.
+            if config.get("causal_execution"):
                 return CausalGlobalEquityEngine(config, market=market)
-            return GlobalEquityEngine(config, market=market)
+            if source == "local":
+                version = str((config.get("strategy") or {}).get("model_version", ""))
+                if version in {"v39d_causal", "v47_causal", "v48_regime_barbell", "v49_precision_trend"}:
+                    return CausalGlobalEquityEngine(config, market=market)
+                return GlobalEquityEngine(config, market=market)
     return _original_create_market_engine(source, config, codes)
 
 
@@ -268,38 +278,46 @@ def discover_models(only: list[str] | None = None) -> list[dict[str, Any]]:
     return found
 
 
-def _copy_model_code(model: dict[str, Any], run_code: Path) -> None:
-    run_code.mkdir(parents=True, exist_ok=True)
-    src: Path = model["src_dir"]
-    # core
-    for name in (
-        "signal_engine.py",
-        "config.json",
-        "DEPENDENCIES.json",
-        "candidate_ledger.py",
-        "_base_engine.py",  # train-loop genome wrapper dependency
-        "GENOME.json",
-        "hunt_config.json",
-        "meta_config.json",
-        "meta_xgb_final.json",
-        "vpa.py",
-        "vwap_peg.py",
-        "vwap_dna.json",
-        "ROUTING.json",
-        "RISK_POLICY.json",
-    ):
-        p = src / name
-        if not p.exists() and model["model_dir"] != src:
-            p = model["model_dir"] / name
-        if p.exists():
-            shutil.copy2(p, run_code / name)
+_MODEL_CODE_FILES = (
+    "signal_engine.py",
+    "config.json",
+    "DEPENDENCIES.json",
+    "candidate_ledger.py",
+    "_base_engine.py",  # train-loop genome wrapper dependency
+    "GENOME.json",
+    "hunt_config.json",
+    "meta_config.json",
+    "meta_xgb_final.json",
+    "secondary_meta.json",
+    "vpa.py",
+    "vwap_peg.py",
+    "vwap_dna.json",
+    "ROUTING.json",
+    "RISK_POLICY.json",
+)
+_REQUEST_CONTRACT_VERSION = 1
+_REQUEST_CONTRACT_FILE = "request_contract.json"
 
-    # A model may declare immutable, vendored runtime dependencies.  This keeps
-    # ensembles reproducible instead of importing mutable sibling models.
+
+def _model_source_entries(model: dict[str, Any]) -> list[tuple[str, Path]]:
+    """Return source files in the same order they are copied into a run."""
+    src = Path(model["src_dir"])
+    model_dir = Path(model["model_dir"])
+    entries: list[tuple[str, Path]] = []
+    for name in _MODEL_CODE_FILES:
+        path = src / name
+        if not path.exists() and model_dir != src:
+            path = model_dir / name
+        if path.is_file():
+            entries.append((name, path.resolve()))
+
+    # A model may declare immutable, vendored runtime dependencies.  Hashing
+    # and copying the same resolved list prevents a mutable sibling model from
+    # silently inheriting stale metrics.
     manifest = src / "DEPENDENCIES.json"
-    if not manifest.exists() and model["model_dir"] != src:
-        manifest = model["model_dir"] / "DEPENDENCIES.json"
-    if manifest.exists():
+    if not manifest.exists() and model_dir != src:
+        manifest = model_dir / "DEPENDENCIES.json"
+    if manifest.is_file():
         try:
             dependencies = json.loads(manifest.read_text()).get("files", [])
         except Exception:
@@ -312,11 +330,95 @@ def _copy_model_code(model: dict[str, Any], run_code: Path) -> None:
             if not isinstance(source_name, str) or not isinstance(target_name, str):
                 continue
             source_path = (src / source_name).resolve()
-            target_path = (run_code / target_name).resolve()
-            if not source_path.is_file() or run_code.resolve() not in target_path.parents:
+            target = Path(target_name)
+            if (
+                not source_path.is_file()
+                or target.is_absolute()
+                or not target.parts
+                or ".." in target.parts
+            ):
                 raise ValueError(f"invalid model dependency: {item}")
-            target_path.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(source_path, target_path)
+            entries.append((target.as_posix(), source_path))
+    return entries
+
+
+def _sha256_file(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1 << 16), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _canonical_json_text(value: Any) -> str:
+    """Encode a request value without key-order or whitespace ambiguity."""
+    try:
+        return json.dumps(
+            value,
+            sort_keys=True,
+            separators=(",", ":"),
+            allow_nan=False,
+        )
+    except (TypeError, ValueError) as exc:
+        raise ValueError("backtest request values must be finite JSON values") from exc
+
+
+def _canonical_json_value(value: Any) -> Any:
+    """Round-trip a request value into its deterministic JSON representation."""
+    return json.loads(_canonical_json_text(value))
+
+
+def _build_request_contract(
+    model: dict[str, Any],
+    *,
+    mode: str,
+    codes: list[str],
+    start: str,
+    end: str,
+    tag: str,
+    force_1d: bool,
+    cash: float,
+    source: str,
+    interval: str,
+    extra_cfg: dict[str, Any] | None,
+    source_entries: list[tuple[str, Path]] | None = None,
+) -> dict[str, Any]:
+    entries = source_entries if source_entries is not None else _model_source_entries(model)
+    return {
+        "contract_version": _REQUEST_CONTRACT_VERSION,
+        "model_id": str(model["id"]),
+        "model_source_dependency_hashes": [
+            {"target": target, "sha256": _sha256_file(path)}
+            for target, path in entries
+        ],
+        # Keep symbol order: it can affect shared-capital execution.
+        "codes": list(codes),
+        "start": start,
+        "end": end,
+        "source": source,
+        "interval": interval,
+        "mode": mode,
+        "cash": float(cash),
+        "extra_cfg": _canonical_json_value(extra_cfg),
+        "tag": tag,
+        "force_1d": bool(force_1d),
+    }
+
+
+def _copy_model_code(
+    model: dict[str, Any],
+    run_code: Path,
+    source_entries: list[tuple[str, Path]] | None = None,
+) -> None:
+    run_code.mkdir(parents=True, exist_ok=True)
+    entries = source_entries if source_entries is not None else _model_source_entries(model)
+    root = run_code.resolve()
+    for target_name, source_path in entries:
+        target_path = (run_code / target_name).resolve()
+        if root not in target_path.parents:
+            raise ValueError(f"invalid model dependency target: {target_name}")
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source_path, target_path)
 
 
 def run_one(
@@ -340,6 +442,26 @@ def run_one(
     cash_tag = f"c{int(cash)}" if cash >= 1000 else f"c{cash:g}"
     run_dir = OUT / "runs" / mid / f"{tag}__{mode}__{cash_tag}"
     metrics_path = run_dir / "artifacts" / "metrics.csv"
+    contract_path = run_dir / _REQUEST_CONTRACT_FILE
+
+    final_interval = interval if interval is not None else ("1D" if force_1d else model.get("interval", "1D"))
+    if mode == "options":
+        final_interval = "1D"
+    source_entries = _model_source_entries(model)
+    request_contract = _build_request_contract(
+        model,
+        mode=mode,
+        codes=codes,
+        start=start,
+        end=end,
+        tag=tag,
+        force_1d=force_1d,
+        cash=cash,
+        source=source,
+        interval=str(final_interval),
+        extra_cfg=extra_cfg,
+        source_entries=source_entries,
+    )
 
     def _pack(row_like: dict, reused: bool) -> dict[str, Any]:
         out = {
@@ -366,22 +488,23 @@ def run_one(
         out["score_risk_adj"] = score_risk_adj(out)
         return out
 
-    if reuse and metrics_path.exists():
+    if reuse and metrics_path.exists() and contract_path.exists():
         try:
-            row = next(csv.DictReader(open(metrics_path)))
-            out = _pack(row, True)
-            return out
+            persisted_contract = json.loads(contract_path.read_text())
+            # Compare canonical JSON, rather than Python mappings, so values
+            # such as true, 1, and 1.0 cannot alias one another.
+            if _canonical_json_text(persisted_contract) == _canonical_json_text(request_contract):
+                with metrics_path.open(newline="") as handle:
+                    row = next(csv.DictReader(handle))
+                out = _pack(row, True)
+                return out
         except Exception:
             pass
 
     if run_dir.exists():
         shutil.rmtree(run_dir)
     run_code = run_dir / "code"
-    _copy_model_code(model, run_code)
-
-    final_interval = interval if interval is not None else ("1D" if force_1d else model.get("interval", "1D"))
-    if mode == "options":
-        final_interval = "1D"
+    _copy_model_code(model, run_code, source_entries)
 
     # Scale max contracts roughly with cash (capacity honesty at $10k)
     max_contracts = max(1, int(500 * (cash / 1_000_000)))
@@ -469,6 +592,9 @@ def run_one(
         for p in art.glob("ohlcv_*.csv"):
             p.unlink(missing_ok=True)
         out = _pack(row, False)
+        # Publish the contract only after complete metrics can be parsed.  A
+        # failed or interrupted run therefore cannot become a reusable hit.
+        contract_path.write_text(json.dumps(request_contract, indent=2, sort_keys=True) + "\n")
         print(
             f"    → PnL=${out['pnl']:+,.0f} ({out['ret']*100:6.1f}%) wr={out['wr']*100:4.0f}% "
             f"dd={out['dd']*100:5.1f}% n={out['n']:3d} | gain={out['score_gain']:.3f} "

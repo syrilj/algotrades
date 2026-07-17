@@ -1,0 +1,17 @@
+{
+  "portfolio": {
+    "total_return": 0.11881617020218593,
+    "max_drawdown": -0.39568525907638924,
+    "sharpe": 0.16399658741496875,
+    "profit_factor": 1.0759,
+    "trade_count": 115,
+    "win_rate": 0.3565217391304348,
+    "final_value": 1118816.1702021859
+  },
+  "generated_utc": "",
+  "codes": [
+    "CRWV.US"
+  ],
+  "start": "2024-08-01",
+  "end": "2026-07-11"
+}

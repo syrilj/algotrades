@@ -1,0 +1,22 @@
+{
+  "base_models": [
+    "v45_ultimate_rsi"
+  ],
+  "primary": "v45_ultimate_rsi",
+  "trend_filter": {
+    "lookback": 250,
+    "price_col": "close",
+    "direction": "above",
+    "apply": "entry"
+  },
+  "quality": {
+    "enabled": true,
+    "min_score": 2
+  },
+  "signal_scale": 0.225,
+  "stop_loss_pct": 0.0,
+  "selection_rule": "frozen_before_oos_eval",
+  "train_window_end": "2025-08-01",
+  "hypothesis": "v45 mean-reversion + SMA(250) entry trend + causal quality score>=2 raises confidence vs raw v45 without starving trade count",
+  "selected_from_train_tag": "q2_s225"
+}

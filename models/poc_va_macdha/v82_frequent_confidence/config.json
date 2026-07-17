@@ -1,0 +1,15 @@
+{
+  "source": "local",
+  "codes": [
+    "APLD.US", "ARM.US", "COIN.US", "IONQ.US", "MSTR.US", "MU.US",
+    "NVDA.US", "PLTR.US", "QQQ.US", "RKLB.US", "SPY.US", "TSLA.US", "XLP.US"
+  ],
+  "interval": "1H",
+  "commission": 0.001,
+  "engine": "daily",
+  "strategy": {
+    "name": "v82_frequent_confidence",
+    "model_version": "v82_frequent_confidence",
+    "note": "Two-tier 1H swing routing: v71 on liquid core, strict v70 on volatile satellites; confidence is ordinal, not a probability."
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "files": [
+    {"source": "../v39d_confluence/signal_engine.py", "target": "v39d_engine.py"},
+    {"source": "../v39d_confluence/meta_config.json", "target": "meta_config.json"},
+    {"source": "../v39d_confluence/meta_xgb_final.json", "target": "meta_xgb_final.json"},
+    {"source": "../v39d_confluence/candidate_ledger.py", "target": "candidate_ledger.py"}
+  ]
+}

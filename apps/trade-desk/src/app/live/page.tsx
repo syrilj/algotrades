@@ -1,80 +1,93 @@
 "use client";
 
-import Link from "next/link";
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { LiveDesk } from "@/components/live/LiveDesk";
+import { ExecutionDesk } from "@/components/live/ExecutionDesk";
 import { OptionsDesk } from "@/components/options/OptionsDesk";
+import { WatchDesk } from "@/components/watch/WatchDesk";
+import { GammaExposureDesk } from "@/components/gamma/GammaExposureDesk";
+import { MoneyFlowDesk } from "@/components/money-flow/MoneyFlowDesk";
+import { PicksDesk } from "@/components/picks/PicksDesk";
+import { ScanDesk } from "@/components/scan/ScanDesk";
+import SupplyChainDesk from "@/components/supply-chain/SupplyChainDesk";
+import { HubTabs } from "@/components/shell/HubTabs";
 import { PageHeader } from "@/components/shell/PageHeader";
-import { gammaHref, liveHref, optionsHref } from "@/lib/routes";
+import {
+  hubPanelId,
+  LIVE_MODE_DESCRIPTIONS,
+  liveHubTabs,
+  resolveLiveMode,
+  type LiveMode,
+} from "@/lib/routes";
 
-type LiveMode = "risk" | "options";
+const DISCOVER_MODES = new Set<LiveMode>([
+  "bias",
+  "flow",
+  "picks",
+  "supply-chain",
+]);
 
-const TABS: { key: LiveMode; label: string }[] = [
-  { key: "risk", label: "Risk Mode" },
-  { key: "options", label: "Options Structure" },
-];
-
-function LiveOptionsHub() {
+function LiveOpsHub() {
   const searchParams = useSearchParams();
-  const rawMode = searchParams.get("mode");
-  const mode: LiveMode = rawMode === "options" ? "options" : "risk";
-  const symbol = searchParams.get("symbol")?.toUpperCase() ?? "";
+  const mode = resolveLiveMode(searchParams.get("mode"));
+  const symbol = searchParams.get("symbol")?.trim().toUpperCase() ?? "";
+  const accountRaw = Number(searchParams.get("account") || "1000");
+  const account =
+    Number.isFinite(accountRaw) && accountRaw > 0 ? accountRaw : 1000;
+
+  const tabs = liveHubTabs(symbol || undefined, account);
+  const activeLabel = tabs.find((t) => t.key === mode)?.label ?? "Decision";
+  const phase = DISCOVER_MODES.has(mode) ? "Discover" : "Operate";
+  const titleByMode: Record<LiveMode, string> = {
+    bias: "Bias",
+    flow: "Money flow",
+    picks: "Picks",
+    "supply-chain": "Supply chain",
+    watch: "Watch",
+    ticket: "Decision",
+    options: "Options",
+    gamma: "Gamma",
+  };
 
   return (
     <div className="td-page">
       <PageHeader
-        title="Live / Options"
-        description="Risk mode ticket and options structure side by side."
+        eyebrow={`Ops · ${phase}`}
+        title={titleByMode[mode] ?? activeLabel}
+        description={LIVE_MODE_DESCRIPTIONS[mode as LiveMode]}
         meta={
           symbol ? (
-            <span className="tabular" style={{ fontFamily: "var(--td-font-mono)" }}>
+            <span
+              className="tabular"
+              style={{ fontFamily: "var(--td-font-mono)" }}
+            >
               {symbol}
             </span>
-          ) : null
+          ) : (
+            <span className="td-chip">bias · flow · picks · decision</span>
+          )
         }
         actions={
-          <div className="flex flex-wrap items-center gap-1">
-            <nav
-              className="flex flex-wrap gap-1 border-b border-[var(--td-ink-700)]"
-              role="tablist"
-              aria-label="Live desk"
-            >
-              {TABS.map((t) => {
-                const active = mode === t.key;
-                const href = t.key === "risk" ? liveHref(symbol) : optionsHref(symbol);
-                return (
-                  <Link
-                    key={t.key}
-                    href={href}
-                    role="tab"
-                    aria-selected={active}
-                    aria-controls={`live-panel-${t.key}`}
-                    className={`td-btn ${active ? "td-btn-primary" : "td-btn-ghost"}`}
-                  >
-                    {t.label}
-                  </Link>
-                );
-              })}
-            </nav>
-            <Link
-              href={gammaHref(symbol)}
-              className="td-btn td-btn-ghost"
-              aria-label="Gamma exposure"
-            >
-              Gamma
-            </Link>
-          </div>
+          <HubTabs tabs={tabs} active={mode} aria-label="Ops workspace" />
         }
       />
 
       <div
-        id={`live-panel-${mode}`}
+        id={hubPanelId(mode)}
         role="tabpanel"
-        className="flex flex-col gap-4"
-        aria-label={TABS.find((t) => t.key === mode)?.label}
+        className="td-hub-panel flex flex-col gap-4"
+        aria-label={activeLabel}
       >
-        {mode === "risk" ? <LiveDesk showHeader={false} /> : <OptionsDesk showHeader={false} />}
+        {mode === "bias" ? <ScanDesk /> : null}
+        {mode === "flow" ? <MoneyFlowDesk showHeader={false} /> : null}
+        {mode === "picks" ? <PicksDesk showHeader={false} /> : null}
+        {mode === "supply-chain" ? (
+          <SupplyChainDesk showHeader={false} />
+        ) : null}
+        {mode === "ticket" ? <ExecutionDesk /> : null}
+        {mode === "watch" ? <WatchDesk showHeader={false} /> : null}
+        {mode === "options" ? <OptionsDesk showHeader={false} /> : null}
+        {mode === "gamma" ? <GammaExposureDesk showHeader={false} /> : null}
       </div>
     </div>
   );
@@ -87,11 +100,11 @@ export default function LivePage() {
     <Suspense
       fallback={
         <div className="td-page">
-          <p className="td-muted">Loading live desk…</p>
+          <p className="td-muted">Loading ops desk…</p>
         </div>
       }
     >
-      <LiveOptionsHub />
+      <LiveOpsHub />
     </Suspense>
   );
 }

@@ -1,0 +1,32 @@
+{
+  "schema_version": "regime-stress-config-v1",
+  "model": "v72_dual_sleeve",
+  "note": "P0-1 multi-regime probe (docs/ML_PROD_READINESS_PLAN.md). Daily bars from data_cache/1d (offline; 1H history only exists from 2024-07). v72's components were selected on 1H bars, so this is a regime PROBE of the rule DNA on 1D, not a like-for-like re-run of the promoted contract. See docs/REGIME_STRESS_FEASIBILITY.md.",
+  "source": "local_1d_cache",
+  "codes": ["TSLA.US", "MU.US", "SPY.US", "IONQ.US", "APLD.US", "XLP.US", "QQQ.US"],
+  "start_date": "2018-01-01",
+  "end_date": "2026-07-11",
+  "initial_cash": 1000,
+  "interval": "1D",
+  "engine": "daily",
+  "sub_windows": {
+    "2018_full": ["2018-01-01", "2018-12-31"],
+    "2018_Q4": ["2018-10-01", "2018-12-31"],
+    "2020_feb_apr": ["2020-02-01", "2020-04-30"],
+    "2022_full": ["2022-01-01", "2022-12-31"]
+  },
+  "pass_bar": {
+    "rule": "max DD inside live kill-switch levels and behavior explainable (flat in red regimes is acceptable)",
+    "halt_new_dd": 0.18,
+    "flatten_dd": 0.28
+  },
+  "data_coverage": {
+    "TSLA.US": "2018-01-02+",
+    "MU.US": "2018-01-02+",
+    "SPY.US": "2018-01-02+",
+    "XLP.US": "2018-01-02+",
+    "QQQ.US": "2018-01-02+",
+    "IONQ.US": "2021-01-04+ (listing)",
+    "APLD.US": "2022-04-13+ (listing)"
+  }
+}

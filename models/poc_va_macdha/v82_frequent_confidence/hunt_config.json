@@ -1,0 +1,11 @@
+{
+  "balanced_model": "v71_live_confidence",
+  "strict_model": "v70_high_confidence_wr",
+  "balanced_symbols": ["SPY.US", "QQQ.US", "XLP.US", "MU.US", "NVDA.US", "TSLA.US"],
+  "excluded_symbols": ["HYG.US", "LQD.US"],
+  "strict_rank_score": 0.75,
+  "max_weight": 0.35,
+  "confidence_kind": "uncalibrated_ordinal_rank_not_probability",
+  "selection_rule": "structural_core_vs_satellite_routing_research_after_historical_review",
+  "validation_status": "retrospective_research_requires_forward_paper_validation"
+}

@@ -88,6 +88,96 @@ function tagForStrike(data: GammaResponse, strike: number): string | null {
   return null;
 }
 
+function GammaHeatmapView({
+  data,
+  filtered,
+  maxAbs,
+}: {
+  data: GammaResponse;
+  filtered: GammaStrike[];
+  maxAbs: number;
+}) {
+  const sorted = useMemo(() => [...filtered].reverse(), [filtered]);
+
+  return (
+    <div className="flex flex-col gap-1.5 p-3 rounded bg-[var(--td-surface-soft)] border border-[var(--td-hairline)] max-h-[520px] overflow-y-auto font-mono text-[12px]">
+      {/* Header row */}
+      <div className="grid grid-cols-[1fr_90px_1fr] gap-4 text-[10px] text-[var(--td-ink-500)] uppercase font-semibold pb-2 border-b border-[var(--td-hairline)]">
+        <div className="text-right pr-2">Put GEX (Outflow / Support)</div>
+        <div className="text-center font-bold">Strike</div>
+        <div className="text-left pl-2">Call GEX (Inflow / Resistance)</div>
+      </div>
+
+      {sorted.map((s) => {
+        const isSpot = Math.abs(s.strike - data.spot) < (data.spot * 0.005); // within 0.5% of spot
+        const tag = tagForStrike(data, s.strike);
+        
+        const putPct = Math.min(100, (Math.abs(s.put_gex) / maxAbs) * 100);
+        const callPct = Math.min(100, (Math.abs(s.call_gex) / maxAbs) * 100);
+
+        return (
+          <div 
+            key={s.strike}
+            className={`grid grid-cols-[1fr_90px_1fr] gap-4 py-1.5 items-center hover:bg-[var(--td-surface-elevated)] transition-colors rounded ${
+              isSpot ? "bg-[rgba(255,255,255,0.035)] border-y border-dashed border-[var(--td-hairline)]" : ""
+            }`}
+          >
+            {/* Put GEX bar & value */}
+            <div className="flex items-center justify-end gap-2 pr-2">
+              <span className="text-[11px] text-[var(--td-ink-300)] tabular-nums">{formatNum(s.put_gex, 0)}</span>
+              <div className="w-24 h-3 bg-[var(--td-canvas)] rounded overflow-hidden flex justify-end shrink-0">
+                {s.put_gex < 0 && (
+                  <div 
+                    style={{ 
+                      width: `${putPct}%`, 
+                      background: "linear-gradient(to left, rgba(239, 68, 68, 0.7), rgba(239, 68, 68, 0.2))" 
+                    }} 
+                    className="h-full rounded-l"
+                  />
+                )}
+              </div>
+            </div>
+
+            {/* Strike Price */}
+            <div className="text-center relative flex flex-col items-center justify-center">
+              <span className={`font-bold px-1.5 py-0.5 rounded text-[11px] leading-none ${
+                isSpot ? "bg-[var(--td-brand-soft)] text-[var(--td-brand)] border border-[var(--td-brand)]" : "text-[var(--td-ink-100)]"
+              }`}>
+                {s.strike.toFixed(2)}
+              </span>
+              {tag && (
+                <span className={`text-[8px] font-bold px-1.5 py-0.5 rounded mt-1 uppercase tracking-wider leading-none shrink-0 ${
+                  tag.includes("CALL") ? "bg-[#2F6B4F1A] text-[#8fc39d] border border-[#2F6B4F33]" :
+                  tag.includes("PUT") ? "bg-[#A348481A] text-[#dc7e76] border border-[#A3484833]" :
+                  "bg-[var(--td-surface-elevated)] text-[var(--td-muted)] border border-[var(--td-hairline)]"
+                }`}>
+                  {tag}
+                </span>
+              )}
+            </div>
+
+            {/* Call GEX value & bar */}
+            <div className="flex items-center justify-start gap-2 pl-2">
+              <div className="w-24 h-3 bg-[var(--td-canvas)] rounded overflow-hidden shrink-0">
+                {s.call_gex > 0 && (
+                  <div 
+                    style={{ 
+                      width: `${callPct}%`, 
+                      background: "linear-gradient(to right, rgba(34, 197, 94, 0.7), rgba(34, 197, 94, 0.2))" 
+                    }} 
+                    className="h-full rounded-r"
+                  />
+                )}
+              </div>
+              <span className="text-[11px] text-[var(--td-ink-300)] tabular-nums">{formatNum(s.call_gex, 0)}</span>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function GammaScene({ data }: { data: GammaResponse }) {
   const titleId = useId();
   const descId = useId();
@@ -97,6 +187,8 @@ export function GammaScene({ data }: { data: GammaResponse }) {
   const [pointer, setPointer] = useState<{ x: number; y: number } | null>(null);
   const [rangePct, setRangePct] = useState<number | null>(10);
   const [series, setSeries] = useState<ExposureSeries>("net");
+  const [viewMode, setViewMode] = useState<"chart" | "heatmap">("heatmap");
+  
   const layout = useGammaLayout(data, wrapWidth, rangePct, series);
   const { filtered, maxAbs, width, minWidth, barW, xForIndex, xForValue, labelStep, displayMin, displayMax } = layout;
 
@@ -140,19 +232,42 @@ export function GammaScene({ data }: { data: GammaResponse }) {
   return (
     <div className="relative">
       <div className="mb-3 flex flex-wrap items-end justify-between gap-3 border-b pb-3" style={{ borderColor: GRID }}>
-        <div className="flex flex-wrap gap-1" role="group" aria-label="Exposure side">
-          {(["net", "calls", "puts"] as const).map((value) => (
+        <div className="flex flex-wrap gap-2 items-center">
+          <div className="flex overflow-hidden rounded border border-[var(--td-hairline)] bg-[var(--td-surface-soft)] mr-2" role="group">
             <button
-              key={value}
-              type="button"
-              aria-pressed={series === value}
-              onClick={() => setSeries(value)}
-              className="td-btn td-btn-ghost px-2 py-1 text-[10px]"
-              style={series === value ? { borderColor: seriesColor, color: seriesColor } : undefined}
+              onClick={() => setViewMode("heatmap")}
+              className={`px-3 py-1 text-[10px] uppercase font-bold transition-colors ${
+                viewMode === "heatmap" ? "bg-[var(--td-brand)] text-[var(--td-canvas)]" : "text-[var(--td-muted)] hover:text-[var(--td-ink)]"
+              }`}
             >
-              {value}
+              Heatmap
             </button>
-          ))}
+            <button
+              onClick={() => setViewMode("chart")}
+              className={`px-3 py-1 text-[10px] uppercase font-bold transition-colors ${
+                viewMode === "chart" ? "bg-[var(--td-brand)] text-[var(--td-canvas)]" : "text-[var(--td-muted)] hover:text-[var(--td-ink)]"
+              }`}
+            >
+              Chart
+            </button>
+          </div>
+
+          {viewMode === "chart" && (
+            <div className="flex flex-wrap gap-1" role="group" aria-label="Exposure side">
+              {(["net", "calls", "puts"] as const).map((value) => (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={series === value}
+                  onClick={() => setSeries(value)}
+                  className="td-btn td-btn-ghost px-2 py-1 text-[10px]"
+                  style={series === value ? { borderColor: seriesColor, color: seriesColor } : undefined}
+                >
+                  {value}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-1" role="group" aria-label="Strike range around spot">
           <span className="mr-1 text-[10px] uppercase tracking-wider" style={{ color: MUTED }}>Strikes</span>
@@ -173,8 +288,12 @@ export function GammaScene({ data }: { data: GammaResponse }) {
 
       {filtered.length === 0 ? (
         <div className="flex h-72 w-full items-center justify-center text-[13px]" style={{ color: MUTED }}>
-          No {seriesLabel.toLowerCase()} gamma at the selected strikes.
+          No gamma at the selected strikes.
         </div>
+      ) : viewMode === "heatmap" ? (
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: "easeOut" }}>
+          <GammaHeatmapView data={data} filtered={filtered} maxAbs={maxAbs} />
+        </motion.div>
       ) : (
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35, ease: "easeOut" }}>
       <div

@@ -1,0 +1,11 @@
+{
+  "sniper_model": "v71_live_confidence",
+  "core_model": "v39d_confluence",
+  "core_scale": 0.85,
+  "both_core_frac": 0.35,
+  "max_weight": 0.50,
+  "sniper_min_conf": 0.0,
+  "selection_rule": "frozen_before_oos_eval",
+  "train_window_end": "2025-08-01",
+  "hypothesis": "Hierarchical dual-sleeve: prefer v71 high-WR sniper when active; else scaled v39d core; when both fire stack sniper + 35% core under 50% cap. No signal averaging."
+}

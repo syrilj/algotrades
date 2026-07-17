@@ -1,0 +1,121 @@
+{
+  "schema_version": 1,
+  "authority": "live_equity_deployment",
+  "family": "poc_va_macdha",
+  "updated_at": "2026-07-16T00:00:00Z",
+  "updated_by": "control-plane-reconciliation",
+  "active": {
+    "equity_model": "v72_dual_sleeve",
+    "bundle": {
+      "path": "models/poc_va_macdha/v72_dual_sleeve",
+      "signal_engine_sha256": "26025102b5cc10980f584ec449951fe060cdd11b9512426968fe82fd0b312633",
+      "config_sha256": "a0466a8081ffc97571a77bb5b5303a1261280dde4a1dc6cde64f1abb8527d6b5",
+      "results_sha256": "a84160010a651e6736c7ffb4d0fae09b72213a8e953a40c6861d7687ad3ef930",
+      "dependency_policy": "required",
+      "dependencies": [
+        {
+          "path": "models/poc_va_macdha/v72_dual_sleeve/hunt_config.json",
+          "sha256": "d0dbbe4cd226750597536b24a8057a597346862ad668e6d3c191ba6c3975e5a8"
+        },
+        {
+          "path": "models/poc_va_macdha/v71_live_confidence/signal_engine.py",
+          "sha256": "f62285a57b325c6386dcf3341fb78fd6725766d0394e7ca3aa35e19d55b64aae"
+        },
+        {
+          "path": "models/poc_va_macdha/v71_live_confidence/gates.py",
+          "sha256": "5f4877f8723cab5fb16d804502b5bcc773a9aab3b85d6f133c99a50fbdb51a54"
+        },
+        {
+          "path": "models/poc_va_macdha/v71_live_confidence/hunt_config.json",
+          "sha256": "625a896279e47de636ea030b84073063959387b8bd3b9788a5566927c9ee1afb"
+        },
+        {
+          "path": "models/poc_va_macdha/v45_ultimate_rsi/signal_engine.py",
+          "sha256": "52fca244456739c441b9851c2aceabc74abbc3fb215cce839875e64e07f0e2e1"
+        },
+        {
+          "path": "models/poc_va_macdha/v45_ultimate_rsi/config.json",
+          "sha256": "63d692ec2dc76a3e30eb1a980003f12105bc88fd3a798552b5a0a67b94306353"
+        },
+        {
+          "path": "models/poc_va_macdha/v39d_confluence/signal_engine.py",
+          "sha256": "82c1516a2bbc68d8d699858633dd392489b80fe1fbcbb9a6763a03f36de800a5"
+        },
+        {
+          "path": "models/poc_va_macdha/v39d_confluence/meta_config.json",
+          "sha256": "fabf8c8d4ed33ac8656921bb9c2f60c36b916a2b19f65bcde38bab072b8957c1"
+        },
+        {
+          "path": "models/poc_va_macdha/v39d_confluence/meta_xgb_final.json",
+          "sha256": "4f94d512bc58e4c9c1a9c2ed76dbf139ff1ca568d089fe3c32399648566dc3b3"
+        },
+        {
+          "path": "models/poc_va_macdha/v39d_confluence/candidate_ledger.py",
+          "sha256": "e0b0fa56df8fd268908d9334e044803f37d64426ff0d056423888c444d647e38"
+        }
+      ]
+    }
+  },
+  "fallbacks": {
+    "equity": [
+      "v39d_confluence",
+      "v71_live_confidence",
+      "v39b_live_adapt"
+    ],
+    "policy": "ordered_fail_closed"
+  },
+  "rollback_model": "v39d_confluence",
+  "calibration": {
+    "artifact": "runs/calibration/active/v72_dual_sleeve.json",
+    "sha256": "a25426106f83488d4aab10773e47d642435e38fea704bdc128bc55cd181bf97b",
+    "status": "blocked_identity_ordinal_only",
+    "probability_calibrated": false,
+    "cross_fitted": false,
+    "semantics": "ordinal_confidence_not_guaranteed_probability"
+  },
+  "execution_readiness": {
+    "model_routing": "ready",
+    "probability_sized_execution": "blocked_until_cross_fitted_calibrator_passes",
+    "reason": "current v72 artifact is an identity map and must not be treated as probability calibration"
+  },
+  "promotion_evidence": [
+    {
+      "artifact": "runs/v72_dual_sleeve/STATE.json",
+      "sha256": "7fd748270a190ec22da7ce53ffc72a274cd1fdaf5ee7a314e2d1ca60f36da54f",
+      "kind": "promotion_gates"
+    },
+    {
+      "artifact": "runs/v72_dual_sleeve/COMPARE.json",
+      "sha256": "9361d26bba3da8e88ddf1f99e39c91d5672a732410758976a290f05eb0b53997",
+      "kind": "baseline_comparison"
+    }
+  ],
+  "data_contract": {
+    "source": "local",
+    "price_adjustment": "adjusted",
+    "interval": "1H",
+    "cash": 1000,
+    "train_window": [
+      "2024-08-01",
+      "2025-08-01"
+    ],
+    "locked_holdout_window": [
+      "2025-08-01",
+      "2026-07-11"
+    ],
+    "universe": [
+      "TSLA.US",
+      "MU.US",
+      "SPY.US",
+      "IONQ.US",
+      "APLD.US",
+      "XLP.US",
+      "QQQ.US"
+    ],
+    "annualization_bars_per_year": 1764
+  },
+  "compatibility": {
+    "winner_metadata": "models/poc_va_macdha/WINNER.json",
+    "desk_routing": "models/poc_va_macdha/DESK_ROUTING.json"
+  }
+}

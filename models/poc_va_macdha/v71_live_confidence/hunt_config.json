@@ -1,0 +1,43 @@
+{
+  "base_models": ["v45_ultimate_rsi"],
+  "primary": "v45_ultimate_rsi",
+  "secondary": null,
+  "secondary_agree_boost": true,
+  "agree_boost_mult": 1.15,
+  "trend_filter": {
+    "lookback": 250,
+    "price_col": "close",
+    "direction": "above",
+    "apply": "entry"
+  },
+  "quality": {
+    "enabled": true,
+    "min_score": 1
+  },
+  "confidence": {
+    "use_rsi_depth": true,
+    "quality_weight": 0.65,
+    "rsi_weight": 0.35,
+    "min_scale_frac": 1.0,
+    "max_scale_frac": 1.55
+  },
+  "signal_scale": 0.225,
+  "max_scale_cap": 0.4,
+  "stop_loss_pct": 0.0,
+  "selection_rule": "frozen_before_oos_eval",
+  "train_window_end": "2025-08-01",
+  "variant_id": "sizeup_q1",
+  "hypothesis": "v45 + SMA250 entry + soft quality floor (min_score=1) + size-UP on high confidence (quality+RSI depth). Low conf still full base scale; high conf up to 1.55x base (cap 40%). Selected on train (excl. pure v50 clone); OOS locked.",
+  "selected_from_train": {
+    "variant": "sizeup_q1",
+    "note": "v50_clone excluded as ablation; sizeup_q1 best novel arm with train WR>=90% n>=20 and OOS ret matching v50",
+    "train_wr": 0.9,
+    "train_ret": 0.49935367507875994,
+    "train_n": 20,
+    "train_sharpe": 2.0493014671487613,
+    "oos_wr": 0.7692307692307693,
+    "oos_ret": 0.30896121676944865,
+    "oos_n": 26,
+    "oos_sharpe": 1.17000516120431
+  }
+}

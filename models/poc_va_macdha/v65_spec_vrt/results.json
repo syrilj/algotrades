@@ -1,0 +1,17 @@
+{
+  "portfolio": {
+    "total_return": 0.037398117937389896,
+    "max_drawdown": -0.042909185088448716,
+    "sharpe": 0.1256783692090018,
+    "profit_factor": 1.4593,
+    "trade_count": 32,
+    "win_rate": 0.5,
+    "final_value": 1037398.11793739
+  },
+  "generated_utc": "",
+  "codes": [
+    "VRT.US"
+  ],
+  "start": "2024-08-01",
+  "end": "2026-07-11"
+}

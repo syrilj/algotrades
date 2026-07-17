@@ -191,6 +191,17 @@ class TickStateAndBarTests(MarketRuntimeTestCase):
                 received_at=datetime(2026, 7, 13, 10, 0, tzinfo=UTC),
             )
 
+    def test_tick_rejects_market_timestamp_far_after_receipt(self):
+        received_at = datetime(2026, 7, 13, 10, 0, tzinfo=UTC)
+        with self.assertRaisesRegex(ValueError, "market_asof"):
+            Tick(
+                instrument_id="VOD.L",
+                price=100.0,
+                size=1.0,
+                market_asof=received_at + timedelta(minutes=10),
+                received_at=received_at,
+            )
+
 
 class FreshnessAndHorizonTests(MarketRuntimeTestCase):
     def test_freshness_uses_market_timestamp_and_category_threshold(self):
@@ -210,6 +221,16 @@ class FreshnessAndHorizonTests(MarketRuntimeTestCase):
         self.assertEqual(stock_freshness.age, timedelta(seconds=20))
         self.assertEqual(stock_freshness.market_asof, market_asof)
         self.assertEqual(stock_freshness.computed_at, self.computed_at)
+
+    def test_future_market_timestamp_is_stale(self):
+        stock = self.instrument(category="stock")
+        freshness = evaluate_freshness(
+            stock,
+            self.computed_at + timedelta(minutes=10),
+            self.computed_at,
+        )
+
+        self.assertTrue(freshness.is_stale)
 
     def test_horizon_adapts_to_category_activity_session_and_freshness(self):
         stock = self.instrument(category="stock")

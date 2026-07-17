@@ -577,8 +577,39 @@ def _soft_feature_mult(
     return float(np.clip(m, 0.35, 1.50))
 
 
-def _sector_rs_score(code: str, data_map: Dict, lookback_days: int = 5) -> float:
-    """Sector relative strength vs SPY (0-1, 0.5 = neutral)."""
+def _relative_strength_score(
+    numerator: Optional[pd.DataFrame],
+    denominator: Optional[pd.DataFrame],
+    index: pd.Index,
+    lookback_bars: int = 5,
+) -> pd.Series:
+    """Point-in-time relative-strength score on ``index``.
+
+    The previous implementation returned one scalar computed from the tail of
+    the *entire* backtest and reused it for every historical decision.  This
+    version produces a causal series: value ``t`` uses returns ending at
+    ``t-1`` and is therefore known before the next-open execution.
+    """
+    neutral = pd.Series(0.5, index=index, dtype=float)
+    if numerator is None or denominator is None or numerator.empty or denominator.empty:
+        return neutral
+    try:
+        num = numerator["close"].astype(float).reindex(index, method="ffill")
+        den = denominator["close"].astype(float).reindex(index, method="ffill")
+        num_ret = num.pct_change(lookback_bars, fill_method=None).shift(1)
+        den_ret = den.pct_change(lookback_bars, fill_method=None).shift(1)
+        return (((num_ret - den_ret) + 0.05) / 0.10).clip(0.0, 1.0).fillna(0.5)
+    except Exception:
+        return neutral
+
+
+def _sector_rs_score(
+    code: str,
+    data_map: Dict,
+    index: pd.Index,
+    lookback_bars: int = 5,
+) -> pd.Series:
+    """Causal sector relative strength vs SPY (0-1, 0.5 neutral)."""
     sym = code.replace(".US", "")
     sectors = {
         "mag7": (["AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "META", "TSLA", "NFLX", "AVGO"], "QQQ"),
@@ -590,38 +621,31 @@ def _sector_rs_score(code: str, data_map: Dict, lookback_days: int = 5) -> float
         if sym in members:
             etf = etf_name
             break
-    if etf is None or etf not in data_map:
-        return 0.5
-    etf_px = data_map[etf]["close"]
-    spy_px = data_map.get("SPY.US", pd.DataFrame())["close"]
-    if len(etf_px) <= lookback_days or len(spy_px) <= lookback_days:
-        return 0.5
-    try:
-        etf_ret = float(etf_px.iloc[-1] / etf_px.iloc[-lookback_days-1] - 1)
-        spy_ret = float(spy_px.iloc[-1] / spy_px.iloc[-lookback_days-1] - 1)
-        rs = etf_ret - spy_ret
-        return float(np.clip((rs + 0.05) / 0.10, 0.0, 1.0))
-    except Exception:
-        return 0.5
+    etf_frame = None
+    if etf:
+        etf_frame = data_map.get(etf)
+        if etf_frame is None:
+            etf_frame = data_map.get(f"{etf}.US")
+    return _relative_strength_score(
+        etf_frame,
+        data_map.get("SPY.US"),
+        index,
+        lookback_bars=lookback_bars,
+    )
 
 
-def _qqq_rs_score(data_map: Dict, lookback_days: int = 5) -> float:
-    """QQQ vs SPY relative strength (0-1, 0.5 = neutral)."""
-    qqq = data_map.get("QQQ.US")
-    spy = data_map.get("SPY.US")
-    if qqq is None or spy is None or qqq.empty or spy.empty:
-        return 0.5
-    qqq_px = qqq["close"]
-    spy_px = spy["close"]
-    if len(qqq_px) <= lookback_days or len(spy_px) <= lookback_days:
-        return 0.5
-    try:
-        qqq_ret = float(qqq_px.iloc[-1] / qqq_px.iloc[-lookback_days-1] - 1)
-        spy_ret = float(spy_px.iloc[-1] / spy_px.iloc[-lookback_days-1] - 1)
-        rs = qqq_ret - spy_ret
-        return float(np.clip((rs + 0.05) / 0.10, 0.0, 1.0))
-    except Exception:
-        return 0.5
+def _qqq_rs_score(
+    data_map: Dict,
+    index: pd.Index,
+    lookback_bars: int = 5,
+) -> pd.Series:
+    """Causal QQQ-vs-SPY relative-strength score."""
+    return _relative_strength_score(
+        data_map.get("QQQ.US"),
+        data_map.get("SPY.US"),
+        index,
+        lookback_bars=lookback_bars,
+    )
 
 
 _HIGH_BETA = {"TSLA.US", "IONQ.US", "APLD.US", "ARM.US"}
@@ -763,9 +787,15 @@ class SignalEngine:
         atr=_atr(data).replace(0,np.nan)
         high=data["high"]
         atr_pct=(atr/close.replace(0,np.nan)).fillna(0.0)
-        med_atr_pct=float(atr_pct.replace(0,np.nan).median())
-        if not np.isfinite(med_atr_pct) or med_atr_pct<=0:
-            med_atr_pct=float(atr_pct.mean()) if atr_pct.mean()>0 else 0.02
+        # Point-in-time volatility baseline.  A full-sample median leaks future
+        # volatility regimes into every historical entry and live replay.
+        med_atr_pct=(
+            atr_pct.replace(0,np.nan)
+            .shift(1)
+            .expanding(min_periods=20)
+            .median()
+            .fillna(0.02)
+        )
 
         # Conviction overlays + live-adapt VPA
         vol_z = vp["vol_z"].shift(1).fillna(0.0)
@@ -787,11 +817,11 @@ class SignalEngine:
         demand_node = (near_val | near_poc).fillna(False)
         ema_bull = cloud["ema_bull"].shift(1).fillna(False).astype(bool)
         ema_bear = cloud["ema_bear"].shift(1).fillna(False).astype(bool)
-        sector_score = _sector_rs_score(code, data_map)
-        qqq_score = _qqq_rs_score(data_map)
-        rs_boost = 0.02 * (float(sector_score) - 0.5) + 0.02 * (float(qqq_score) - 0.5)
-        qqq_weak = float(qqq_score) < 0.40
-        hb_soft = (code in _HIGH_BETA) and qqq_weak
+        sector_score = _sector_rs_score(code, data_map, data.index)
+        qqq_score = _qqq_rs_score(data_map, data.index)
+        rs_boost = 0.02 * (sector_score - 0.5) + 0.02 * (qqq_score - 0.5)
+        qqq_weak = qqq_score < 0.40
+        hb_soft = qqq_weak if code in _HIGH_BETA else pd.Series(False, index=data.index)
 
         gates=[poc_ok,in_va]
         if require_htf_green: gates.append(htf)
@@ -821,9 +851,11 @@ class SignalEngine:
             spy_reg=self._spy_htf.reindex(data.index,method="ffill").fillna(0.0)
         signal=pd.Series(0.0,index=data.index); in_pos=False; entry_size=0.0
         entry_px=np.nan; peak_px=np.nan; entry_atr=np.nan; entry_bar=-1
-        # Seed from live desk streak if available (rapid adapt across sessions)
-        streak_mult = float(self._live_streak)
-        consec = int(self._live_consec)
+        # Historical replay state is local to this symbol.  Seeding from a
+        # mutable desk file, or carrying one symbol's future outcomes into the
+        # next symbol, makes output order-dependent and non-reproducible.
+        streak_mult = 1.0
+        consec = 0
         for i in range(len(data)):
             px=float(close.iloc[i])
             a=float(atr.iloc[i]) if np.isfinite(atr.iloc[i]) else 0.0
@@ -831,7 +863,7 @@ class SignalEngine:
                 if bool(long_entry.iloc[i]):
                     feats=self._meta_row(code,i,close,poc,val,vwap,atr,local_ha,macd_hist,above_vwap,vp,htf,conf,spy_reg)
                     proba=float(self._booster.predict_proba(np.asarray([feats],dtype=float))[0,1])
-                    boost = _volume_z_boost(float(vol_z.iloc[i])) + float(rs_boost)
+                    boost = _volume_z_boost(float(vol_z.iloc[i])) + float(rs_boost.iloc[i])
                     # Live: VPA mom lifts meta confidence
                     boost += 0.015 * float(np.clip(vpa_mom.iloc[i], -1.0, 1.0))
                     # A+ confluence slight meta nudge (secondary only)
@@ -843,9 +875,10 @@ class SignalEngine:
                         boost += 0.02
                     adj_proba = float(np.clip(proba + boost, 0.0, 1.0))
                     meta_sz=_prob_to_size(adj_proba, self._thr)
+                    median_atr_i = float(med_atr_pct.iloc[i])
                     feat_m = _soft_feature_mult(
                         float(atr_pct.iloc[i]),
-                        med_atr_pct,
+                        median_atr_i,
                         float(room_pct.iloc[i]),
                         float(macd_hist.iloc[i]) if pd.notna(macd_hist.iloc[i]) else 0.0,
                         float(ret_5d.iloc[i]),
@@ -857,10 +890,10 @@ class SignalEngine:
                         bool(demand_node.iloc[i]),
                         bool(ema_bull.iloc[i]),
                         bool(ema_bear.iloc[i]),
-                        bool(hb_soft),
+                        bool(hb_soft.iloc[i]),
                     )
                     raw = meta_sz * feat_m * streak_mult if meta_sz > 0 else 0.0
-                    sz=_risk_scale_size(raw, float(atr_pct.iloc[i]), med_atr_pct, kelly_fraction)
+                    sz=_risk_scale_size(raw, float(atr_pct.iloc[i]), median_atr_i, kelly_fraction)
                     sz = float(np.clip(sz * self._risk_scale, 0.0, 1.0))
                     self._ledger.record_entry(
                         timestamp=data.index[i],
@@ -925,8 +958,6 @@ class SignalEngine:
                         streak_mult, consec = _live_streak_update(
                             streak_mult, won, consec, self._after_win, self._after_loss
                         )
-                        self._live_streak = streak_mult
-                        self._live_consec = consec
                     reason = "soft_exit" if soft_exit else ("trail_stop" if trail_stop else "hard_stop")
                     self._ledger.record_exit(
                         timestamp=data.index[i], code=code, exit_px=px, reason=reason

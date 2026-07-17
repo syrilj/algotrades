@@ -1,0 +1,11 @@
+{
+  "base_models": ["v39d_confluence", "v39b_live_adapt", "v50_high_win_rate", "v63_spy_prune"],
+  "use_specialist": true,
+  "lookback_bars": 60,
+  "metric": "composite",
+  "switching_penalty": 0.02,
+  "specialist_bias": 0.005,
+  "standard_bias": 0.002,
+  "fallback": "v39d_confluence",
+  "warmup": 80
+}

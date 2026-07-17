@@ -1,0 +1,17 @@
+{
+  "portfolio": {
+    "total_return": 1.0722269858469877,
+    "max_drawdown": -0.16457227336099964,
+    "sharpe": 0.7197992596881831,
+    "profit_factor": 3.4231,
+    "trade_count": 25,
+    "win_rate": 0.6,
+    "final_value": 2072226.985846988
+  },
+  "generated_utc": "",
+  "codes": [
+    "SNDK.US"
+  ],
+  "start": "2024-08-01",
+  "end": "2026-07-11"
+}

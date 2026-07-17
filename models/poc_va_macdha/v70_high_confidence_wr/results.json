@@ -1,0 +1,23 @@
+{
+  "portfolio": {
+    "total_return": 0.4330475776314078,
+    "max_drawdown": -0.19497016835674877,
+    "sharpe": 1.2469739607332957,
+    "profit_factor": 4.0786,
+    "trade_count": 33,
+    "win_rate": 0.9090909090909091,
+    "final_value": 1433047.5776314079
+  },
+  "generated_utc": "",
+  "codes": [
+    "TSLA.US",
+    "MU.US",
+    "SPY.US",
+    "IONQ.US",
+    "APLD.US",
+    "XLP.US",
+    "QQQ.US"
+  ],
+  "start": "2024-08-01",
+  "end": "2026-07-11"
+}

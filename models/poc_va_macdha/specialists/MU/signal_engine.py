@@ -1,20 +1,22 @@
 from __future__ import annotations
-from typing import Dict
+"""Parametric desk specialist — loads strategy knobs from config.json if present."""
+from pathlib import Path
+from typing import Dict, Any
+import json
 import numpy as np
 import pandas as pd
+
+# --- indicators (shared specialist stack) ---
 
 def _ema(s, n):
     return s.ewm(span=n, adjust=False).mean()
 
-
 def _sma(s, n):
     return s.rolling(n, min_periods=max(1, n // 2)).mean()
-
 
 def _alpha_from_apt(apt: float) -> float:
     decay = np.exp(-np.log(2.0) / max(1.0, float(apt)))
     return 1.0 - decay
-
 
 def dynamic_swing_anchored_vwap(df, swing_period=50, base_apt=20.0, use_adapt_apt=False, vol_bias=10.0):
     high = df["high"].to_numpy(float)
@@ -66,279 +68,276 @@ def dynamic_swing_anchored_vwap(df, swing_period=50, base_apt=20.0, use_adapt_ap
         vwap[i] = p_acc/vol_acc if vol_acc > 0 else np.nan
     return pd.DataFrame({"vwap": vwap, "dir": direction, "uptrend": direction > 0}, index=df.index)
 
-
 def squeeze_momentum(df, length=20, mult_bb=2.0, length_kc=20, mult_kc=1.5, use_tr=True):
-    """LazyBear SQZMOM_LB."""
     src = df["close"]
     basis = _sma(src, length)
-    # LazyBear BB uses multKC * stdev in original script (known quirk) — match LazyBear exactly
-    dev = mult_kc * src.rolling(length, min_periods=length).std(ddof=0)
-    upper_bb = basis + mult_bb * src.rolling(length, min_periods=length).std(ddof=0)
-    lower_bb = basis - mult_bb * src.rolling(length, min_periods=length).std(ddof=0)
-    # Recreate as published: basis=sma, upperBB=basis+mult*stdev — use BB mult for BB
     std = src.rolling(length, min_periods=max(2, length//2)).std(ddof=0)
     upper_bb = basis + mult_bb * std
     lower_bb = basis - mult_bb * std
     ma = _sma(src, length_kc)
-    tr = pd.concat([
-        df["high"]-df["low"],
-        (df["high"]-df["close"].shift(1)).abs(),
-        (df["low"]-df["close"].shift(1)).abs(),
-    ], axis=1).max(axis=1)
-    rng = tr if use_tr else (df["high"] - df["low"])
-    rangema = _sma(rng, length_kc)
-    upper_kc = ma + rangema * mult_kc
-    lower_kc = ma - rangema * mult_kc
-    sqz_on = (lower_bb > lower_kc) & (upper_bb < upper_kc)
-    sqz_off = (lower_bb < lower_kc) & (upper_bb > upper_kc)
-    # linreg of (src - avg(avg(highest,lowest), sma))
-    highest = df["high"].rolling(length_kc, min_periods=1).max()
-    lowest = df["low"].rolling(length_kc, min_periods=1).min()
-    mid = ((highest + lowest) / 2.0 + _sma(src, length_kc)) / 2.0
-    delta = src - mid
-    # rolling linear regression value at end of window (slope*0 + intercept relative) == linreg(...,0)
-    def _linreg0(x):
-        if np.any(~np.isfinite(x)):
-            return np.nan
-        n = len(x)
-        t = np.arange(n, dtype=float)
-        t_mean = t.mean()
-        x_mean = x.mean()
-        denom = ((t - t_mean) ** 2).sum()
-        if denom == 0:
-            return x_mean
-        slope = ((t - t_mean) * (x - x_mean)).sum() / denom
-        intercept = x_mean - slope * t_mean
-        return intercept + slope * (n - 1)  # value at last bar of window
-
-    val = delta.rolling(length_kc, min_periods=length_kc).apply(_linreg0, raw=True)
-    val_prev = val.shift(1)
-    mom_up = val > 0
-    mom_up_inc = mom_up & (val > val_prev)
-    mom_dn = val < 0
-    squeeze_release = sqz_on.shift(1).fillna(False) & sqz_off  # just released
-    return pd.DataFrame({
-        "sqz_val": val,
-        "sqz_on": sqz_on.fillna(False),
-        "sqz_off": sqz_off.fillna(False),
-        "sqz_release": squeeze_release.fillna(False),
-        "mom_pos": mom_up.fillna(False),
-        "mom_pos_inc": mom_up_inc.fillna(False),
-        "mom_neg": mom_dn.fillna(False),
-    }, index=df.index)
-
+    high, low, close = df["high"], df["low"], df["close"]
+    prev = close.shift(1)
+    tr = pd.concat([(high-low), (high-prev).abs(), (low-prev).abs()], axis=1).max(axis=1)
+    rangema = tr.ewm(span=length_kc, adjust=False).mean() if use_tr else (high-low).rolling(length_kc).mean()
+    upper_kc = ma + mult_kc * rangema
+    lower_kc = ma - mult_kc * rangema
+    sqz_on = ((lower_bb > lower_kc) & (upper_bb < upper_kc)).fillna(False)
+    sqz_off = ((lower_bb < lower_kc) & (upper_bb > upper_kc)).fillna(False)
+    mom = src - basis
+    return {
+        "sqz_on": sqz_on.astype(bool),
+        "sqz_off": sqz_off.astype(bool),
+        "sqz_release": (sqz_on.shift(1).fillna(False) & sqz_off).astype(bool),
+        "mom_pos": (mom > 0).fillna(False).astype(bool),
+        "mom_neg": (mom < 0).fillna(False).astype(bool),
+        "mom_pos_inc": ((mom > mom.shift(1)) & (mom > 0)).fillna(False).astype(bool),
+    }
 
 def volume_price_state(df, look=5, vol_sma=20):
-    """Volume-price confirmation / red-flag logic.
-
-    Confirm long: price rising AND volume expanding
-    Red flag:     price rising AND volume drying up
-    Healthy dip:  price falling AND volume drying up (not a panic)
-    Dump:         price falling AND volume expanding
-    """
-    close = df["close"]
-    vol = df["volume"]
-    price_up = close > close.shift(look)
-    price_dn = close < close.shift(look)
-    vsma = _sma(vol, vol_sma)
-    vol_up = vol > vsma
-    vol_dn = vol < vsma
-    # also short-term volume trend
-    vol_rising = vol > vol.shift(look)
-    vol_falling = vol < vol.shift(look)
-
-    confirm_up = price_up & (vol_up | vol_rising)          # price↑ volume↑
-    red_flag_up = price_up & vol_falling & ~vol_up         # price↑ volume drying — weak
-    healthy_pull = price_dn & vol_falling                  # price↓ volume↓
-    dump = price_dn & vol_rising & vol_up                  # price↓ volume↑ — avoid longs
-
-    return pd.DataFrame({
-        "confirm_up": confirm_up.fillna(False),
-        "red_flag_up": red_flag_up.fillna(False),
-        "healthy_pull": healthy_pull.fillna(False),
-        "dump": dump.fillna(False),
-        "vol_expand": vol_up.fillna(False),
-    }, index=df.index)
-
-
-def _standardized_macd_ha(df, fast=12, slow=26, signal_len=9):
-    src_px = df["close"]
-    hl = (df["high"] - df["low"]).replace(0, np.nan)
-    macd = (_ema(src_px, fast) - _ema(src_px, slow)) / _ema(hl, slow) * 100.0
-    macd = macd.replace([np.inf, -np.inf], np.nan).fillna(0.0)
-    macd_prev = macd.shift(1).fillna(macd)
-    o, h, l, c = macd_prev, np.maximum(macd, macd_prev), np.minimum(macd, macd_prev), macd
-    ha_close = (o + h + l + c) / 4.0
-    ha_open = pd.Series(index=df.index, dtype=float)
-    ha_open.iloc[0] = (o.iloc[0] + c.iloc[0]) / 2.0
-    for i in range(1, len(df)):
-        ha_open.iloc[i] = (ha_open.iloc[i-1] + ha_close.iloc[i-1]) / 2.0
-    out = pd.DataFrame({"ha_close": ha_close, "ha_open": ha_open, "macd": macd}, index=df.index)
-    out["ha_green"] = out["ha_close"] > out["ha_open"]
-    out["ha_red"] = out["ha_close"] < out["ha_open"]
-    return out
-
-
-def _volume_profile_levels(highs, lows, volumes, rows, value_area_pct):
-    price_high = float(np.max(highs)); price_low = float(np.min(lows))
-    if not np.isfinite(price_high) or not np.isfinite(price_low) or price_high <= price_low:
-        mid = float(np.nanmean((highs+lows)/2)); return mid, mid, mid
-    step = (price_high - price_low) / rows
-    if step <= 0:
-        mid = (price_high+price_low)/2; return mid, price_high, price_low
-    vol_bins = np.zeros(rows)
-    for h,l,v in zip(highs, lows, volumes):
-        if not np.isfinite(v) or v <= 0: continue
-        br = h - l
-        for level in range(rows):
-            bin_lo = price_low + level*step
-            if h >= bin_lo and l < bin_lo+step:
-                vol_bins[level] += v * (1.0 if br==0 else step/br)
-    if vol_bins.sum() <= 0:
-        mid = (price_high+price_low)/2; return mid, price_high, price_low
-    poc_level = int(np.argmax(vol_bins))
-    target = vol_bins.sum() * value_area_pct
-    value = vol_bins[poc_level]; above = below = poc_level
-    while value < target:
-        if below==0 and above==rows-1: break
-        va = vol_bins[above+1] if above < rows-1 else 0.0
-        vb = vol_bins[below-1] if below > 0 else 0.0
-        if va==0 and vb==0: break
-        if va >= vb: above += 1; value += va
-        else: below -= 1; value += vb
-    return float(price_low+(poc_level+0.5)*step), float(price_low+(above+1)*step), float(price_low+below*step)
-
-
-def _prior_session_profile(df, lookback, rows, value_area_pct):
-    n=len(df); poc=np.full(n,np.nan); vah=np.full(n,np.nan); val=np.full(n,np.nan)
-    highs=df["high"].to_numpy(float); lows=df["low"].to_numpy(float); vols=df["volume"].to_numpy(float)
-    for i in range(lookback, n):
-        poc[i], vah[i], val[i] = _volume_profile_levels(highs[i-lookback:i], lows[i-lookback:i], vols[i-lookback:i], rows, value_area_pct)
-    return pd.DataFrame({"poc":poc,"vah":vah,"val":val}, index=df.index)
-
+    close = df["close"].astype(float)
+    high = df["high"].astype(float)
+    low = df["low"].astype(float)
+    vol = df["volume"].astype(float)
+    ret1 = close.pct_change()
+    vma = _sma(vol, vol_sma)
+    vol_expand = (vol > 1.15 * vma).fillna(False)
+    green = (close > close.shift(1)).fillna(False)
+    red = (close < close.shift(1)).fillna(False)
+    rng = (high - low).replace(0, np.nan)
+    upper_wick = (high - close).clip(lower=0) / rng
+    lower_wick = (close - low).clip(lower=0) / rng
+    dump = (red & vol_expand & (ret1 < -0.02)).fillna(False)
+    red_flag_up = (green & vol_expand & (upper_wick > 0.55) & (ret1 > 0.015)).fillna(False)
+    confirm_up = (green & vol_expand & (ret1 > 0.005)).fillna(False)
+    healthy_pull = (red & ~vol_expand & (lower_wick > 0.4)).fillna(False)
+    return {
+        "vol_expand": vol_expand.astype(bool),
+        "dump": dump.astype(bool),
+        "red_flag_up": red_flag_up.astype(bool),
+        "confirm_up": confirm_up.astype(bool),
+        "healthy_pull": healthy_pull.astype(bool),
+    }
 
 def _resample_ohlcv(df, rule):
-    return (df[["open","high","low","close","volume"]].resample(rule, label="right", closed="right")
-            .agg({"open":"first","high":"max","low":"min","close":"last","volume":"sum"}).dropna(subset=["close"]))
+    if not rule:
+        return df
+    o = df["open"].resample(rule).first()
+    h = df["high"].resample(rule).max()
+    l = df["low"].resample(rule).min()
+    c = df["close"].resample(rule).last()
+    v = df["volume"].resample(rule).sum()
+    return pd.DataFrame({"open": o, "high": h, "low": l, "close": c, "volume": v}).dropna()
 
+def _standardized_macd_ha(df, fast=12, slow=26, signal=9):
+    close = df["close"].astype(float)
+    macd = _ema(close, fast) - _ema(close, slow)
+    sig = _ema(macd, signal)
+    hist = macd - sig
+    ha_close = (macd + sig + hist + macd.shift(1).fillna(macd)) / 4.0
+    ha_open = (macd.shift(1).fillna(macd) + sig.shift(1).fillna(sig)) / 2.0
+    ha_green = ha_close >= ha_open
+    return pd.DataFrame({"macd": macd, "ha_green": ha_green, "ha_red": ~ha_green}, index=df.index)
 
-def _htf_ha_green(df, htf, fast, slow, sig):
-    htf_df = _resample_ohlcv(df, htf) if htf else df
-    if htf_df.empty: return pd.Series(False, index=df.index)
-    ha = _standardized_macd_ha(htf_df, fast, slow, sig)
-    return ha["ha_green"].astype(float).shift(1).reindex(df.index, method="ffill").fillna(0)>0.5
+def _htf_ha_green(df, htf, fast=12, slow=26, signal=9):
+    frame = _resample_ohlcv(df, htf)
+    if frame.empty:
+        return pd.Series(False, index=df.index)
+    ha = _standardized_macd_ha(frame, fast, slow, signal)["ha_green"]
+    return ha.reindex(df.index, method="ffill").fillna(False).astype(bool)
 
+def _prior_session_profile(df, lookback=20, rows=25, value_area_pct=0.7):
+    close = df["close"].astype(float)
+    high = df["high"].astype(float)
+    low = df["low"].astype(float)
+    volume = df["volume"].astype(float)
+    n = len(df)
+    poc = np.full(n, np.nan)
+    val = np.full(n, np.nan)
+    vah = np.full(n, np.nan)
+    for i in range(n):
+        a = max(0, i - lookback)
+        if i - a < 5:
+            continue
+        sl = low.iloc[a:i].to_numpy(); sh = high.iloc[a:i].to_numpy(); sv = volume.iloc[a:i].to_numpy()
+        lo, hi = float(np.nanmin(sl)), float(np.nanmax(sh))
+        if not np.isfinite(lo) or not np.isfinite(hi) or hi <= lo:
+            continue
+        bins = np.linspace(lo, hi, rows + 1)
+        vol = np.zeros(rows)
+        for j in range(len(sl)):
+            a0, b0, v0 = float(sl[j]), float(sh[j]), float(sv[j])
+            if not np.isfinite(v0) or v0 <= 0:
+                continue
+            if b0 <= a0:
+                idx = min(rows - 1, max(0, int((a0 - lo) / (hi - lo + 1e-12) * rows)))
+                vol[idx] += v0
+                continue
+            for k in range(rows):
+                bl, bh = bins[k], bins[k + 1]
+                overlap = max(0.0, min(b0, bh) - max(a0, bl))
+                if overlap > 0:
+                    vol[k] += v0 * overlap / (b0 - a0)
+        mid = 0.5 * (bins[:-1] + bins[1:])
+        poc[i] = float(mid[int(np.argmax(vol))])
+        order = np.argsort(vol)[::-1]
+        total = float(vol.sum()) or 1.0
+        acc = 0.0
+        mask = np.zeros(rows, dtype=bool)
+        for k in order:
+            mask[k] = True
+            acc += float(vol[k])
+            if acc / total >= value_area_pct:
+                break
+        idx = np.where(mask)[0]
+        val[i] = float(mid[idx.min()]); vah[i] = float(mid[idx.max()])
+    return {"poc": pd.Series(poc, index=df.index), "val": pd.Series(val, index=df.index), "vah": pd.Series(vah, index=df.index)}
 
+_DEFAULTS: Dict[str, Any] = {
+    "value_area_pct": 0.7,
+    "profile_rows": 25,
+    "profile_lookback": 20,
+    "macd_fast": 12,
+    "macd_slow": 26,
+    "macd_signal": 9,
+    "macd_htf": "4h",
+    "signal_tf": "2h",
+    "require_htf_green": True,
+    "require_vwap_uptrend": False,
+    "require_above_vwap": False,
+    "require_volume_expand": False,
+    "require_vol_confirm": False,
+    "block_red_flag": True,
+    "block_dump": True,
+    "require_sqz_release": False,
+    "require_mom_pos": False,
+    "require_mom_pos_inc": False,
+    "allow_healthy_pull_entry": False,
+    "exit_on_poc_break": False,
+    "exit_on_val_break": False,
+    "exit_below_vwap": False,
+    "exit_on_sqz_neg": False,
+    "soft_confidence": False,
+    "swing_period": 50,
+    "vol_look": 5,
+    "vol_sma": 20,
+    "min_confidence": 0.6
+}
 
+def _load_cfg() -> Dict[str, Any]:
+    cfg = dict(_DEFAULTS)
+    p = Path(__file__).resolve().parent / "config.json"
+    if p.exists():
+        try:
+            raw = json.loads(p.read_text())
+            strat = raw.get("strategy") or {}
+            for k, v in strat.items():
+                if k in cfg or k in (
+                    "value_area_pct","profile_rows","profile_lookback","macd_fast","macd_slow","macd_signal",
+                    "macd_htf","signal_tf","require_htf_green","require_vwap_uptrend","require_above_vwap",
+                    "require_volume_expand","require_vol_confirm","block_red_flag","block_dump",
+                    "require_sqz_release","require_mom_pos","require_mom_pos_inc","allow_healthy_pull_entry",
+                    "exit_on_poc_break","exit_on_val_break","exit_below_vwap","exit_on_sqz_neg",
+                    "soft_confidence","swing_period","vol_look","vol_sma","min_confidence",
+                ):
+                    if k in (
+                        "value_area_pct","profile_rows","profile_lookback","macd_fast","macd_slow","macd_signal",
+                        "macd_htf","signal_tf","require_htf_green","require_vwap_uptrend","require_above_vwap",
+                        "require_volume_expand","require_vol_confirm","block_red_flag","block_dump",
+                        "require_sqz_release","require_mom_pos","require_mom_pos_inc","allow_healthy_pull_entry",
+                        "exit_on_poc_break","exit_on_val_break","exit_below_vwap","exit_on_sqz_neg",
+                        "soft_confidence","swing_period","vol_look","vol_sma","min_confidence",
+                    ):
+                        cfg[k] = v
+        except Exception:
+            pass
+    return cfg
 
 class SignalEngine:
-    def __init__(
-        self,
-        value_area_pct=0.7,
-        profile_rows=25,
-        profile_lookback=20,
-        macd_fast=12,
-        macd_slow=26,
-        macd_signal=9,
-        macd_htf='4h',
-        signal_tf='2h',
-        require_htf_green=True,
-        require_vwap_uptrend=False,
-        require_above_vwap=False,
-        require_volume_expand=False,
-        require_vol_confirm=False,
-        block_red_flag=True,
-        block_dump=True,
-        require_sqz_release=False,
-        require_mom_pos=False,
-        require_mom_pos_inc=False,
-        allow_healthy_pull_entry=False,
-        exit_on_poc_break=False,
-        exit_on_val_break=False,
-        exit_below_vwap=False,
-        exit_on_sqz_neg=False,
-        soft_confidence=False,
-        swing_period=50,
-        vol_look=5,
-        vol_sma=20,
-        min_confidence=0.6,
-    ):
-        self.value_area_pct=value_area_pct; self.profile_rows=profile_rows; self.profile_lookback=profile_lookback
-        self.macd_fast=macd_fast; self.macd_slow=macd_slow; self.macd_signal=macd_signal
-        self.macd_htf=macd_htf; self.signal_tf=signal_tf; self.require_htf_green=require_htf_green
-        self.require_vwap_uptrend=require_vwap_uptrend; self.require_above_vwap=require_above_vwap
-        self.require_volume_expand=require_volume_expand; self.require_vol_confirm=require_vol_confirm
-        self.block_red_flag=block_red_flag; self.block_dump=block_dump
-        self.require_sqz_release=require_sqz_release; self.require_mom_pos=require_mom_pos
-        self.require_mom_pos_inc=require_mom_pos_inc; self.allow_healthy_pull_entry=allow_healthy_pull_entry
-        self.exit_on_poc_break=exit_on_poc_break; self.exit_on_val_break=exit_on_val_break
-        self.exit_below_vwap=exit_below_vwap; self.exit_on_sqz_neg=exit_on_sqz_neg
-        self.soft_confidence=soft_confidence; self.swing_period=swing_period
-        self.vol_look=vol_look; self.vol_sma=vol_sma; self.min_confidence=min_confidence
+    def __init__(self, **kwargs):
+        cfg = _load_cfg()
+        cfg.update({k: v for k, v in kwargs.items() if v is not None})
+        self.__dict__.update(cfg)
 
     def _signals_on_frame(self, data):
         levels = _prior_session_profile(data, self.profile_lookback, self.profile_rows, self.value_area_pct)
-        poc,vah,val = levels["poc"],levels["vah"],levels["val"]
-        close=data["close"]
-        poc_ok=(close>=poc)&poc.notna(); in_va=(close>=val)&(close<=vah)&val.notna()
-        htf=_htf_ha_green(data,self.macd_htf,self.macd_fast,self.macd_slow,self.macd_signal)
-        local_ha=_standardized_macd_ha(data,self.macd_fast,self.macd_slow,self.macd_signal)
-        swing=dynamic_swing_anchored_vwap(data,self.swing_period)
-        vwap=swing["vwap"].shift(1); uptrend=swing["uptrend"].shift(1).fillna(False).astype(bool)
-        above_vwap=(close>=vwap).fillna(False)
-        vp=volume_price_state(data,self.vol_look,self.vol_sma); sqz=squeeze_momentum(data)
-        gates=[poc_ok,in_va]
+        poc, vah, val = levels["poc"], levels["vah"], levels["val"]
+        close = data["close"]
+        poc_ok = (close >= poc) & poc.notna()
+        in_va = (close >= val) & (close <= vah) & val.notna()
+        htf = _htf_ha_green(data, self.macd_htf, self.macd_fast, self.macd_slow, self.macd_signal)
+        local_ha = _standardized_macd_ha(data, self.macd_fast, self.macd_slow, self.macd_signal)
+        swing = dynamic_swing_anchored_vwap(data, self.swing_period)
+        vwap = swing["vwap"].shift(1)
+        uptrend = swing["uptrend"].shift(1).fillna(False).astype(bool)
+        above_vwap = (close >= vwap).fillna(False)
+        vp = volume_price_state(data, self.vol_look, self.vol_sma)
+        sqz = squeeze_momentum(data)
+        gates = [poc_ok, in_va]
         if self.require_htf_green: gates.append(htf)
         if self.require_vwap_uptrend: gates.append(uptrend)
         if self.require_above_vwap: gates.append(above_vwap)
         if self.require_volume_expand: gates.append(vp["vol_expand"])
-        if self.require_vol_confirm: gates.append(vp["confirm_up"]|(self.allow_healthy_pull_entry&vp["healthy_pull"]&above_vwap))
+        if self.require_vol_confirm:
+            gates.append(vp["confirm_up"] | (self.allow_healthy_pull_entry & vp["healthy_pull"] & above_vwap))
         if self.block_red_flag: gates.append(~vp["red_flag_up"])
         if self.block_dump: gates.append(~vp["dump"])
-        if self.require_sqz_release: gates.append(sqz["sqz_release"]|sqz["sqz_off"])
+        if self.require_sqz_release: gates.append(sqz["sqz_release"] | sqz["sqz_off"])
         if self.require_mom_pos: gates.append(sqz["mom_pos"])
         if self.require_mom_pos_inc: gates.append(sqz["mom_pos_inc"])
-        long_hard=gates[0]
-        for g in gates[1:]: long_hard=long_hard&g
+        long_hard = gates[0]
+        for g in gates[1:]:
+            long_hard = long_hard & g
         if self.soft_confidence:
-            parts=[poc_ok,in_va,htf,uptrend,above_vwap,vp["confirm_up"]|vp["healthy_pull"],~vp["red_flag_up"],sqz["mom_pos"],sqz["sqz_off"]|sqz["sqz_release"]]
-            total=None
-            for p in parts: total=p.astype(float) if total is None else total+p.astype(float)
-            conf=total/float(len(parts))
-            long_entry=poc_ok&in_va&(conf>=self.min_confidence)
-            if self.block_red_flag: long_entry=long_entry&(~vp["red_flag_up"])
-            if self.block_dump: long_entry=long_entry&(~vp["dump"])
-            if self.require_htf_green: long_entry=long_entry&htf
-            size=conf.clip(0,1)
+            parts = [poc_ok, in_va, htf, uptrend, above_vwap, vp["confirm_up"] | vp["healthy_pull"], ~vp["red_flag_up"], sqz["mom_pos"], sqz["sqz_off"] | sqz["sqz_release"]]
+            total = None
+            for p in parts:
+                total = p.astype(float) if total is None else total + p.astype(float)
+            conf = total / float(len(parts))
+            long_entry = poc_ok & in_va & (conf >= self.min_confidence)
+            if self.block_red_flag: long_entry = long_entry & (~vp["red_flag_up"])
+            if self.block_dump: long_entry = long_entry & (~vp["dump"])
+            if self.require_htf_green: long_entry = long_entry & htf
+            size = conf.clip(0, 1)
         else:
-            long_entry=long_hard; size=pd.Series(1.0,index=data.index)
-        signal=pd.Series(0.0,index=data.index); in_pos=False
+            long_entry = long_hard
+            size = pd.Series(1.0, index=data.index)
+        signal = pd.Series(0.0, index=data.index)
+        in_pos = False
         for i in range(len(data)):
             if not in_pos:
                 if bool(long_entry.iloc[i]):
-                    in_pos=True; signal.iloc[i]=float(size.iloc[i]) if self.soft_confidence else 1.0
+                    in_pos = True
+                    signal.iloc[i] = float(size.iloc[i]) if self.soft_confidence else 1.0
             else:
-                exit_now=False
-                if self.require_htf_green and not bool(htf.iloc[i]): exit_now=True
-                if self.exit_on_poc_break and not bool(poc_ok.iloc[i]): exit_now=True
-                if self.exit_on_val_break and close.iloc[i]<val.iloc[i]: exit_now=True
-                if self.exit_below_vwap and pd.notna(vwap.iloc[i]) and close.iloc[i]<vwap.iloc[i]: exit_now=True
-                if self.exit_on_sqz_neg and bool(sqz["mom_neg"].iloc[i]): exit_now=True
-                if bool(local_ha["ha_red"].iloc[i]) and not bool(htf.iloc[i]): exit_now=True
-                if self.block_red_flag and bool(vp["red_flag_up"].iloc[i]): exit_now=True
-                if exit_now: in_pos=False; signal.iloc[i]=0.0
-                else: signal.iloc[i]=float(size.iloc[i]) if self.soft_confidence else 1.0; in_pos=True
+                exit_now = False
+                if self.require_htf_green and not bool(htf.iloc[i]): exit_now = True
+                if self.exit_on_poc_break and not bool(poc_ok.iloc[i]): exit_now = True
+                if self.exit_on_val_break and close.iloc[i] < val.iloc[i]: exit_now = True
+                if self.exit_below_vwap and pd.notna(vwap.iloc[i]) and close.iloc[i] < vwap.iloc[i]: exit_now = True
+                if self.exit_on_sqz_neg and bool(sqz["mom_neg"].iloc[i]): exit_now = True
+                if bool(local_ha["ha_red"].iloc[i]) and not bool(htf.iloc[i]): exit_now = True
+                if self.block_red_flag and bool(vp["red_flag_up"].iloc[i]): exit_now = True
+                if exit_now:
+                    in_pos = False
+                    signal.iloc[i] = 0.0
+                else:
+                    signal.iloc[i] = float(size.iloc[i]) if self.soft_confidence else 1.0
+                    in_pos = True
         return signal.fillna(0.0)
 
     def _one(self, df):
-        data=df.copy(); data.index=pd.to_datetime(data.index)
-        if getattr(data.index,"tz",None) is not None: data.index=data.index.tz_localize(None)
-        data=data.sort_index()
+        data = df.copy()
+        data.index = pd.to_datetime(data.index)
+        if getattr(data.index, "tz", None) is not None:
+            data.index = data.index.tz_localize(None)
+        data = data.sort_index()
+        data.columns = [str(c).lower() for c in data.columns]
         if self.signal_tf:
-            frame=_resample_ohlcv(data,self.signal_tf)
-            if frame.empty: return pd.Series(0.0,index=data.index)
-            return self._signals_on_frame(frame).reindex(data.index,method="ffill").fillna(0.0)
+            frame = _resample_ohlcv(data, self.signal_tf)
+            if frame.empty:
+                return pd.Series(0.0, index=data.index)
+            return self._signals_on_frame(frame).reindex(data.index, method="ffill").fillna(0.0)
         return self._signals_on_frame(data)
 
     def generate(self, data_map):
-        return {c: self._one(df) for c,df in data_map.items()}
+        return {c: self._one(df) for c, df in data_map.items()}

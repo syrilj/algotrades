@@ -5,7 +5,14 @@ import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "r
 
 import { formatNum, formatPct, formatUsd } from "@/lib/format";
 import { analyzeHref, modelHref } from "@/lib/routes";
-import type { ApiEnvelope, ClaimLevel, RankerResponse, RankerRow } from "@/lib/types";
+import { colorVarFor } from "@/lib/actionColors";
+import type {
+  ApiEnvelope,
+  ClaimLevel,
+  RankerRead,
+  RankerResponse,
+  RankerRow,
+} from "@/lib/types";
 
 type RankerPanelProps = {
   symbol: string;
@@ -25,6 +32,104 @@ function scoreBarColor(score: number): string {
   return score >= 0 ? "var(--td-action-buy-now)" : "var(--td-action-avoid)";
 }
 
+/** Evidence-gate reason codes → operator-readable labels (tools/symbol_ranker.py). */
+const REASON_LABELS: Record<string, string> = {
+  no_valid_full_window: "No valid full-window backtest",
+  no_trades: "No trades in evidence window",
+  win_rate_lb_below_breakeven: "Win-rate lower bound below breakeven",
+  recent_window_negative: "Recent window return negative",
+  drawdown_gate: "Max drawdown exceeds risk gate",
+  live_underperformance: "Live paper trading underperforming",
+  thin_sample_capped: "Confidence capped — thin sample size",
+  synthetic_options_pricing_capped: "Confidence capped — synthetic options pricing",
+  ranker_stale_refresh_required: "Ranker cache stale — refresh required",
+  no_desk_runnable_evidence: "No desk-runnable engine evidence",
+  sample_below_trust_floor: "Sample size below trust floor",
+  confidence_below_watch_threshold: "Confidence below watch threshold",
+};
+
+/** Honest fallback for any reason code not yet in the label map above. */
+function humanizeReason(code: string): string {
+  const known = REASON_LABELS[code];
+  if (known) return known;
+  const spaced = code.replace(/_/g, " ").trim();
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1);
+}
+
+/**
+ * verdict → action color token. Reuses the shared action-color map (same
+ * tokens as ActionChip / OptionsDesk) by piggy-backing on the closest
+ * existing semantic key: TRUST=buy/positive, WATCH=wait, STAND_ASIDE=avoid.
+ */
+function verdictColorVar(verdict: RankerRead["verdict"] | undefined): string {
+  if (verdict === "TRUST") return colorVarFor("action", "RISK_OK");
+  if (verdict === "WATCH") return colorVarFor("action", "WATCH");
+  return colorVarFor("action", "STAND_ASIDE");
+}
+
+function verdictLabel(verdict: RankerRead["verdict"] | undefined): string {
+  return String(verdict ?? "STAND_ASIDE").replace(/_/g, " ");
+}
+
+function VerdictStrip({ read }: { read: RankerRead }) {
+  const color = verdictColorVar(read.verdict);
+  const isStandAside = read.verdict === "STAND_ASIDE";
+  const reasons = read.reasons ?? [];
+
+  return (
+    <div
+      className="mb-3 flex flex-col gap-2 border-l-2 px-3 py-2"
+      style={{
+        borderColor: color,
+        background: `color-mix(in oklch, ${color} 8%, transparent)`,
+      }}
+    >
+      <div className="flex flex-wrap items-center gap-2">
+        <span
+          className="td-action-chip td-action-chip--md"
+          style={{
+            color,
+            background: `color-mix(in oklch, ${color} 18%, transparent)`,
+            border: `1px solid ${color}`,
+          }}
+        >
+          {verdictLabel(read.verdict)}
+        </span>
+        {read.model ? (
+          <Link
+            href={modelHref(read.model)}
+            className="tabular no-underline text-[13px]"
+            style={{ fontFamily: "var(--td-font-mono)", color: "var(--td-ink-100)" }}
+          >
+            {read.model}
+          </Link>
+        ) : (
+          <span className="text-[12px]" style={{ color: "var(--td-ink-500)" }}>
+            no engine cleared evidence
+          </span>
+        )}
+        <span
+          className="tabular ml-auto shrink-0 text-[12px] font-semibold"
+          style={{ fontFamily: "var(--td-font-mono)", color }}
+        >
+          {formatPct(read.confidence)} confidence
+        </span>
+      </div>
+
+      {isStandAside && reasons.length > 0 ? (
+        <ul
+          className="m-0 flex list-none flex-col gap-0.5 p-0 text-[11px] leading-snug"
+          style={{ color: "var(--td-ink-400)" }}
+        >
+          {reasons.map((r) => (
+            <li key={r}>— {humanizeReason(r)}</li>
+          ))}
+        </ul>
+      ) : null}
+    </div>
+  );
+}
+
 function RankerRowCard({
   row,
   maxScore,
@@ -41,6 +146,9 @@ function RankerRowCard({
   const barPct = maxScore > 0 ? Math.min(100, (Math.abs(row.score) / maxScore) * 100) : 0;
   const inUse = activeModel === row.model;
   const live = row.live;
+  const confDim = row.confidence == null || row.confidence === 0;
+  const confReasons = row.confidence_reasons ?? [];
+  const confTitle = confReasons.length > 0 ? confReasons.map(humanizeReason).join("; ") : undefined;
 
   return (
     <li
@@ -135,6 +243,12 @@ function RankerRowCard({
         <span>WR {formatPct(row.win_rate, 0)}</span>
         <span>DD {formatPct(row.max_drawdown, 1)}</span>
         <span>n {row.trade_count ?? "—"}</span>
+        <span
+          title={confTitle}
+          style={confDim ? { color: "var(--td-ink-500)" } : undefined}
+        >
+          Conf {row.confidence != null ? formatPct(row.confidence, 0) : "—"}
+        </span>
       </div>
     </li>
   );
@@ -244,6 +358,8 @@ export function RankerPanel({
           </button>
         </div>
       </div>
+
+      {data?.read ? <VerdictStrip read={data.read} /> : null}
 
       {error ? (
         <div className="td-alert td-alert--error mb-3" role="alert">

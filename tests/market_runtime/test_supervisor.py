@@ -118,3 +118,33 @@ class SupervisorTests(unittest.TestCase):
         persisted = persistence.query("A.L")
         self.assertEqual(len(persisted), 1)
         self.assertEqual(persisted[0].price, 100.0)
+
+    def test_stream_exception_reconnects_with_backoff(self):
+        ticks = self.ticks
+
+        class FlakyAdapter(FakeAdapter):
+            def __init__(self, catalog):
+                super().__init__(catalog, ticks)
+                self.attempts = 0
+
+            def stream(self, symbols, start=None):
+                self.attempts += 1
+                if self.attempts == 1:
+                    raise RuntimeError("temporary stream failure")
+                yield from super().stream(symbols, start=start)
+
+        adapter = FlakyAdapter(self.catalog)
+        supervisor = StreamSupervisor(
+            adapter,
+            max_symbols=10,
+            warming_seconds=0,
+            reconnect_initial_seconds=0.01,
+            reconnect_max_seconds=0.02,
+        )
+        supervisor.start()
+        time.sleep(0.1)
+
+        self.assertGreaterEqual(adapter.attempts, 2)
+        self.assertIsNotNone(supervisor.latest("A.L"))
+        self.assertEqual(supervisor.runtime_status()["last_error"], "temporary stream failure")
+        supervisor.stop()

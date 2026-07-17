@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import math
 import sys
 from pathlib import Path
 from typing import Any
@@ -34,7 +35,12 @@ def load_pass_bar() -> dict[str, Any]:
 
 
 def check_pass_bar(row: dict[str, Any]) -> dict[str, Any]:
-    """Same spirit as tools/findings.check_pass_bar, row-shaped metrics."""
+    """Evaluate configured promotion metrics, failing closed on missing inputs.
+
+    PASS_BAR is a promotion contract.  A configured metric that was not
+    computed is therefore a failed gate, not an implicit neutral/default value.
+    Legacy metric names (``pf``, ``n`` and ``expectancy``) remain supported.
+    """
     bar = load_pass_bar()
     gates = bar.get("gates") or {}
     if row.get("error"):
@@ -50,30 +56,60 @@ def check_pass_bar(row: dict[str, Any]) -> dict[str, Any]:
                     pass
         return default
 
-    pf = f("profit_factor", default=1.0)
-    # many rows lack PF — do not fail solely on missing PF if absent
-    has_pf = "profit_factor" in row and row["profit_factor"] is not None
+    def present(*keys: str) -> bool:
+        for key in keys:
+            if key not in row or row[key] is None:
+                continue
+            try:
+                if math.isfinite(float(row[key])):
+                    return True
+            except (TypeError, ValueError):
+                continue
+        return False
+
+    pf = f("profit_factor", "pf")
+    has_pf = present("profit_factor", "pf")
     dd = abs(f("dd", "max_drawdown"))
+    has_dd = present("dd", "max_drawdown")
     sharpe = f("sharpe")
+    has_sharpe = present("sharpe")
     trades = f("n", "trade_count")
-    exp = f("expectancy", "expectancy_after_costs", default=0.0)
+    has_trades = present("n", "trade_count")
+    exp = f("expectancy_after_costs", "expectancy", default=0.0)
+    has_exp = present("expectancy_after_costs", "expectancy")
     reasons: list[str] = []
-    if has_pf and pf < float(gates.get("profit_factor_min", 1.2)):
-        reasons.append(f"profit_factor {pf:.3f} < {gates['profit_factor_min']}")
-    if dd > float(gates.get("max_drawdown_max_abs", 0.25)):
-        reasons.append(f"|max_drawdown| {dd:.3f} > {gates['max_drawdown_max_abs']}")
-    if sharpe < float(gates.get("sharpe_min", 0.5)):
-        reasons.append(f"sharpe {sharpe:.3f} < {gates['sharpe_min']}")
-    if trades < float(gates.get("min_trades", 40)):
-        reasons.append(f"trade_count {trades:.0f} < {gates['min_trades']}")
+    if "profit_factor_min" in gates:
+        if not has_pf:
+            reasons.append("missing required metric: profit_factor")
+        elif pf < float(gates["profit_factor_min"]):
+            reasons.append(f"profit_factor {pf:.3f} < {gates['profit_factor_min']}")
+    if "max_drawdown_max_abs" in gates:
+        if not has_dd:
+            reasons.append("missing required metric: max_drawdown")
+        elif dd > float(gates["max_drawdown_max_abs"]):
+            reasons.append(f"|max_drawdown| {dd:.3f} > {gates['max_drawdown_max_abs']}")
+    if "sharpe_min" in gates:
+        if not has_sharpe:
+            reasons.append("missing required metric: sharpe")
+        elif sharpe < float(gates["sharpe_min"]):
+            reasons.append(f"sharpe {sharpe:.3f} < {gates['sharpe_min']}")
+    if "min_trades" in gates:
+        if not has_trades:
+            reasons.append("missing required metric: trade_count")
+        elif trades < float(gates["min_trades"]):
+            reasons.append(f"trade_count {trades:.0f} < {gates['min_trades']}")
     exp_min = gates.get("expectancy_after_costs_min")
-    if exp_min is not None and "expectancy" in row and exp < float(exp_min):
-        reasons.append(f"expectancy {exp:.4f} < {exp_min}")
+    if exp_min is not None:
+        if not has_exp:
+            reasons.append("missing required metric: expectancy_after_costs")
+        elif exp < float(exp_min):
+            reasons.append(f"expectancy_after_costs {exp:.4f} < {exp_min}")
     return {
         "passed": len(reasons) == 0,
         "reasons": reasons,
         "snapshot": {
             "profit_factor": pf if has_pf else None,
+            "expectancy_after_costs": exp if has_exp else None,
             "max_drawdown": -dd,
             "sharpe": sharpe,
             "trade_count": trades,
@@ -83,8 +119,48 @@ def check_pass_bar(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _promotion_evidence_ok(row: dict[str, Any]) -> tuple[bool, list[str]]:
+    """Require an untouched final lockbox plus independent multi-lock evidence."""
+    evidence = row.get("promotion_evidence")
+    if not isinstance(evidence, dict):
+        return False, ["missing promotion_evidence"]
+
+    lockbox = evidence.get("lockbox")
+    multi_lock = evidence.get("multi_lock")
+    reasons: list[str] = []
+    if not isinstance(lockbox, dict):
+        reasons.append("missing untouched lockbox evidence")
+    else:
+        if lockbox.get("evaluation_role") not in {"untouched_lockbox", "final_lockbox"}:
+            reasons.append("lockbox is not marked untouched")
+        if lockbox.get("ok") is not True:
+            reasons.append("lockbox did not pass")
+        if not lockbox.get("window_id"):
+            reasons.append("lockbox window_id missing")
+        if lockbox.get("selection_use_forbidden") is not True:
+            reasons.append("lockbox is not protected from selection use")
+        if not lockbox.get("window_start") or not lockbox.get("window_end"):
+            reasons.append("lockbox boundaries missing")
+        candidate_id = row.get("id") or row.get("model")
+        if candidate_id and lockbox.get("candidate_id") != candidate_id:
+            reasons.append("lockbox candidate identity mismatch")
+
+    if not isinstance(multi_lock, dict):
+        reasons.append("missing multi-lock evidence")
+    else:
+        if multi_lock.get("ok") is not True or multi_lock.get("status") != "PASS":
+            reasons.append("multi-lock did not pass")
+        if int(multi_lock.get("n_holdouts") or 0) < 1:
+            reasons.append("multi-lock has no usable holdouts")
+    return not reasons, reasons
+
+
 def apply_gates(row: dict[str, Any]) -> dict[str, Any]:
-    """Annotate pass_bar + claim_level + promote eligibility."""
+    """Annotate pass bar, claim level, and final promotion eligibility.
+
+    Compatibility note: research rows without promotion evidence still receive
+    their normal claim level, but can no longer be auto-promoted.
+    """
     pb = check_pass_bar(row)
     out = dict(row)
     out["pass_bar"] = pb
@@ -102,10 +178,14 @@ def apply_gates(row: dict[str, Any]) -> dict[str, Any]:
     if track is DataTrack.OPTIONS_SYNTHETIC and level is ClaimLevel.CLAIM:
         level = ClaimLevel.RESEARCH
     out["claim_level"] = level.value
+    evidence_ok, evidence_reasons = _promotion_evidence_ok(out)
+    out["promotion_evidence_ok"] = evidence_ok
+    out["promotion_evidence_reasons"] = evidence_reasons
     out["may_auto_promote"] = bool(
         track.may_auto_promote
         and level is ClaimLevel.CLAIM
         and pb["passed"]
+        and evidence_ok
         and not out.get("error")
     )
     return out
@@ -145,6 +225,7 @@ def multi_lock_verdict(
         "flags": flags,
         "train_wr": train_wr,
         "n_holdouts": len(ok_hold),
+        "evaluation_role": "multi_lock_validation",
     }
 
 

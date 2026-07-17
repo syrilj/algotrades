@@ -1,0 +1,61 @@
+<h2>Trade Desk — surface audit</h2>
+<p class="subtitle">What exists today vs what overlaps. Click a consolidation ambition when ready.</p>
+
+<div class="section">
+  <p class="label">Primary nav (5)</p>
+  <div class="mock-nav">Command · Radar · Execution · Portfolio · Lab</div>
+</div>
+
+<div class="section">
+  <p class="label">Duplication map (current state)</p>
+  <div class="split">
+    <div class="mockup">
+      <div class="mockup-header">Operator path (trade now)</div>
+      <div class="mockup-body">
+        <p><strong>Command</strong> — analyze one symbol (home)</p>
+        <p><strong>Execution</strong> — live plan + bag scan + ticket</p>
+        <p><strong>Watch</strong> (legacy / Systems) — poll list + market scan + action board</p>
+        <p style="color:var(--text-muted);margin-top:12px">⚠ Execution scan ≈ Watch board. Same job: multi-symbol action table → deep-link Analyze/Live.</p>
+        <p style="color:var(--text-muted)">⚠ Radar “Watch” tab is a stub → “Open Watch desk”</p>
+        <p style="color:var(--text-muted)">⚠ Radar “Picks” tab is a stub → “Open Picks desk”</p>
+      </div>
+    </div>
+    <div class="mockup">
+      <div class="mockup-header">Research / portfolio path</div>
+      <div class="mockup-body">
+        <p><strong>Lab</strong> tabs: Leaderboard · Models · Evolve · Backtest</p>
+        <p><strong>Portfolio nav</strong> = Positions hub (open / portfolio / history)</p>
+        <p>Also standalone: /portfolio, /leaderboard, /models, /evolve, /robust, /gamma, /options, /picks, /supply-chain</p>
+        <p style="color:var(--text-muted);margin-top:12px">⚠ Systems menu re-exposes pages already inside Lab / Live hubs</p>
+        <p style="color:var(--text-muted)">⚠ Account → /portfolio while nav “Portfolio” → /positions</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <p class="label">How aggressive should consolidation be?</p>
+  <div class="options">
+    <div class="option" data-choice="surgical" onclick="toggleSelect(this)">
+      <div class="letter">A</div>
+      <div class="content">
+        <h3>Surgical</h3>
+        <p>Keep 5 primary routes. Wire stubs so Radar/Watch/Picks actually work. Fix nav labels, formatting, UX polish. Minimal route deletion.</p>
+      </div>
+    </div>
+    <div class="option" data-choice="hub-first" onclick="toggleSelect(this)">
+      <div class="letter">B</div>
+      <div class="content">
+        <h3>Hub-first (recommended)</h3>
+        <p>Merge Watch + Execution bag-scan into one Execution workspace (tabs: Ticket · Watch · Options · Gamma). Make Radar a real multi-view hub. Hide/redirect legacy routes. Shared board component.</p>
+      </div>
+    </div>
+    <div class="option" data-choice="radical" onclick="toggleSelect(this)">
+      <div class="letter">C</div>
+      <div class="content">
+        <h3>Radical desk</h3>
+        <p>Collapse to 3 surfaces: Command (analyze), Markets (scan+watch+picks), Book (positions+portfolio). Everything else secondary drawers/tabs. Biggest UX win, biggest change risk.</p>
+      </div>
+    </div>
+  </div>
+</div>

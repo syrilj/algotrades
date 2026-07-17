@@ -1,0 +1,35 @@
+{
+  "source": "yfinance",
+  "codes": [
+    "META.US"
+  ],
+  "start_date": "2024-08-01",
+  "end_date": "2026-07-11",
+  "initial_cash": 1000000,
+  "commission": 0.001,
+  "engine": "daily",
+  "interval": "1H",
+  "strategy": {
+    "name": "v65_spec_meta",
+    "model_version": "v65_spec_meta",
+    "desk_specialist": true,
+    "desk_symbol": "META.US",
+    "dna_donor": "dna_tsla",
+    "engine_base": "v39d_confluence",
+    "bakeoff": {
+      "id": "_bake_meta_dna_tsla",
+      "dna": "dna_tsla",
+      "kind": "donor",
+      "ret": 0.027971744567264034,
+      "dd": -0.07976302524291895,
+      "sharpe": 0.28141306382646925,
+      "n": 38,
+      "wr": 0.42105263157894735,
+      "final": 1027.971744567264,
+      "ok": true,
+      "source_data": "yfinance",
+      "symbol": "META.US"
+    },
+    "note": "Proper specialist rebuilt from v39d + winning DNA bakeoff"
+  }
+}

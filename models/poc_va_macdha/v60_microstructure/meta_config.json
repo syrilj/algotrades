@@ -1,0 +1,35 @@
+{
+  "feat_cols": [
+    "ofi",
+    "ofi_persistence",
+    "ofi_long",
+    "absorption",
+    "absorption_raw",
+    "upper_wick_frac",
+    "lower_wick_frac",
+    "range_pct",
+    "schedule_dev",
+    "vpin",
+    "vol_z",
+    "close_loc",
+    "vpa_confirmation",
+    "trend",
+    "above_vwap",
+    "vol_regime",
+    "rsi",
+    "dist_vwap_pct",
+    "atr_pct",
+    "return_1h",
+    "return_4h",
+    "return_1d",
+    "hour",
+    "day_of_week"
+  ],
+  "threshold": 0.65,
+  "use_xgb": false,
+  "params": {
+    "label": "high_conviction_long",
+    "philosophy": "microstructure_institutional_flow",
+    "parent": "v60_microstructure"
+  }
+}

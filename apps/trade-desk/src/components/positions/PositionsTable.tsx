@@ -2,16 +2,24 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { Briefcase, History, Wallet } from "lucide-react";
 
+import { EmptyState } from "@/components/ui/EmptyState";
 import { formatNum, formatUsd } from "@/lib/format";
-import { analyzeHref, modelHref } from "@/lib/routes";
+import { analyzeHref, liveHref, modelHref } from "@/lib/routes";
 import type { LedgerStatsRow, PaperPosition } from "@/lib/types";
+
+export type PositionsTableMode = "open" | "history" | "all";
 
 type PositionsTableProps = {
   positions: PaperPosition[];
   statsRows: LedgerStatsRow[];
   onClose: (id: string, exit: number) => Promise<void>;
+  onUpdate?: (id: string, updates: { shares?: number; entry?: number; stop?: number }) => Promise<void>;
+  onDelete?: (id: string) => Promise<void>;
   closingId?: string | null;
+  /** open = live risk only; history = closed + model stats; all = both (legacy). */
+  mode?: PositionsTableMode;
 };
 
 function pnlColor(n: number | null | undefined): string {
@@ -22,21 +30,146 @@ function pnlColor(n: number | null | undefined): string {
 function OpenRow({
   row,
   onClose,
+  onUpdate,
+  onDelete,
   closing,
 }: {
   row: PaperPosition;
   onClose: (id: string, exit: number) => Promise<void>;
+  onUpdate?: (id: string, updates: { shares?: number; entry?: number; stop?: number }) => Promise<void>;
+  onDelete?: (id: string) => Promise<void>;
   closing: boolean;
 }) {
   const [showClose, setShowClose] = useState(false);
   const [exit, setExit] = useState(String(row.mark ?? row.entry ?? ""));
 
+  const [isEditing, setIsEditing] = useState(false);
+  const [editShares, setEditShares] = useState(String(row.shares));
+  const [editEntry, setEditEntry] = useState(String(row.entry));
+  const [editStop, setEditStop] = useState(String(row.stop));
+  const [updating, setUpdating] = useState(false);
+
+  const saveEdit = async () => {
+    if (!onUpdate) return;
+    setUpdating(true);
+    try {
+      await onUpdate(row.id, {
+        shares: Number(editShares),
+        entry: Number(editEntry),
+        stop: Number(editStop),
+      });
+      setIsEditing(false);
+    } catch {
+      // handled by page state
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const deleteRow = async () => {
+    if (!onDelete) return;
+    if (confirm(`Are you sure you want to delete ${row.symbol} trade ${row.id}?`)) {
+      setUpdating(true);
+      try {
+        await onDelete(row.id);
+      } catch {
+        // handled
+      } finally {
+        setUpdating(false);
+      }
+    }
+  };
+
+  if (isEditing) {
+    return (
+      <tr>
+        <td>
+          <div className="flex flex-col gap-0.5">
+            <Link href={liveHref(row.symbol)} className="no-underline font-semibold">
+              {row.symbol}
+            </Link>
+            <Link
+              href={analyzeHref({ symbol: row.symbol })}
+              className="no-underline text-[10px]"
+              style={{ color: "var(--td-ink-400)" }}
+            >
+              Analyze
+            </Link>
+          </div>
+        </td>
+        <td>{row.side}</td>
+        <td>
+          <Link href={modelHref(row.model)} className="no-underline">
+            {row.model}
+          </Link>
+        </td>
+        <td>
+          <input
+            className="td-input w-16 tabular text-[11px]"
+            value={editShares}
+            onChange={(e) => setEditShares(e.target.value)}
+          />
+        </td>
+        <td>
+          <input
+            className="td-input w-20 tabular text-[11px]"
+            value={editEntry}
+            onChange={(e) => setEditEntry(e.target.value)}
+          />
+        </td>
+        <td>
+          <input
+            className="td-input w-20 tabular text-[11px]"
+            value={editStop}
+            onChange={(e) => setEditStop(e.target.value)}
+          />
+        </td>
+        <td className="tabular">{formatNum(row.mark)}</td>
+        <td className="tabular" style={{ color: pnlColor(row.unrealized_pnl) }}>
+          {formatUsd(row.unrealized_pnl)}
+        </td>
+        <td className="tabular">{formatNum(row.unrealized_r, 2)}R</td>
+        <td className="tabular text-[11px]">{row.opened_at?.slice(0, 10) ?? "—"}</td>
+        <td></td>
+        <td>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              className="td-btn td-btn-primary text-[11px] px-2 py-0.5"
+              disabled={updating}
+              onClick={() => void saveEdit()}
+            >
+              Save
+            </button>
+            <button
+              type="button"
+              className="td-btn td-btn-ghost text-[11px] px-2 py-0.5"
+              disabled={updating}
+              onClick={() => setIsEditing(false)}
+            >
+              Cancel
+            </button>
+          </div>
+        </td>
+      </tr>
+    );
+  }
+
   return (
     <tr>
       <td>
-        <Link href={analyzeHref({ symbol: row.symbol })} className="no-underline">
-          {row.symbol}
-        </Link>
+        <div className="flex flex-col gap-0.5">
+          <Link href={liveHref(row.symbol)} className="no-underline font-semibold" title="Open execution decision">
+            {row.symbol}
+          </Link>
+          <Link
+            href={analyzeHref({ symbol: row.symbol })}
+            className="no-underline text-[10px]"
+            style={{ color: "var(--td-ink-400)" }}
+          >
+            Analyze
+          </Link>
+        </div>
       </td>
       <td>{row.side}</td>
       <td>
@@ -61,56 +194,116 @@ function OpenRow({
         ) : null}
       </td>
       <td>
-        {showClose ? (
-          <div className="flex items-center gap-1">
-            <input
-              className="td-input w-20 tabular text-[11px]"
-              value={exit}
-              onChange={(e) => setExit(e.target.value)}
-            />
-            <button
-              type="button"
-              className="td-btn td-btn-ghost text-[11px]"
-              disabled={closing}
-              onClick={() => void onClose(row.id, Number(exit)).then(() => setShowClose(false))}
-            >
-              OK
-            </button>
-          </div>
-        ) : (
-          <button
-            type="button"
-            className="td-btn td-btn-ghost text-[11px]"
-            onClick={() => setShowClose(true)}
-          >
-            Close
-          </button>
-        )}
+        <div className="flex items-center gap-1">
+          {showClose ? (
+            <div className="flex items-center gap-1">
+              <input
+                className="td-input w-20 tabular text-[11px]"
+                value={exit}
+                onChange={(e) => setExit(e.target.value)}
+              />
+              <button
+                type="button"
+                className="td-btn td-btn-ghost text-[11px]"
+                disabled={closing}
+                onClick={() => void onClose(row.id, Number(exit)).then(() => setShowClose(false))}
+              >
+                OK
+              </button>
+              <button
+                type="button"
+                className="td-btn td-btn-ghost text-[11px]"
+                onClick={() => setShowClose(false)}
+              >
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <>
+              <button
+                type="button"
+                className="td-btn td-btn-ghost text-[11px] px-1"
+                onClick={() => setShowClose(true)}
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                className="td-btn td-btn-ghost text-[11px] px-1"
+                onClick={() => setIsEditing(true)}
+              >
+                Edit
+              </button>
+              <button
+                type="button"
+                className="td-btn td-btn-ghost text-[11px] px-1"
+                style={{ color: "var(--td-action-avoid)" }}
+                onClick={() => void deleteRow()}
+              >
+                Delete
+              </button>
+            </>
+          )}
+        </div>
       </td>
     </tr>
   );
 }
 
+
 export function PositionsTable({
   positions,
   statsRows,
   onClose,
+  onUpdate,
+  onDelete,
   closingId,
+  mode = "all",
 }: PositionsTableProps) {
-  const open = positions.filter((p) => p.status === "open");
-  const closed = positions.filter((p) => p.status === "closed");
+  const showOpen = mode === "open" || mode === "all";
+  const showHistory = mode === "history" || mode === "all";
+  const open = showOpen ? positions.filter((p) => p.status === "open") : [];
+  const closed = showHistory
+    ? positions.filter((p) => p.status === "closed")
+    : [];
 
   if (positions.length === 0) {
     return (
-      <p className="text-[13px]" style={{ color: "var(--td-ink-300)" }}>
-        No paper trades yet — log one from Analyze → Verdict → Log paper trade.
-      </p>
+      <EmptyState
+        icon={Wallet}
+        title="No paper trades yet"
+        hint="Log one from Command → Verdict → Log paper trade, or Execution → Decision when gates pass."
+        steps={[
+          "Open Command and run a symbol analyze",
+          "Or open Execution, load a live plan, and paper-fill when ready",
+        ]}
+      />
+    );
+  }
+
+  if (showOpen && open.length === 0 && !showHistory) {
+    return (
+      <EmptyState
+        icon={Briefcase}
+        title="No open positions"
+        hint="Closed outcomes live under History. Open risk appears after a paper fill."
+      />
+    );
+  }
+
+  if (showHistory && closed.length === 0 && statsRows.length === 0 && !showOpen) {
+    return (
+      <EmptyState
+        icon={History}
+        title="No closed trades yet"
+        hint="Close an open position to record P&L and model stats."
+      />
     );
   }
 
   return (
     <div className="flex flex-col gap-4">
-      {open.length > 0 ? (
+      {showOpen && open.length > 0 ? (
         <div className="overflow-x-auto">
           <span className="td-label">Open</span>
           <table className="mt-2 w-full text-[12px]" style={{ fontFamily: "var(--td-font-mono)" }}>
@@ -136,6 +329,8 @@ export function PositionsTable({
                   key={row.id}
                   row={row}
                   onClose={onClose}
+                  onUpdate={onUpdate}
+                  onDelete={onDelete}
                   closing={closingId === row.id}
                 />
               ))}
@@ -144,7 +339,7 @@ export function PositionsTable({
         </div>
       ) : null}
 
-      {closed.length > 0 ? (
+      {showHistory && closed.length > 0 ? (
         <div className="overflow-x-auto">
           <span className="td-label">Closed</span>
           <table className="mt-2 w-full text-[12px]" style={{ fontFamily: "var(--td-font-mono)" }}>
@@ -178,7 +373,7 @@ export function PositionsTable({
         </div>
       ) : null}
 
-      {statsRows.length > 0 ? (
+      {showHistory && statsRows.length > 0 ? (
         <div
           className="border-t pt-3 text-[11px]"
           style={{ borderColor: "var(--td-ink-700)", color: "var(--td-ink-300)" }}

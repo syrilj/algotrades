@@ -6,7 +6,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { ApiEnvelope, ModelMetaConfig, ModelsCatalog } from "@/lib/types";
 import { ModelBadges } from "@/components/leaderboard/ModelBadges";
 import { ScoreBar } from "@/components/leaderboard/ScoreBar";
-import { ModelFlow } from "@/components/models/ModelFlow";
+import { ModelMathVisual } from "@/components/models/ModelMathVisual";
 import { ModelTuningView } from "@/components/models/ModelTuningView";
 import { analyzeHref } from "@/lib/routes";
 
@@ -50,6 +50,26 @@ function fmtPct(n: number | undefined, digits = 1): string {
 function fmtNum(n: number | undefined, digits = 2): string {
   if (n == null || Number.isNaN(n)) return "—";
   return n.toFixed(digits);
+}
+
+function cleanMarkdownText(text: string): string {
+  if (!text) return "";
+  return text
+    .split("\n")
+    .map((line) => {
+      // Remove header hashes but keep the text
+      const headerMatch = line.match(/^#+\s+(.*)$/);
+      if (headerMatch) return headerMatch[1].toUpperCase();
+      // Replace leading markdown bullet points with neat unicode bullets
+      const bulletMatch = line.match(/^[-*]\s+(.*)$/);
+      if (bulletMatch) return `  • ${bulletMatch[1]}`;
+      // Remove divider lines (e.g. --- or ===)
+      if (/^[=-]{3,}$/.test(line.trim())) return "";
+      return line;
+    })
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n") // remove excessive newlines
+    .trim();
 }
 
 function pickMetrics(
@@ -127,7 +147,7 @@ export default function ModelDetailPage() {
       }}
     >
       <nav className="mb-4 text-[13px]" style={{ color: "var(--td-ink-400, #bbbbbb)" }}>
-        <Link href="/leaderboard" className="hover:underline">
+        <Link href="/research?view=leaderboard" className="hover:underline">
           ← Leaderboard
         </Link>
         <span className="mx-2">·</span>
@@ -267,7 +287,7 @@ export default function ModelDetailPage() {
                   Analyze with this model
                 </Link>
                 <Link
-                  href="/leaderboard"
+                  href="/research?view=leaderboard"
                   className="text-center text-[13px] py-2 rounded-sm"
                   style={{
                     border: "1px solid var(--td-ink)",
@@ -280,14 +300,8 @@ export default function ModelDetailPage() {
             </section>
           </div>
 
-          <section
-            className="p-4 rounded-sm mb-6"
-            style={{
-              background: "var(--td-ink-900, #0d0d0d)",
-              border: "1px solid var(--td-ink-700, #3c3c3c)",
-            }}
-          >
-            <ModelFlow model={detail.id} />
+          <section className="mb-6">
+            <ModelMathVisual modelId={detail.id} metaConfig={detail.meta_config} />
           </section>
 
           <section
@@ -317,7 +331,7 @@ export default function ModelDetailPage() {
                     "var(--td-font-mono, ui-monospace, Menlo, monospace)",
                 }}
               >
-                {md}
+                {cleanMarkdownText(md)}
               </pre>
             ) : (
               <p

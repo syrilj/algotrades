@@ -1,0 +1,12 @@
+{
+  "mode": "best_router",
+  "standard_candidates": [
+    "v39d_confluence",
+    "v39b_live_adapt",
+    "v63_spy_prune",
+    "v50_high_win_rate"
+  ],
+  "use_desk_specialists": true,
+  "use_symbol_ranker": true,
+  "use_historical_cards": true
+}

@@ -7,6 +7,8 @@ export type WatchControlsValue = {
   every: number;
   interval: string;
   model: string;
+  /** open = core + hot sectors + movers; full = wider DEFAULT_WATCH universe */
+  universe?: "open" | "full";
 };
 
 type WatchControlsProps = {
@@ -94,7 +96,7 @@ export function WatchControls({
             className="td-input w-full"
             value={value.model}
             onChange={(e) => onChange({ ...value, model: e.target.value })}
-            disabled={running}
+            disabled={running || scanning}
             aria-label="Model"
             style={{ fontFamily: "var(--td-font-mono)" }}
           >
@@ -107,6 +109,25 @@ export function WatchControls({
           </select>
         </label>
 
+        <label className="td-field" style={{ width: "7.5rem" }}>
+          <span className="td-label">Scan scope</span>
+          <select
+            className="td-input w-full"
+            value={value.universe ?? "open"}
+            onChange={(e) =>
+              onChange({
+                ...value,
+                universe: e.target.value === "full" ? "full" : "open",
+              })
+            }
+            disabled={running || scanning}
+            aria-label="Market scan universe"
+          >
+            <option value="open">open · fast</option>
+            <option value="full">wide · more names</option>
+          </select>
+        </label>
+
         <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
           {onMarketScan ? (
             <button
@@ -114,7 +135,7 @@ export function WatchControls({
               onClick={onMarketScan}
               className="td-btn td-btn-ghost"
               disabled={running || scanning}
-              title="Scan hot sectors + liquid names → rank plays with WINNER model"
+              title="Scan hot sectors + day movers + liquid names → rank with WINNER model (do next + math on board)"
             >
               {scanning ? (
                 <Loader2 className="size-3.5 animate-spin" strokeWidth={1.75} />

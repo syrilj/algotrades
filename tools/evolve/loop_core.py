@@ -14,11 +14,115 @@ from backtest.metrics import calc_bars_per_year
 from tools import snapshot_data
 from tools.direction_report import build_direction_report, _md_report as _direction_md
 from tools.dynamic_model_rank import OUT as DMR_OUT, run_one as dmr_run_one
-from tools.evolve import audit_gen, costs, folds, validate_run
+from tools.evolve import audit_gen, costs, folds, gates, validate_run
 
 ROOT = Path(__file__).resolve().parents[2]
 EVOLVE_DIR = ROOT / "runs" / "evolve_direction_v1"
 TRIALS_PATH = ROOT / "models" / "_shared" / "trials.jsonl"
+
+
+def _legacy_trial_key(parent: str, variant_id: str) -> str:
+    import hashlib
+
+    payload = {"parent": parent, "variant_id": variant_id}
+    return hashlib.sha1(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest()
+
+
+def _contract_trial_key(
+    parent: str,
+    variant_id: str,
+    *,
+    cash: float,
+    interval: str,
+    codes: list[str],
+) -> str:
+    """Dedupe equivalent experiments without conflating evaluation contracts."""
+    import hashlib
+
+    payload = {
+        "contract_version": 1,
+        "parent": parent,
+        "variant_id": variant_id,
+        "cash": float(cash),
+        "interval": str(interval).upper(),
+        "codes": sorted(str(code) for code in codes),
+    }
+    return hashlib.sha1(json.dumps(payload, sort_keys=True).encode("utf-8")).hexdigest()
+
+
+def load_trial_history(path: Path = TRIALS_PATH) -> tuple[set[str], list[dict[str, Any]]]:
+    """Load completed trials from TRIALS_PATH.
+
+    Returns:
+      (tried_keys, top_parents)
+      - tried_keys: set of sha1 hashes of {"parent": ..., "variant_id": ...} to dedupe.
+      - top_parents: top-K (K=5) trial dicts sorted by fitness desc, with non-null lockbox_fitness.
+    """
+    tried_keys = set()
+    completed_trials = []
+
+    if not path.exists():
+        return tried_keys, []
+
+    try:
+        with path.open("r") as f:
+            for line in f:
+                if not line.strip():
+                    continue
+                try:
+                    t = json.loads(line)
+                    parent = str(t.get("parent", ""))
+                    variant_id = str(t.get("variant_id", ""))
+                    # Preserve legacy two-field keys for old readers/tests.
+                    tried_keys.add(_legacy_trial_key(parent, variant_id))
+                    # New trials also record the material evaluation contract.
+                    # A historical $1M run must not suppress a $1k-scale run.
+                    if (
+                        t.get("cash") is not None
+                        and t.get("interval")
+                        and isinstance(t.get("codes"), list)
+                    ):
+                        tried_keys.add(
+                            _contract_trial_key(
+                                parent,
+                                variant_id,
+                                cash=float(t["cash"]),
+                                interval=str(t["interval"]),
+                                codes=list(t["codes"]),
+                            )
+                        )
+
+                    lockbox_evaluated = t.get("lockbox_evaluated")
+                    if lockbox_evaluated is None:
+                        # Legacy rows predate the explicit flag. New contract-
+                        # aware research rows can be identified by their empty
+                        # promotion evidence and must not seed from a fake 0.0
+                        # lockbox placeholder.
+                        is_contract_row = (
+                            t.get("cash") is not None
+                            and t.get("interval")
+                            and isinstance(t.get("codes"), list)
+                        )
+                        lockbox_evaluated = (
+                            not is_contract_row
+                            or bool((t.get("promotion_evidence") or {}).get("lockbox"))
+                        )
+                    if (
+                        t.get("fitness") is not None
+                        and t.get("lockbox_fitness") is not None
+                        and bool(lockbox_evaluated)
+                    ):
+                        completed_trials.append(t)
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
+    # Sort completed trials by fitness desc, take top 5
+    completed_trials.sort(key=lambda x: float(x.get("fitness", 0.0)), reverse=True)
+    top_parents = completed_trials[:5]
+
+    return tried_keys, top_parents
 
 
 def _model_id(model_dir: Path) -> str:
@@ -181,8 +285,8 @@ def run_candidate(
     all_fold_ms: list[dict[str, Any]] = []
     folds_data: list[tuple[pd.DataFrame, pd.Series, int]] = []
     fold_results: dict[str, Any] = {}
-    oos_start = None
-    oos_end = None
+    validation_start = None
+    validation_end = None
     base_run_dir = None
 
     for fold in fold_set:
@@ -207,15 +311,19 @@ def run_candidate(
         run_dir = ROOT / out["path"]
         if base_run_dir is None:
             base_run_dir = run_dir
-            if oos_start is None:
-                oos_start = fold["oos_start"]
-            oos_end = fold["oos_end"]
+            if validation_start is None:
+                validation_start = fold.get("validation_start", fold["oos_start"])
+            validation_end = fold.get("validation_end", fold["oos_end"])
 
         # probe slippage on first fold
         if probe_slippage and fold == fold_set[0]:
             costs.probe_slippage_applied(run_dir, expected_slippage=slippage, n_probe=3)
 
-        trades, equity = folds.slice_oos(run_dir, fold["oos_start"], fold["oos_end"])
+        trades, equity = folds.slice_validation(
+            run_dir,
+            fold.get("validation_start", fold["oos_start"]),
+            fold.get("validation_end", fold["oos_end"]),
+        )
         m = folds.fold_metrics(trades, equity, bpy)
         all_fold_ms.append(m)
         fold_results[fold["name"]] = m
@@ -244,8 +352,9 @@ def run_candidate(
     cfg = {
         "source": "local",
         "codes": codes,
-        "start_date": str(oos_start or combined_equity.index.min().date()),
-        "end_date": str(oos_end or combined_equity.index.max().date()),
+        "start_date": str(validation_start or combined_equity.index.min().date()),
+        "end_date": str(validation_end or combined_equity.index.max().date()),
+        "evaluation_role": "selection_validation",
         "initial_cash": cash,
         "commission": 0.001,
         "engine": "daily",
@@ -256,7 +365,12 @@ def run_candidate(
 
     validation = validate_run.run_package_validation(combined_dir)
 
-    bars = _load_cache_bars(codes, interval, str(oos_start or "2025-01-01"), str(oos_end or "2026-07-11"))
+    bars = _load_cache_bars(
+        codes,
+        interval,
+        str(validation_start or "2025-01-01"),
+        str(validation_end or "2026-07-11"),
+    )
     direction_report = build_direction_report(combined_dir / "artifacts" / "trades.csv", bars)
     (combined_dir / "DIRECTION.json").write_text(json.dumps(direction_report, indent=2, default=float))
     (combined_dir / "DIRECTION.md").write_text(_direction_md(direction_report))
@@ -288,6 +402,8 @@ def run_candidate(
         "model_dir": str(model["model_dir"]),
         "lockbox": {},
         "track_b": {},
+        "evaluation_role": "selection_validation",
+        "promotion_evidence": {},
     }
     return candidate
 
@@ -333,7 +449,11 @@ def run_track_b(
             print(f"[track_b] {fold['name']} skipped: {out['error']}")
             continue
         run_dir = ROOT / out["path"]
-        trades, equity = folds.slice_oos(run_dir, fold["oos_start"], fold["oos_end"])
+        trades, equity = folds.slice_validation(
+            run_dir,
+            fold.get("validation_start", fold["oos_start"]),
+            fold.get("validation_end", fold["oos_end"]),
+        )
         m = folds.fold_metrics(trades, equity, tb_bpy)
         all_fold_ms.append(m)
         fold_results[fold["name"]] = m
@@ -357,7 +477,11 @@ def run_track_b(
         combined_equity = combined_equity / combined_equity.iloc[0]
 
     pooled = folds.fold_metrics(combined_trades, combined_equity, tb_bpy)
-    return {"pooled_metrics": pooled, "fold_metrics": fold_results}
+    return {
+        "pooled_metrics": pooled,
+        "fold_metrics": fold_results,
+        "evaluation_role": "multi_lock_validation",
+    }
 
 
 def run_lockbox_and_audit(
@@ -389,12 +513,48 @@ def run_lockbox_and_audit(
     if out.get("error"):
         raise RuntimeError(f"lockbox failed: {out['error']}")
     run_dir = ROOT / out["path"]
-    trades, equity = folds.slice_oos(run_dir, lockbox["oos_start"], lockbox["oos_end"])
+    trades, equity = folds.slice_lockbox(run_dir, lockbox["oos_start"], lockbox["oos_end"])
     m = folds.fold_metrics(trades, equity, candidate["bars_per_year"])
-    candidate["lockbox"] = {"fold_metrics": m, "fitness": folds.fold_utility(m)}
+    lock_gate = gates.check_pass_bar(m)
+    candidate["lockbox"] = {
+        "fold_metrics": m,
+        "fitness": folds.fold_utility(m),
+        "evaluation_role": lockbox["evaluation_role"],
+        "window_id": lockbox["window_id"],
+        "window_start": lockbox["oos_start"],
+        "window_end": lockbox["oos_end"],
+        "candidate_id": candidate["id"],
+        "model_id": model_id,
+        "selection_use_forbidden": True,
+        "ok": bool(lock_gate["passed"]),
+        "pass_bar": lock_gate,
+    }
 
     if not candidate.get("track_b") or not candidate["track_b"].get("pooled_metrics"):
         candidate["track_b"] = run_track_b(candidate, model, run_fn=run_fn, extra_cfg=extra_cfg)
+
+    selection_metrics = list((candidate.get("fold_metrics") or {}).values())
+    train_ref = dict(selection_metrics[0]) if selection_metrics else {}
+    train_ref.update({"tag": "selection_reference", "is_holdout": False})
+    lock_rows = [train_ref] if train_ref else []
+    for name, metrics in (candidate["track_b"].get("fold_metrics") or {}).items():
+        lock_rows.append({**metrics, "tag": name, "is_holdout": True})
+    multi_lock = gates.multi_lock_verdict(lock_rows)
+    candidate["promotion_evidence"] = {
+        "lockbox": candidate["lockbox"],
+        "multi_lock": multi_lock,
+    }
+    promotion_gate = gates.apply_gates(
+        {
+            **m,
+            "id": candidate["id"],
+            "mode": "daily",
+            "data_track": "equity_ohlcv",
+            "promotion_evidence": candidate["promotion_evidence"],
+        }
+    )
+    candidate["promotion_gate"] = promotion_gate
+    candidate["may_auto_promote"] = bool(promotion_gate["may_auto_promote"])
 
     out_path = Path(candidate["run_dir"]) / "AUDIT.json"
     audit_path = audit_gen.write_audit(candidate, None, out_path)
@@ -404,15 +564,24 @@ def run_lockbox_and_audit(
 def write_trial(candidate: dict[str, Any]) -> Path:
     """Append a candidate summary to models/_shared/trials.jsonl."""
     TRIALS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    lockbox = candidate.get("lockbox") if isinstance(candidate.get("lockbox"), dict) else {}
+    lockbox_evaluated = bool(lockbox.get("fold_metrics"))
     row = {
         "ts": datetime.now(timezone.utc).isoformat(),
         "campaign_id": candidate.get("campaign_id", ""),
         "gen": candidate.get("gen", 0),
         "variant_id": candidate.get("variant_id", candidate.get("id", "")),
         "parent": candidate.get("parent", ""),
+        "cash": candidate.get("cash"),
+        "interval": candidate.get("interval"),
+        "codes": candidate.get("codes", []),
         "fitness": candidate.get("fitness", 0.0),
         "fold_metrics": candidate.get("fold_metrics", {}),
-        "lockbox_fitness": candidate.get("lockbox", {}).get("fitness", 0.0),
+        "lockbox_fitness": lockbox.get("fitness") if lockbox_evaluated else None,
+        "lockbox_evaluated": lockbox_evaluated,
+        "promotion_evidence": candidate.get("promotion_evidence", {}),
+        "promotion_gate": candidate.get("promotion_gate", {}),
+        "may_auto_promote": bool(candidate.get("may_auto_promote", False)),
     }
     with TRIALS_PATH.open("a") as f:
         f.write(json.dumps(row, default=str) + "\n")
@@ -451,19 +620,81 @@ def run_campaign(
     cash: float = 1_000_000,
     campaign_id: str = "evolve_campaign",
     menu: list[dict[str, Any]] | None = None,
+    memory_path: Path | None = None,
+    qualify_generation_best: bool = True,
+    max_variants_per_generation: int | None = None,
 ) -> list[dict[str, Any]]:
-    """Smoke campaign: 2 generations of direction + code variants."""
+    """Run fold-ranked generations with persistent failure-guided mutations.
+
+    ``qualify_generation_best=False`` keeps an autonomous research campaign
+    away from the final lockbox.  Long-running controllers must reserve that
+    evidence for one terminal, frozen-candidate qualification; repeated
+    lockbox reads would turn the lockbox into another selection set.
+    """
     from tools.evolve import mutations as mut
+    from tools.evolve.model_feedback import (
+        DEFAULT_MEMORY_PATH,
+        load_memory,
+        prioritize_mutation_menu,
+        rank_model_runs,
+        save_memory,
+        update_memory,
+    )
+
+    tried_keys, top_parents = load_trial_history()
+    if base_model_dir.name == "v39b_live_adapt" and top_parents:
+        for p in top_parents:
+            vid = p.get("variant_id")
+            if vid:
+                p_dir = ROOT / "models" / "poc_va_macdha" / vid
+                if p_dir.exists() and (p_dir / "signal_engine.py").exists():
+                    print(f"[evolve] Seeding generation-0 parent from top historical parent: {vid} (fitness={p.get('fitness')})", flush=True)
+                    base_model_dir = p_dir
+                    break
 
     base_model = _build_model(base_model_dir)
     _set_bridge("1h")
 
-    menu = menu or mut.COMBINED_MUTATION_MENU
-    variants = mut.spawn_direction_variants(base_model, menu=menu)
+    base_menu = menu or mut.COMBINED_MUTATION_MENU
+    feedback_path = memory_path or DEFAULT_MEMORY_PATH
+    memory = load_memory(feedback_path)
+    guided_menu = prioritize_mutation_menu(
+        base_menu,
+        [{"model_id": base_model["id"], "failures": []}],
+        memory,
+    )
+    variants = mut.spawn_direction_variants(base_model, menu=guided_menu)
     results: list[dict[str, Any]] = []
 
     for gen in range(generations):
-        gen_results = []
+        # Filter out variants that have already been tried
+        filtered_variants = []
+        skip_count = 0
+        for v in variants:
+            vid = v["id"]
+            parent = v.get("parent", base_model["id"])
+            h = _contract_trial_key(
+                str(parent),
+                str(vid),
+                cash=cash,
+                interval=str(v.get("interval") or "1H"),
+                codes=list(v.get("codes") or []),
+            )
+            if h in tried_keys:
+                skip_count += 1
+            else:
+                filtered_variants.append(v)
+        if skip_count > 0:
+            print(f"[evolve] Generation {gen}: skipped {skip_count} already-tried variants.", flush=True)
+        variants = filtered_variants
+        # Apply the compute budget after deduplication so an already-tried top
+        # priority mutation cannot leave a generation with zero work while
+        # untried candidates still exist later in the guided menu.
+        if max_variants_per_generation is not None:
+            variants = variants[: max(1, int(max_variants_per_generation))]
+
+        gen_results: list[dict[str, Any]] = []
+        failed_rows: list[dict[str, Any]] = []
         for variant in variants:
             variant_id = variant["id"]
             parent = variant.get("parent", base_model["id"])
@@ -482,23 +713,116 @@ def run_campaign(
                     mutations=variant.get("mutations", []),
                     extra_cfg=extra,
                 )
+                candidate["mutation_name"] = variant.get("mutation_name")
+                candidate["mutation_targets"] = variant.get("mutation_targets", [])
+                candidate["feedback_priority"] = variant.get("feedback_priority")
+                candidate["extra_cfg"] = extra
                 gen_results.append(candidate)
                 write_trial(candidate)
             except Exception as exc:
                 print(f"  FAIL {variant_id}: {exc}", flush=True)
+                failed_rows.append(
+                    {
+                        "id": variant_id,
+                        "tag": f"generation_{gen}",
+                        "error": str(exc)[:200],
+                        "n": 0,
+                        "ret": 0.0,
+                        "dd": 0.0,
+                        "sharpe": 0.0,
+                        "parent": parent,
+                        "mutation_name": variant.get("mutation_name"),
+                        "mutation_targets": variant.get("mutation_targets", []),
+                    }
+                )
 
         if not gen_results:
+            if failed_rows:
+                failed_rankings = rank_model_runs(
+                    {row["id"]: [row] for row in failed_rows},
+                    expected_runs=len(folds.FOLDS_1H),
+                )
+                memory = update_memory(memory, failed_rankings, generation=gen)
+                save_memory(memory, feedback_path)
             break
-        # Promote best by fitness
-        best = max(gen_results, key=lambda c: c["fitness"])
-        try:
-            best_model = _build_model(Path(best["model_dir"]))
-            run_lockbox_and_audit(best, best_model, extra_cfg=best.get("extra_cfg", {}))
-            write_trial(best)
-        except Exception as exc:
-            print(f"  LOCKBOX/audit fail for {best['id']}: {exc}", flush=True)
+
+        # Rank each candidate across identical rolling validation folds. This
+        # stability, confidence, and failure diagnostics to fold_fitness.
+        by_candidate = {candidate["id"]: candidate for candidate in gen_results}
+        fold_runs: dict[str, list[dict[str, Any]]] = {}
+        for candidate in gen_results:
+            fold_runs[candidate["id"]] = [
+                {
+                    **metrics,
+                    "id": candidate["id"],
+                    "tag": fold_name,
+                    "utility": folds.fold_utility(metrics),
+                }
+                for fold_name, metrics in candidate.get("fold_metrics", {}).items()
+            ]
+        for row in failed_rows:
+            fold_runs[row["id"]] = [row]
+        rankings = rank_model_runs(
+            fold_runs,
+            min_trades=40,
+            expected_runs=len(folds.FOLDS_1H),
+        )
+        for row in rankings:
+            candidate = by_candidate.get(row["id"])
+            if candidate is None:
+                failed = next((item for item in failed_rows if item["id"] == row["id"]), {})
+                row.update(
+                    {
+                        "parent": failed.get("parent"),
+                        "mutation_name": failed.get("mutation_name"),
+                        "mutation_targets": failed.get("mutation_targets", []),
+                    }
+                )
+                continue
+            candidate["rank"] = row["rank"]
+            candidate["rank_score"] = row["rank_score"]
+            candidate["rank_confidence"] = row["rank_confidence"]
+            candidate["failure_profile"] = row["failure_profile"]
+            row.update(
+                {
+                    "parent": candidate.get("parent"),
+                    "mutation_name": candidate.get("mutation_name"),
+                    "mutation_targets": candidate.get("mutation_targets", []),
+                }
+            )
+
+        control = next(
+            (row for row in rankings if row.get("mutation_name") == "base" and row["id"] in by_candidate),
+            None,
+        )
+        parent_scores = {base_model["id"]: float(control["rank_score"])} if control else {}
+        memory = update_memory(memory, rankings, generation=gen, parent_scores=parent_scores)
+        save_memory(memory, feedback_path)
+
+        best_row = next(row for row in rankings if row["id"] in by_candidate)
+        best = by_candidate[best_row["id"]]
+        print(
+            f"  RANK #{best_row['rank']} {best['id']} score={best_row['rank_score']:.3f} "
+            f"confidence={best_row['rank_confidence']:.0%} "
+            f"failures={best_row['failure_profile']['failure_tags']}",
+            flush=True,
+        )
+        if qualify_generation_best:
+            try:
+                best_model = _build_model(Path(best["model_dir"]))
+                run_lockbox_and_audit(best, best_model, extra_cfg=best.get("extra_cfg", {}))
+                write_trial(best)
+            except Exception as exc:
+                print(f"  LOCKBOX/audit fail for {best['id']}: {exc}", flush=True)
         results.extend(gen_results)
-        # Next generation parents from best
-        variants = mut.spawn_direction_variants(_build_model(Path(best["model_dir"])), menu=menu)
+        # Next generation targets recurring failures and mutations that have
+        # produced positive score deltas, while preserving exploration.
+        base_model = _build_model(Path(best["model_dir"]))
+        guided_menu = prioritize_mutation_menu(
+            base_menu,
+            [row.get("failure_profile") or {} for row in rankings],
+            memory,
+        )
+        variants = mut.spawn_direction_variants(base_model, menu=guided_menu)
 
     return results
