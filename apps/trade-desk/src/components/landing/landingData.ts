@@ -155,6 +155,7 @@ export const FEATURES = [
     body: "Inspect current features, volume levels, and XGBoost meta probabilities for any selected symbol.",
     href: "/command",
     accent: "var(--td-brand)",
+    icon: "ScanSearch",
   },
   {
     key: "execution",
@@ -162,6 +163,7 @@ export const FEATURES = [
     body: "Review paper ticket details, volume structure, and gamma bounds on the unified execution grid.",
     href: "/live",
     accent: "var(--td-action-buy-breakout)",
+    icon: "CircleDollarSign",
   },
   {
     key: "lab",
@@ -169,6 +171,7 @@ export const FEATURES = [
     body: "Compare model features, review walk-forward backtests, and manage promotion gate runs.",
     href: "/research",
     accent: "var(--td-warning)",
+    icon: "FlaskConical",
   },
   {
     key: "risk",
@@ -176,6 +179,7 @@ export const FEATURES = [
     body: "Simulate Almgren-Chriss transaction impact costs and configure dynamic Kelly sizing limits.",
     href: "/live",
     accent: "var(--td-success)",
+    icon: "ShieldCheck",
   },
   {
     key: "options",
@@ -183,6 +187,7 @@ export const FEATURES = [
     body: "Trace options open interest, delta, and gamma walls as structural features for the meta-classifier.",
     href: "/live?mode=gamma",
     accent: "var(--td-m-violet)",
+    icon: "ChartNoAxesCombined",
   },
   {
     key: "agent",
@@ -190,6 +195,7 @@ export const FEATURES = [
     body: "Generates structured Facts → Decision → Suggestion briefs by querying live feature values.",
     href: "/analysis-agent",
     accent: "var(--td-body)",
+    icon: "Brain",
   },
 ] as const;
 
