@@ -64,7 +64,7 @@ jobs:
       - name: Verify unprivileged runtime and health endpoint
         run: |
           test "$(docker image inspect tradingalgo-market-runtime:ci --format '{{.Config.User}}')" = "runtime"
-          docker run --rm --detach --name market-runtime-ci --publish 8000:8000 --env MARKET_RUNTIME_API_TOKEN=ci-smoke-token tradingalgo-market-runtime:ci
+          docker run --rm --detach --name market-runtime-ci --publish 8000:8000 --env MARKET_RUNTIME_API_TOKEN=ci-smoke-token --env LSE_API_KEY=ci-smoke-key tradingalgo-market-runtime:ci
           trap 'docker stop market-runtime-ci >/dev/null 2>&1 || true' EXIT
           for attempt in $(seq 1 20); do
             if curl --fail --silent --show-error http://127.0.0.1:8000/health >/dev/null; then
