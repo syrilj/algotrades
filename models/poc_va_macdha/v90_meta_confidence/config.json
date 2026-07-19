@@ -1,0 +1,12 @@
+{
+  "source": "local",
+  "codes": ["TSLA.US", "MU.US", "SPY.US", "IONQ.US", "APLD.US", "XLP.US", "QQQ.US"],
+  "interval": "1H",
+  "commission": 0.001,
+  "engine": "daily",
+  "strategy": {
+    "name": "v90_meta_confidence",
+    "model_version": "v90_meta_confidence",
+    "note": "Two-sided meta-labeler: causal features -> XGBoost LONG/SHORT heads on triple-barrier labels (purged K-fold) -> isotonic-calibrated confidence -> BUY/SELL/FLAT. Raw score drives decision; calibrated probability is the honest confidence. Params/labels frozen before OOS; artifacts from tools/train_v90_meta_confidence.py."
+  }
+}
