@@ -1,0 +1,108 @@
+# Fixed research profile:
+# - more tradable breakouts (entry 40, lighter volume gate)
+# - wider initial ATR stop (3x) so trends can breathe
+# - Donchian trail ratchet (stops only move up)
+# - SPY regime kept ON
+# - earnings off for cleaner synthetic research
+run:
+  name: donchian_v2_fixed
+  seed: 42
+  initial_equity: 1000000
+  timezone: America/New_York
+  base_currency: USD
+
+data:
+  vendor: synthetic
+  cache_root: ../data_cache
+  lse_interval: 1d
+  start_date: "2018-01-01"
+  end_date: "2024-12-31"
+  benchmark: SPY
+  use_delisted: true
+  min_history_days: 252
+  survivorship_bias: false
+  adjustment_convention: "synthetic_raw_and_adjusted"
+
+universe:
+  exchanges:
+    - NYSE
+    - NASDAQ
+  security_types:
+    - common_stock
+  min_price: 5.0
+  min_median_dollar_volume_20d: 100000
+  max_position_fraction_of_adv: 0.05
+  exclude_otc: true
+  exclude_etfs: true
+  exclude_adrs: false
+
+signal:
+  entry_lookback: 40
+  exit_lookback: 20
+  trend_sma_days: 200
+  benchmark_regime_filter: true
+  volume_lookback: 50
+  volume_multiple: 1.2
+  require_volume_confirm: true
+  require_stock_trend_filter: true
+  breakout_uses_close: true
+  max_holding_days: null
+
+risk:
+  atr_days: 20
+  atr_multiple: 3.0
+  trail_with_donchian: true
+  use_atr_stop: true
+  risk_per_trade: 0.005
+  max_portfolio_heat: 0.04
+  max_positions: 10
+  max_position_weight: 0.15
+  max_sector_weight: 0.40
+  kill_switch_drawdown: -0.12
+  resume_drawdown: -0.08
+  allow_new_entries_during_kill_switch: false
+
+execution:
+  signal_to_fill: next_open
+  slippage_bps: 5
+  commission_per_share: 0.005
+  minimum_commission: 1.0
+  allow_fractional_shares: false
+  intraday_stop_policy: stop_price
+  gap_stop_policy: fill_at_open
+  volume_participation_limit: 0.05
+  capacity_slippage:
+    enabled: false
+    b0: 5.0
+    b1: 10.0
+    b2: 0.0
+
+earnings:
+  enabled: false
+  entry_blackout_days_before: 7
+  entry_blackout_days_after: 1
+  force_exit_before_earnings: false
+
+ranking:
+  mode: simple
+
+validation:
+  walkforward:
+    scheme: anchored
+    initial_train_years: 3
+    test_years: 1
+    step_years: 1
+  bootstrap:
+    method: stationary
+    samples: 500
+    seed: 42
+  promotion:
+    minimum_oos_sharpe: 0.7
+    minimum_oos_to_is_ratio: 0.60
+    minimum_deflated_sharpe_probability: 0.95
+    minimum_bootstrap_sharpe_lower_bound: 0.0
+    require_survivorship_free_data: true
+    require_stress_era_history: false
+
+artifacts:
+  root: artifacts/runs

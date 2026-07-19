@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "quantmodel"
+version = "0.1.0"
+description = "Auditable long-only US equity Donchian swing-trend research system"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "TradingAlgoWork" }]
+dependencies = [
+  "numpy>=1.24",
+  "pandas>=2.0",
+  "pyyaml>=6.0",
+  "jsonschema>=4.18",
+  "pyarrow>=14.0",
+  "exchange-calendars>=4.5",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=7.4",
+  "pytest-cov>=4.1",
+]
+report = [
+  "matplotlib>=3.7",
+]
+
+[project.scripts]
+qm-backtest = "quantmodel.cli:main_backtest"
+qm-demo = "quantmodel.cli:main_demo"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "-q"

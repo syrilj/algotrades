@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "quantmodel experiment config",
+  "type": "object",
+  "required": ["run", "data", "universe", "signal", "risk", "execution", "validation"],
+  "properties": {
+    "run": {
+      "type": "object",
+      "required": ["name", "seed", "initial_equity"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "seed": { "type": "integer" },
+        "initial_equity": { "type": "number", "exclusiveMinimum": 0 },
+        "timezone": { "type": "string" },
+        "base_currency": { "type": "string" }
+      }
+    },
+    "data": {
+      "type": "object",
+      "required": ["vendor", "benchmark", "min_history_days"],
+      "properties": {
+        "vendor": {
+          "type": "string",
+          "enum": ["lse_cache", "local_cache", "synthetic", "norgate", "polygon"]
+        },
+        "cache_root": { "type": "string" },
+        "lse_interval": { "type": "string" },
+        "start_date": { "type": ["string", "null"] },
+        "end_date": { "type": ["string", "null"] },
+        "benchmark": { "type": "string" },
+        "use_delisted": { "type": "boolean" },
+        "min_history_days": { "type": "integer", "minimum": 1 },
+        "survivorship_bias": { "type": "boolean" },
+        "adjustment_convention": { "type": "string" }
+      }
+    },
+    "universe": {
+      "type": "object",
+      "required": ["min_price", "min_median_dollar_volume_20d", "max_position_fraction_of_adv"],
+      "properties": {
+        "exchanges": { "type": "array", "items": { "type": "string" } },
+        "security_types": { "type": "array", "items": { "type": "string" } },
+        "min_price": { "type": "number", "minimum": 0 },
+        "min_median_dollar_volume_20d": { "type": "number", "minimum": 0 },
+        "max_position_fraction_of_adv": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+        "exclude_otc": { "type": "boolean" },
+        "exclude_etfs": { "type": "boolean" },
+        "exclude_adrs": { "type": "boolean" }
+      }
+    },
+    "signal": {
+      "type": "object",
+      "required": ["entry_lookback", "exit_lookback", "trend_sma_days", "volume_lookback", "volume_multiple"],
+      "properties": {
+        "entry_lookback": { "type": "integer", "minimum": 2 },
+        "exit_lookback": { "type": "integer", "minimum": 2 },
+        "trend_sma_days": { "type": "integer", "minimum": 2 },
+        "benchmark_regime_filter": { "type": "boolean" },
+        "volume_lookback": { "type": "integer", "minimum": 2 },
+        "volume_multiple": { "type": "number", "exclusiveMinimum": 0 },
+        "breakout_uses_close": { "type": "boolean" },
+        "max_holding_days": { "type": ["integer", "null"], "minimum": 1 }
+      }
+    },
+    "risk": {
+      "type": "object",
+      "required": [
+        "atr_days",
+        "atr_multiple",
+        "risk_per_trade",
+        "max_portfolio_heat",
+        "max_positions",
+        "kill_switch_drawdown",
+        "resume_drawdown"
+      ],
+      "properties": {
+        "atr_days": { "type": "integer", "minimum": 2 },
+        "atr_multiple": { "type": "number", "exclusiveMinimum": 0 },
+        "risk_per_trade": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+        "max_portfolio_heat": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+        "max_positions": { "type": "integer", "minimum": 1 },
+        "max_position_weight": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+        "max_sector_weight": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+        "kill_switch_drawdown": { "type": "number", "maximum": 0 },
+        "resume_drawdown": { "type": "number", "maximum": 0 },
+        "allow_new_entries_during_kill_switch": { "type": "boolean" }
+      }
+    },
+    "execution": {
+      "type": "object",
+      "required": ["signal_to_fill", "slippage_bps", "commission_per_share"],
+      "properties": {
+        "signal_to_fill": { "type": "string", "enum": ["next_open"] },
+        "slippage_bps": { "type": "number", "minimum": 0 },
+        "commission_per_share": { "type": "number", "minimum": 0 },
+        "minimum_commission": { "type": "number", "minimum": 0 },
+        "allow_fractional_shares": { "type": "boolean" },
+        "intraday_stop_policy": { "type": "string" },
+        "gap_stop_policy": { "type": "string" },
+        "volume_participation_limit": { "type": "number", "exclusiveMinimum": 0, "maximum": 1 },
+        "capacity_slippage": { "type": "object" }
+      }
+    },
+    "earnings": { "type": "object" },
+    "ranking": { "type": "object" },
+    "validation": {
+      "type": "object",
+      "required": ["walkforward", "bootstrap", "promotion"],
+      "properties": {
+        "walkforward": { "type": "object" },
+        "bootstrap": { "type": "object" },
+        "promotion": { "type": "object" }
+      }
+    },
+    "artifacts": { "type": "object" }
+  },
+  "additionalProperties": true
+}

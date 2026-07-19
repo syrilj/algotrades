@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
-import { TradeDeskLandingClean } from "@/components/landing/TradeDeskLandingClean";
+import { TradeDeskLandingFirecrawl } from "@/components/landing/TradeDeskLandingFirecrawl";
 
 export const metadata: Metadata = {
   title: "Trade Desk — Research operator terminal for equity model paths",
@@ -31,5 +31,5 @@ export default async function HomePage({
     redirect(`/command?${params.toString()}`);
   }
 
-  return <TradeDeskLandingClean />;
+  return <TradeDeskLandingFirecrawl />;
 }

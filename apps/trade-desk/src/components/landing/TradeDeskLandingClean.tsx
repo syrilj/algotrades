@@ -148,7 +148,7 @@ function PipelineVisualization() {
 }
 
 // Feature card
-function FeatureCard({ feature, index }: { feature: (typeof FEATURES)[number]; index: number }) {
+function FeatureCard({ feature }: { feature: (typeof FEATURES)[number] }) {
   const Icon = iconMap[feature.icon] || Brain;
   
   return (
@@ -342,8 +342,8 @@ export function TradeDeskLandingClean() {
           <div className="text-center mb-16">
             <span className="text-brand text-sm font-mono uppercase tracking-widest">One desk, four jobs</span>
             <h2 className="text-3xl md:text-5xl font-bold text-ink mt-4 mb-4">
-              From "what is happening?"<br />
-              to "what is my risk?"
+              From &ldquo;what is happening?&rdquo;<br />
+              to &ldquo;what is my risk?&rdquo;
             </h2>
             <p className="text-body max-w-2xl mx-auto">
               Switch between analysis, paper execution, options, and model research without losing the stock you are studying.
@@ -351,8 +351,8 @@ export function TradeDeskLandingClean() {
           </div>
           
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {FEATURES.map((feature, index) => (
-              <FeatureCard key={feature.key} feature={feature} index={index} />
+            {FEATURES.map((feature) => (
+              <FeatureCard key={feature.key} feature={feature} />
             ))}
           </div>
         </div>
