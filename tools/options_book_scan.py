@@ -9,10 +9,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -21,6 +23,25 @@ sys.path.insert(0, str(ROOT / "tools"))
 from options_picker import PREFERRED, propose, _norm_symbol  # noqa: E402
 
 DEFAULT_BOOK = ["MSTR", "TSLA", "SKHY", "IONQ"]
+
+
+def _jsonable(obj: Any) -> Any:
+    """Recursively convert NaN/Inf and numpy scalars to strict JSON values."""
+    if isinstance(obj, dict):
+        return {k: _jsonable(v) for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_jsonable(v) for v in obj]
+    if isinstance(obj, tuple):
+        return [_jsonable(v) for v in obj]
+    if isinstance(obj, float) and (math.isnan(obj) or math.isinf(obj)):
+        return None
+    if hasattr(obj, "dtype"):  # numpy scalar
+        if obj.dtype.kind in "iub":  # integer / unsigned / boolean
+            return int(obj)
+        if obj.dtype.kind == "f":  # float
+            v = float(obj)
+            return None if math.isnan(v) or math.isinf(v) else v
+    return obj
 
 
 def _vol_package(symbol: str) -> dict:
@@ -301,7 +322,7 @@ def main():
         workers=args.workers,
     )
     if args.json:
-        print(json.dumps(out, indent=2, default=str))
+        print(json.dumps(_jsonable(out), indent=2, default=str))
     else:
         print(f"OPTIONS BOOK  n={out['n']}  best={out.get('best')}  account=${args.account:.0f}")
         for r in out["rows"]:

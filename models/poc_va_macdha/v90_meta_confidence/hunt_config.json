@@ -1,0 +1,12 @@
+{
+  "allow_short": true,
+  "base_scale": 0.25,
+  "selective_scale": 0.35,
+  "horizon_bars": 8,
+  "barrier_k_atr": 1.0,
+  "cost_roundtrip": 0.001,
+  "selection_rule": "frozen_before_oos_eval",
+  "train_window": ["2024-08-01", "2025-08-01"],
+  "holdout_window": ["2025-08-01", "2026-07-11"],
+  "note": "Thresholds live in thresholds.json (derived from train OOF raw-score quantiles). allow_short=false turns the short head into a flatten/avoid signal only."
+}
