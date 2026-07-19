@@ -17,6 +17,7 @@ import { analyzeHref, liveHref } from "@/lib/routes";
 import { Chip } from "@/components/ui/Chip";
 import { Stat } from "@/components/ui/Stat";
 import { colorVarFor } from "@/lib/actionColors";
+import { ActiveFlowTape } from "@/components/options/ActiveFlowTape";
 
 const QUICK_BOOK = ["MSTR", "TSLA", "SKHY", "IONQ"] as const;
 
@@ -661,6 +662,8 @@ function OptionsDeskInner({ showHeader = true }: { showHeader?: boolean }) {
           </span>
         </div>
       </section>
+
+      <ActiveFlowTape onSelect={(sym) => void run(sym)} />
 
       <OptionsVisualGuide
         symbol={symbol}

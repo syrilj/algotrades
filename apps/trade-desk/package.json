@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "sucrase-node src/lib/executionState.test.ts && sucrase-node src/lib/routes.test.ts && sucrase-node src/lib/format.test.ts && sucrase-node src/lib/marketPulse.test.ts && sucrase-node src/lib/marketContext.test.ts && sucrase-node src/lib/lseOptionsFlow.test.ts && sucrase-node src/lib/actionColors.test.ts && sucrase-node src/lib/backendUrl.test.ts",
+    "test": "sucrase-node src/lib/executionState.test.ts && sucrase-node src/lib/routes.test.ts && sucrase-node src/lib/format.test.ts && sucrase-node src/lib/marketPulse.test.ts && sucrase-node src/lib/marketContext.test.ts && sucrase-node src/lib/lseOptionsFlow.test.ts && sucrase-node src/lib/flowFeed.test.ts && sucrase-node src/lib/actionColors.test.ts && sucrase-node src/lib/backendUrl.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
