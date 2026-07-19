@@ -1,0 +1,13 @@
+{
+  "enter_hi": 0.6711237639188766,
+  "enter_lo": 0.6292740762233734,
+  "selective": 0.7243282222747804,
+  "exit": 0.45,
+  "quantile_source": "train_oof_pooled",
+  "operating_point_quantiles": {
+    "active_top10": 0.9,
+    "balanced_top5": 0.95,
+    "selective_top2": 0.98,
+    "sniper_top1": 0.99
+  }
+}
