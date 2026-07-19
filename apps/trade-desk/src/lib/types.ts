@@ -586,6 +586,8 @@ export interface UnusualOptionsFlag {
   reason?: string;
   unusual?: boolean;
   methodology?: string;
+  /** ISO print timestamp when the source is genuine time-and-sales. */
+  trade_time?: string | null;
 }
 
 export interface UnusualOptionsFlow {
