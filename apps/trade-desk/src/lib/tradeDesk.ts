@@ -37,17 +37,16 @@ import { normalizeLseOptionsFlow } from "./lseOptionsFlow";
 const DEFAULT_TIMEOUT_MS = 120_000;
 
 function extractJson(stdout: string): unknown {
-  const trimmed = stdout.trim();
-  const startArr = trimmed.indexOf("[");
-  const startObj = trimmed.indexOf("{");
-  let start = -1;
-  if (startArr === -1) start = startObj;
-  else if (startObj === -1) start = startArr;
-  else start = Math.min(startArr, startObj);
-  if (start === -1) {
-    throw new Error("No JSON in trade_desk stdout");
+  const re = /[{[]/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(stdout)) !== null) {
+    try {
+      return JSON.parse(stdout.slice(match.index));
+    } catch {
+      // Not valid JSON starting at this brace/bracket; keep scanning.
+    }
   }
-  return JSON.parse(trimmed.slice(start));
+  throw new Error("No JSON in trade_desk stdout");
 }
 
 function runPythonScript(
