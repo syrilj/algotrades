@@ -1033,6 +1033,8 @@ export interface GammaResponse {
   otm_put_oi?: number | null;
   total_oi?: number | null;
   total_volume?: number;
+  /** Open interest by strike/expiry — may be absent when source is intraday flow proxy. */
+  open_interest_by_strike?: Record<string, number>;
   n_contracts: number;
   weight: string;
   sign_convention: string;
@@ -1232,4 +1234,59 @@ export interface WinnerHealth {
 export interface PromotionPayload {
   queue: PromotionEntry[];
   winner_health: WinnerHealth;
+}
+
+/** Aggregate options-flow discovery rows used by the Top Tickers desk. */
+export interface TopTickerRow {
+  symbol: string;
+  rank: number;
+  total_premium: number;
+  call_premium: number;
+  put_premium: number;
+  call_count: number;
+  put_count: number;
+  flag_count: number;
+  total_volume: number;
+  total_score: number;
+  avg_score: number;
+  max_score: number;
+  short_dte_premium: number;
+  otm_premium: number;
+  sentiment: "bullish" | "bearish" | "neutral";
+  bullish_pct: number;
+}
+
+export interface TopTickerCategory {
+  key: string;
+  label: string;
+  description: string;
+  rows: TopTickerRow[];
+}
+
+export interface TopTickersResponse {
+  ok: boolean;
+  categories: TopTickerCategory[];
+  asof_utc: string;
+  note?: string;
+  error?: string;
+}
+
+/** Single off-exchange equity print (dark pool / FINRA TRF). */
+export interface DarkPoolPrint {
+  ts: string;
+  symbol: string;
+  price: number;
+  size: number;
+  notional: number;
+  vs_market: "above" | "at" | "below" | string;
+  pct_adv?: number | null;
+  venue?: string | null;
+}
+
+export interface DarkPoolResponse {
+  ok: boolean;
+  prints: DarkPoolPrint[];
+  asof_utc: string;
+  note?: string;
+  error?: string;
 }
